@@ -2940,25 +2940,24 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                </>
-              )}
 
-              {/* Todos los Docentes — filtrado por modelo/periodo de esta sección */}
-              {todosDocentes.length > 0 && (() => {
-                const tabLabel = sistema === 'meipa' ? 'MEIPA · Docencia'
-                  : sistema === 'salud' ? 'Salud / ABP · 360/MECDI'
-                  : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} · 360/MECDI`
-                const { modelo, sistemaParam } = getQueryParams()
-                return (
-                  <div className="mt-6">
-                    <TodosDocentesPanel
-                      docentes={todosDocentes}
-                      context={{ modelo: modelo || '', sistema: sistemaParam || '', label: tabLabel }}
-                    />
-                  </div>
-                )
-              })()}
+                  {/* Todos los Docentes — filtrado por modelo/periodo de esta sección */}
+                  {todosDocentes.length > 0 && (() => {
+                    const tabLabel = sistema === 'meipa' ? 'MEIPA · Docencia'
+                      : sistema === 'salud' ? 'Salud / ABP · 360/MECDI'
+                      : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} · 360/MECDI`
+                    const { modelo, sistemaParam } = getQueryParams()
+                    return (
+                      <div className="mt-6">
+                        <TodosDocentesPanel
+                          docentes={todosDocentes}
+                          context={{ modelo: modelo || '', sistema: sistemaParam || '', label: tabLabel }}
+                        />
+                      </div>
+                    )
+                  })()}
                 </div>{/* end sistemaRef */}
+              )}
             </>
           )}
 

@@ -18,4 +18,3 @@ passlib[bcrypt]
 bcrypt
 jinja2
 xhtml2pdf
-weasyprint
