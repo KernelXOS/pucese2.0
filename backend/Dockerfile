@@ -2,10 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Dependencias del sistema: psycopg2 + WeasyPrint (cairo, pango, gdk-pixbuf)
+# Dependencias del sistema: psycopg2 + pycairo (requerido por xhtml2pdf -> svglib)
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
+    pkg-config \
+    libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
