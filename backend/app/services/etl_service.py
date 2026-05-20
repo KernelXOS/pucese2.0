@@ -466,13 +466,15 @@ class ETLService:
     # ── HETEROEVALUACION xlsx (202456 / 202466) ───────────────────────────────
 
     INSTR_360_MAP = {
-        _norm_str('Heteroevaluación Grado Nuevo Docencia Esmeraldas'): ('docencia', 'hetero_est'),
-        _norm_str('Heteroevaluación Grado Nuevo Docencia Quito'):      ('docencia', 'hetero_est'),
-        _norm_str('Heteroevaluación Grado Nuevo Docencia Ibarra'):     ('docencia', 'hetero_est'),
-        _norm_str('Heteroevalauación Grado Nuevo ABP Quito'):          ('abp',      'hetero_est'),
-        _norm_str('Heteroevaluacion Grado Nuevo Docencia Esmeraldas'): ('docencia', 'hetero_est'),
-        _norm_str('Heteroevaluacion Grado Nuevo Docencia Quito'):      ('docencia', 'hetero_est'),
-        _norm_str('Heteroevaluacion Grado Nuevo ABP Quito'):           ('abp',      'hetero_est'),
+        _norm_str('Heteroevaluación Grado Nuevo Docencia Esmeraldas'): ('docencia',  'hetero_est'),
+        _norm_str('Heteroevaluación Grado Nuevo Docencia Quito'):      ('docencia',  'hetero_est'),
+        _norm_str('Heteroevaluación Grado Nuevo Docencia Ibarra'):     ('docencia',  'hetero_est'),
+        _norm_str('Heteroevalauación Grado Nuevo ABP Quito'):          ('abp',       'hetero_est'),
+        _norm_str('Heteroevalauación Grado Nuevo Servicios Quito'):    ('servicios', 'hetero_est'),
+        _norm_str('Heteroevaluacion Grado Nuevo Docencia Esmeraldas'): ('docencia',  'hetero_est'),
+        _norm_str('Heteroevaluacion Grado Nuevo Docencia Quito'):      ('docencia',  'hetero_est'),
+        _norm_str('Heteroevaluacion Grado Nuevo ABP Quito'):           ('abp',       'hetero_est'),
+        _norm_str('Heteroevaluacion Grado Nuevo Servicios Quito'):     ('servicios', 'hetero_est'),
     }
 
     MEIPA_KEYWORDS = [
@@ -582,6 +584,12 @@ class ETLService:
                 for (ced, modelo), comps in scores_360.items():
                     puntaje = comps.get('hetero_est', 0.0)
                     s = staff.get(ced, {})
+                    # Para servicios el peso es 100% → het_estudiantil = puntaje completo
+                    # Para abp/docencia el peso es 50% → het_estudiantil = puntaje * 0.50
+                    if modelo == 'servicios':
+                        het_est = round(puntaje, 2)
+                    else:
+                        het_est = round(puntaje / 100 * 50, 2)
                     recs.append({
                         'docente_nombre': nombres_360[(ced, modelo)],
                         'facultad':       _map_facultad(depts_360[(ced, modelo)]),
@@ -591,7 +599,7 @@ class ETLService:
                         'puntaje_100':    round(puntaje, 2),
                         'promedio':       round(puntaje / 100 * 5, 2),
                         'nivel_desempeno': _nivel_from_puntaje(puntaje),
-                        'het_estudiantil': round(puntaje / 100 * 50, 2),
+                        'het_estudiantil': het_est,
                         'comp_hetero_est': round(puntaje, 2),
                         'sexo':           s.get('genero', ''),
                         'antiguedad_anos': s.get('antiguedad_anos'),

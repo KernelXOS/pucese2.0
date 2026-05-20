@@ -2472,20 +2472,6 @@ export default function App() {
                     <span>Docencia (ABP)</span>
                     {sistema === 'salud' && saludSubTab === 'abp' && <span style={{ width:4, height:4, borderRadius:'50%', background:'#f87171', flexShrink:0, marginLeft:'auto' }} />}
                   </button>
-                  <button
-                    onClick={() => { handleSistemaChange('salud'); setSaludSubTab('servicios') }}
-                    className="w-full flex items-center gap-2.5 text-left rounded-lg transition-all"
-                    style={{
-                      padding:'5px 10px',
-                      color: sistema === 'salud' && saludSubTab === 'servicios' ? '#fff' : 'rgba(255,255,255,0.38)',
-                      background: sistema === 'salud' && saludSubTab === 'servicios' ? 'rgba(185,28,28,0.25)' : 'transparent',
-                      fontSize: 11.5, fontWeight: sistema === 'salud' && saludSubTab === 'servicios' ? 600 : 400,
-                    }}
-                  >
-                    <Stethoscope size={11} style={{ color: sistema === 'salud' && saludSubTab === 'servicios' ? '#fca5a5' : 'rgba(255,255,255,0.25)', flexShrink:0 }} />
-                    <span>Servicios Hospitalarios</span>
-                    {sistema === 'salud' && saludSubTab === 'servicios' && <span style={{ width:4, height:4, borderRadius:'50%', background:'#ef4444', flexShrink:0, marginLeft:'auto' }} />}
-                  </button>
                 </div>
               </div>
             )}
