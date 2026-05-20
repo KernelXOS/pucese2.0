@@ -1893,6 +1893,7 @@ export default function App() {
   const [sistema, setSistema]         = useState<'overview'|'meipa'|'360'|'salud'>('overview')
   const [activeTab, setActiveTab]     = useState('docencia')  // for 360 sub-model
   const [activeAnio, setActiveAnio]   = useState<number | undefined>(undefined)
+  const [saludSubTab, setSaludSubTab] = useState<'abp'|'servicios'>('abp')
 
   const [kpis, setKpis]               = useState<any>(null)
   const [ranking, setRanking]         = useState<any[]>([])
@@ -2137,7 +2138,6 @@ export default function App() {
   const [expandedMEIPA, setExpandedMEIPA] = useState(true)
   const [expanded360, setExpanded360]     = useState(true)
   const [expandedSalud, setExpandedSalud] = useState(true)
-  const [saludSubTab, setSaludSubTab]     = useState<'abp'|'servicios'>('abp')
 
   const SIDEBAR_W = sidebarOpen ? 268 : 68
 
