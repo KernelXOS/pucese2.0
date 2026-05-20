@@ -1381,6 +1381,143 @@ const MODELO_COLOR: Record<string, string> = {
 }
 const SISTEMA_COLOR: Record<string, string> = { meipa:'#6d28d9', '360':'#0f5ca8' }
 
+// ── CompetenciasPreguntas ──────────────────────────────────────────────────────
+function CompetenciasPreguntas({ data }: { data: any }) {
+  const periodos: string[] = data.periodos || []
+  const periodLabel = (p: string) =>
+    p === '202501' ? 'I-2025' : p === '202502' ? 'II-2025' : p === '202402' ? 'II-2024' : p === '202401' ? 'I-2024' : p
+
+  const scoreColor = (v: number) =>
+    v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
+
+  const ScoreBar = ({ value, max = 100 }: { value: number; max?: number }) => (
+    <div className="flex items-center gap-2 min-w-0">
+      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(value / max * 100, 100)}%`, background: scoreColor(value) }} />
+      </div>
+      <span className="text-[11px] font-black tabular-nums shrink-0" style={{ color: scoreColor(value) }}>{value.toFixed(1)}%</span>
+    </div>
+  )
+
+  interface TableRow { [key: string]: any }
+
+  const TableSection = ({
+    title, icon, rows, nameKey, accent, flip = false,
+  }: { title: string; icon: string; rows: TableRow[]; nameKey: string; accent: string; flip?: boolean }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      {/* header */}
+      <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
+        <span className="text-base">{icon}</span>
+        <span className="text-[12px] font-black text-slate-700 uppercase tracking-[0.12em]">{title}</span>
+        <span className="ml-auto text-[10px] text-slate-400 font-semibold">{rows.length} ítems</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              <th className="text-left py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em] w-8">#</th>
+              <th className="text-left py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em]">Descripción</th>
+              {periodos.map(p => (
+                <th key={p} className="text-center py-2 px-3 font-black text-slate-500 uppercase tracking-[0.08em] whitespace-nowrap">{periodLabel(p)}</th>
+              ))}
+              <th className="text-right py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em] whitespace-nowrap">Promedio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => {
+              const name = String(row[nameKey] || '')
+              const display = name.length > 72 ? name.slice(0, 72) + '…' : name
+              return (
+                <tr key={i} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="py-2.5 px-4 font-black" style={{ color: flip ? '#dc2626' : '#16a34a' }}>
+                    {flip ? rows.length - i : i + 1}
+                  </td>
+                  <td className="py-2.5 px-4 text-slate-700 font-medium leading-tight max-w-xs">
+                    <span title={name}>{display}</span>
+                  </td>
+                  {periodos.map(p => {
+                    const v = row[p]
+                    return (
+                      <td key={p} className="py-2.5 px-3 text-center">
+                        {v != null
+                          ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreColor(v) + '18', color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                          : <span className="text-slate-300">—</span>
+                        }
+                      </td>
+                    )
+                  })}
+                  <td className="py-2.5 px-4">
+                    <ScoreBar value={row.promedio} />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="mt-8 space-y-8">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-xl bg-indigo-50">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <div>
+          <h3 className="text-sm font-black text-slate-800">Análisis de Competencias y Preguntas</h3>
+          <p className="text-[11px] text-slate-400">Ranking por período — basado en evaluaciones detalladas</p>
+        </div>
+      </div>
+
+      {/* ── Competencias ───────────────────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Competencias evaluadas</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TableSection
+            title="Mejores competencias"
+            icon="🏆"
+            rows={data.competencias_top || []}
+            nameKey="competencia"
+            accent="#16a34a"
+          />
+          <TableSection
+            title="Competencias a mejorar"
+            icon="⚠️"
+            rows={data.competencias_peor || []}
+            nameKey="competencia"
+            accent="#dc2626"
+            flip
+          />
+        </div>
+      </div>
+
+      {/* ── Preguntas ──────────────────────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Preguntas individuales</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TableSection
+            title="Preguntas mejor puntuadas"
+            icon="⭐"
+            rows={data.preguntas_top || []}
+            nameKey="pregunta"
+            accent="#16a34a"
+          />
+          <TableSection
+            title="Preguntas críticas"
+            icon="📉"
+            rows={data.preguntas_peor || []}
+            nameKey="pregunta"
+            accent="#dc2626"
+            flip
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: { modelo: string; sistema: string; label: string } }) {
   const [search, setSearch]           = useState('')
   const [filterSis, setFilterSis]     = useState('todos')
@@ -1902,6 +2039,7 @@ export default function App() {
   const [tendencias, setTendencias]   = useState<any[]>([])
   const [analytics, setAnalytics]     = useState<any>(null)
   const [comparativo, setComparativo]       = useState<any>(null)
+  const [compPreguntas, setCompPreguntas]   = useState<any>(null)
   const [todosDocentes, setTodosDocentes]   = useState<any[]>([])
   const [aiAnalysis, setAiAnalysis]         = useState('')
   const [loading, setLoading]               = useState(true)
@@ -1965,12 +2103,14 @@ export default function App() {
       const { modelo, anio, sistemaParam } = getQueryParams()
 
       if (sistema === 'overview') {
-        const [compRes, todosRes] = await Promise.all([
+        const [compRes, todosRes, cpRes] = await Promise.all([
           api.getComparativo(anio),
           api.getTodosDocentes(anio, undefined, undefined),
+          api.getCompetenciasPreguntas().catch(() => null),
         ])
         setComparativo(compRes.data)
         setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
+        if (cpRes) setCompPreguntas(cpRes.data)
       } else {
         const fetchList: Promise<any>[] = [
           api.getKPIs(modelo, anio, sistemaParam),
@@ -2633,6 +2773,10 @@ export default function App() {
               {todosDocentes.length > 0 && (
                 <TodosDocentesPanel docentes={todosDocentes} />
               )}
+
+              {/* ── Competencias y Preguntas ─────────────────────────────── */}
+              {compPreguntas && <CompetenciasPreguntas data={compPreguntas} />}
+
               <AIConsultaPanel anio={activeAnio} />
               </div>{/* end comparativoRef */}
             </>

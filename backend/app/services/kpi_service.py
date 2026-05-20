@@ -742,4 +742,157 @@ class KPIService:
         }
 
 
+    def get_competencias_preguntas(self) -> dict:
+        """
+        Lee los archivos eval_detalladas para calcular el ranking de
+        competencias y preguntas (mejor / peor puntuadas) por periodo.
+        No toca la BD — trabaja directo sobre los Excel del ETL.
+        """
+        import glob, os, warnings, unicodedata
+        import pandas as pd
+        warnings.filterwarnings('ignore')
+
+        try:
+            from app.services.etl_service import BASE
+        except Exception:
+            BASE = '/app/data'
+
+        # Recoger todos los archivos detallados disponibles
+        patterns = [
+            os.path.join(BASE, 'eval_detalladas_2025_02', '*.xlsx'),
+            os.path.join(BASE, 'eval_detalladas_2025_01', '*.xlsx'),
+            os.path.join(BASE, 'eval_detalladas_2024_02', '*.xlsx'),
+        ]
+        files = []
+        for pat in patterns:
+            files += glob.glob(pat)
+
+        if not files:
+            return {}
+
+        dfs = []
+        for fpath in files:
+            try:
+                df = pd.read_excel(fpath, dtype=str)
+                # normalise column names
+                df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
+                needed = {'pregunta', 'calificacion', 'competencia', 'periodo_evaluacion'}
+                if needed.issubset(set(df.columns)):
+                    dfs.append(df[list(needed)])
+            except Exception:
+                continue
+
+        if not dfs:
+            return {}
+
+        all_df = pd.concat(dfs, ignore_index=True)
+        all_df['cal'] = pd.to_numeric(all_df['calificacion'], errors='coerce')
+        # escala 1-4; cal=0 = sin respuesta → excluir
+        all_df = all_df[all_df['cal'].between(1, 4)]
+        # Puntaje sobre 100: 1→25, 2→50, 3→75, 4→100
+        all_df['pct'] = (all_df['cal'] / 4) * 100
+
+        def _clean(s):
+            if not isinstance(s, str):
+                return str(s)
+            s = unicodedata.normalize('NFKD', s)
+            s = ''.join(c for c in s if not unicodedata.combining(c))
+            return s.strip()
+
+        def _norm_name(s: str) -> str:
+            """Collapse spaces and title-case for grouping."""
+            import re
+            s = _clean(s)
+            s = re.sub(r'\s+', ' ', s).strip()
+            return s.title()
+
+        all_df['competencia']        = all_df['competencia'].apply(_norm_name)
+        all_df['pregunta']           = all_df['pregunta'].apply(_clean)
+        all_df['periodo_evaluacion'] = all_df['periodo_evaluacion'].apply(_clean)
+
+        periodos = sorted(all_df['periodo_evaluacion'].unique().tolist())
+
+        # ── Competencias ──────────────────────────────────────────────────────
+        comp_g = (
+            all_df.groupby('competencia')['pct']
+            .agg(promedio='mean', n='count')
+            .reset_index()
+        )
+        comp_g['promedio'] = comp_g['promedio'].round(2)
+        comp_g = comp_g[comp_g['competencia'] != '']
+
+        # Por periodo
+        comp_p = (
+            all_df.groupby(['competencia', 'periodo_evaluacion'])['pct']
+            .mean().round(2).reset_index()
+        )
+        comp_p.columns = ['competencia', 'periodo', 'promedio']
+
+        def _enrich_comp(rows):
+            result = []
+            for _, r in rows.iterrows():
+                entry = {
+                    'competencia': r['competencia'],
+                    'promedio':    round(r['promedio'], 2),
+                    'n':           int(r['n']),
+                }
+                for p in periodos:
+                    val = comp_p[
+                        (comp_p['competencia'] == r['competencia']) &
+                        (comp_p['periodo'] == p)
+                    ]['promedio']
+                    entry[p] = round(float(val.values[0]), 2) if len(val) else None
+                result.append(entry)
+            return result
+
+        comp_sorted = comp_g.sort_values('promedio', ascending=False)
+        top_comp    = _enrich_comp(comp_sorted.head(6))
+        worst_comp  = _enrich_comp(comp_sorted.tail(6).sort_values('promedio'))
+
+        # ── Preguntas ─────────────────────────────────────────────────────────
+        preg_g = (
+            all_df.groupby('pregunta')['pct']
+            .agg(promedio='mean', n='count')
+            .reset_index()
+        )
+        preg_g['promedio'] = preg_g['promedio'].round(2)
+        preg_g = preg_g[preg_g['pregunta'] != '']
+
+        # Por periodo
+        preg_p = (
+            all_df.groupby(['pregunta', 'periodo_evaluacion'])['pct']
+            .mean().round(2).reset_index()
+        )
+        preg_p.columns = ['pregunta', 'periodo', 'promedio']
+
+        def _enrich_preg(rows):
+            result = []
+            for _, r in rows.iterrows():
+                entry = {
+                    'pregunta': r['pregunta'],
+                    'promedio': round(r['promedio'], 2),
+                    'n':        int(r['n']),
+                }
+                for p in periodos:
+                    val = preg_p[
+                        (preg_p['pregunta'] == r['pregunta']) &
+                        (preg_p['periodo'] == p)
+                    ]['promedio']
+                    entry[p] = round(float(val.values[0]), 2) if len(val) else None
+                result.append(entry)
+            return result
+
+        preg_sorted = preg_g.sort_values('promedio', ascending=False)
+        top_preg    = _enrich_preg(preg_sorted.head(6))
+        worst_preg  = _enrich_preg(preg_sorted.tail(6).sort_values('promedio'))
+
+        return {
+            'periodos':          periodos,
+            'competencias_top':  top_comp,
+            'competencias_peor': worst_comp,
+            'preguntas_top':     top_preg,
+            'preguntas_peor':    worst_preg,
+        }
+
+
 kpi_service = KPIService()
