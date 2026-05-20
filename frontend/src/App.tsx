@@ -1777,6 +1777,11 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
                           Ingreso: {new Date(d.fecha_ingreso + 'T00:00:00').toLocaleDateString('es-EC', { day:'2-digit', month:'short', year:'numeric' })}
                         </p>
                       )}
+                      {d.n_evaluadores ? (
+                        <p className="text-[8px] text-slate-400 mt-0.5 flex items-center gap-1">
+                          <span>👥</span><span>{d.n_evaluadores} estudiantes evaluaron</span>
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       onClick={(e) => downloadDocente(d.cedula, d.nombre, e)}
@@ -1862,9 +1867,18 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
               {/* Expanded detail */}
               {isExp && (
                 <div className="px-5 pb-5 bg-slate-50/60 border-t border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pt-3 mb-2">
-                    Componentes del Modelo — {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)} · {d.sistema === 'meipa' ? 'MEIPA' : '360/MECDI'}
-                  </p>
+                  <div className="flex items-center justify-between pt-3 mb-2 flex-wrap gap-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      Componentes del Modelo — {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)} · {d.sistema === 'meipa' ? 'MEIPA' : '360/MECDI'}
+                    </p>
+                    {d.n_evaluadores ? (
+                      <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background:'#eff6ff', color:'#0056b3', border:'1px solid #bfdbfe' }}>
+                        <span>👥</span>
+                        <span>{d.n_evaluadores} estudiantes evaluaron</span>
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="space-y-2 mb-4">
                     {(d.componentes || []).map((c: any, ci: number) => {
                       const col = pctColor(c.pct)

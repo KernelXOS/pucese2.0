@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime
+from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
-from app.models.base import Base
+
+Base = declarative_base()
 
 class Evaluacion(Base):
     __tablename__ = "evaluaciones"
@@ -52,6 +54,7 @@ class Evaluacion(Base):
     sistema         = Column(String, index=True)   # 'meipa' o '360'
     antiguedad_anos = Column(Float)                # Antigüedad en años (float)
     funcion_docente = Column(String)               # 'DOCENCIA', 'COORDINACIÓN', 'OPERATIVO', etc.
+    n_evaluadores   = Column(Integer)              # Nº de estudiantes/evaluadores que respondieron
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

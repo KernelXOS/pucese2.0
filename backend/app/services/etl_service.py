@@ -559,14 +559,19 @@ class ETLService:
 
             # 360 rows
             if not df_360.empty:
+                col_nresp = fc('numero_respuestas', 'num_resp')
+                df_360['_nresp'] = pd.to_numeric(df_360[col_nresp], errors='coerce') if col_nresp else np.nan
+
                 agg360 = df_360.groupby(['_ced', '_instr']).agg(
                     nome=('_nom', _first_mode),
                     puntaje=('_punt', 'mean'),
                     dept=('_dept', _first_mode),
+                    n_resp=('_nresp', 'max'),
                 ).reset_index()
                 scores_360: dict = {}
                 nombres_360: dict = {}
                 depts_360:   dict = {}
+                nresp_360:   dict = {}
                 for _, row in agg360.iterrows():
                     ced     = str(row['_ced']).strip()
                     instr_n = str(row['_instr']).strip()
@@ -579,6 +584,8 @@ class ETLService:
                         scores_360[key]  = {}
                         nombres_360[key] = self._build_nombre(ced, staff, row['nome'])
                         depts_360[key]   = str(row.get('dept', '')).strip()
+                        nval = row.get('n_resp')
+                        nresp_360[key] = int(nval) if nval and not pd.isna(nval) else None
                     scores_360[key][comp] = puntaje
 
                 for (ced, modelo), comps in scores_360.items():
@@ -605,6 +612,7 @@ class ETLService:
                         'antiguedad_anos': s.get('antiguedad_anos'),
                         'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
                         'archivo_fuente':  os.path.basename(fpath),
+                        'n_evaluadores':  nresp_360.get((ced, modelo)),
                     })
         except Exception as e:
             pass
@@ -830,6 +838,13 @@ class ETLService:
         df['contrib']  = (df['cal_norm'] / df['max_cal'].replace(0,1)) * df['peso_num']
         df['_ced']     = df['usuario_evaluado'].astype(str).str.strip().str.lstrip('0')
 
+        # Conteo de evaluadores únicos por (cedula, instrumento)
+        n_eval_df = df.groupby(['_ced','cod_instrumento'])['evaluador'].nunique().reset_index()
+        n_eval_df.columns = ['_ced', 'cod_instrumento', 'n_uniq']
+        n_eval_map: dict = {}  # (ced, cod) → n_evaluadores
+        for _, r in n_eval_df.iterrows():
+            n_eval_map[(str(r['_ced']).strip(), str(r['cod_instrumento']).strip())] = int(r['n_uniq'])
+
         by_instr = df.groupby(['_ced','apellidos_evaluado','nombres_evaluado','programa','cod_instrumento'])\
                      .agg(score=('contrib','sum'), max_score=('peso_num','sum')).reset_index()
         by_instr['puntaje_100'] = (by_instr['score'] / by_instr['max_score'].replace(0,1) * 100).round(2)
@@ -867,11 +882,15 @@ class ETLService:
             if key not in model_scores:
                 nom_ev = f"{_clean_nombre(row['apellidos_evaluado'])} {_clean_nombre(row['nombres_evaluado'])}".strip()
                 model_scores[key] = {
-                    'nombre':   self._build_nombre(ced, staff, nom_ev),
-                    'programa': best_programa.get(key, _clean_nombre(row['programa'])),
-                    'scores':   {},
+                    'nombre':        self._build_nombre(ced, staff, nom_ev),
+                    'programa':      best_programa.get(key, _clean_nombre(row['programa'])),
+                    'scores':        {},
+                    'n_evaluadores': {},
                 }
             model_scores[key]['scores'][comp] = {'puntaje': float(row['puntaje_100']), 'peso': peso}
+            n_u = n_eval_map.get((ced, str(row['cod_instrumento']).strip()))
+            if n_u:
+                model_scores[key]['n_evaluadores'][comp] = n_u
 
         # Propagate shared instruments to ABP, Tecnologado, Posgrado
         for _, row in by_instr.iterrows():
@@ -1060,6 +1079,11 @@ class ETLService:
             puntaje  = round(total_score / total_peso * 100, 2)
             programa = info['programa']
             s = staff.get(ced, {})
+            # n_evaluadores: tomar el conteo del componente hetero_est (estudiantes)
+            n_ev_map = info.get('n_evaluadores', {})
+            n_ev = n_ev_map.get('hetero_est') or n_ev_map.get('hetero_dir') or (
+                max(n_ev_map.values()) if n_ev_map else None
+            )
 
             _MODELO_FACULTAD = {'tecnologado': 'Tecnologado', 'posgrado': 'Posgrado'}
             rec = {
@@ -1076,6 +1100,7 @@ class ETLService:
                 'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
                 'sexo':            s.get('genero', ''),
                 'archivo_fuente':  'eval_detalladas_2025 + CSV_202566',
+                'n_evaluadores':   n_ev,
             }
             if modelo in ('docencia', 'abp', 'tecnologado'):
                 # Het.Est(50) + Pares(20) + CEV(10) + Auto(20)

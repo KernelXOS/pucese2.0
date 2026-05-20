@@ -652,15 +652,17 @@ class KPIService:
                 componentes.append({'label': label, 'pct': pct})
 
             componentes.sort(key=lambda x: x['pct'], reverse=True)
+            n_ev = next((r.n_evaluadores for r in recs if r.n_evaluadores and r.n_evaluadores > 0), None)
             result.append({
-                'nombre':   nombre,
-                'cedula':   ced or '',
-                'sistema':  sis or '',
-                'modelo':   mod or '',
-                'facultad': facultad,
-                'puntaje':  puntaje,
-                'nivel':    nivel,
-                'componentes': componentes,
+                'nombre':       nombre,
+                'cedula':       ced or '',
+                'sistema':      sis or '',
+                'modelo':       mod or '',
+                'facultad':     facultad,
+                'puntaje':      puntaje,
+                'nivel':        nivel,
+                'componentes':  componentes,
+                'n_evaluadores': n_ev,
             })
 
         result.sort(key=lambda x: x['puntaje'], reverse=True)

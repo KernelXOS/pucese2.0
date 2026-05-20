@@ -8,6 +8,22 @@ from app.core.config import settings
 # Crear las tablas en la base de datos
 Base.metadata.create_all(bind=engine)
 
+# ── Migraciones ligeras: añadir columnas nuevas si no existen ─────────────
+def _run_migrations():
+    from sqlalchemy import text
+    cols = [
+        "ALTER TABLE evaluaciones ADD COLUMN IF NOT EXISTS n_evaluadores INTEGER",
+    ]
+    try:
+        with engine.connect() as conn:
+            for sql in cols:
+                conn.execute(text(sql))
+            conn.commit()
+    except Exception as e:
+        print(f"[MIGRATION] Advertencia: {e}")
+
+_run_migrations()
+
 app = FastAPI(title=settings.PROJECT_NAME)
 
 @app.on_event("startup")
