@@ -69,14 +69,14 @@ class KPIService:
         mejor = q.with_entities(
             Evaluacion.docente_nombre, Evaluacion.facultad,
             func.avg(Evaluacion.puntaje_100).label('avg_score')
-        ).group_by(Evaluacion.docente_nombre).order_by(
+        ).group_by(Evaluacion.docente_nombre, Evaluacion.facultad).order_by(
             func.avg(Evaluacion.puntaje_100).desc()
         ).first()
 
         peor = q.with_entities(
             Evaluacion.docente_nombre, Evaluacion.facultad,
             func.avg(Evaluacion.puntaje_100).label('avg_score')
-        ).group_by(Evaluacion.docente_nombre).order_by(
+        ).group_by(Evaluacion.docente_nombre, Evaluacion.facultad).order_by(
             func.avg(Evaluacion.puntaje_100).asc()
         ).first()
 
@@ -364,7 +364,7 @@ class KPIService:
                 func.avg(Evaluacion.puntaje_100).label('puntaje'),
                 Evaluacion.nivel_desempeno,
             ).group_by(
-                Evaluacion.docente_nombre, Evaluacion.facultad, Evaluacion.cedula
+                Evaluacion.docente_nombre, Evaluacion.facultad, Evaluacion.cedula, Evaluacion.nivel_desempeno
             ).order_by(func.avg(Evaluacion.puntaje_100).desc()).all()
 
             def _td(r):
@@ -556,7 +556,9 @@ class KPIService:
             Evaluacion.nivel_desempeno,
             Evaluacion.cedula,
             Evaluacion.sistema,
-        ).group_by(Evaluacion.docente_nombre, Evaluacion.facultad, Evaluacion.modelo)\
+        ).group_by(Evaluacion.docente_nombre, Evaluacion.facultad, Evaluacion.modelo,
+                   Evaluacion.nivel_desempeno, Evaluacion.cedula, Evaluacion.sistema,
+                   Evaluacion.periodo, Evaluacion.anio)\
          .order_by(func.avg(Evaluacion.puntaje_100).desc())\
          .limit(limit).all()
 
