@@ -1,93 +1,38 @@
 """
 Servicio de generación de PDF por docente.
-Usa Jinja2 para renderizar HTML y WeasyPrint para convertir a PDF.
+Usa Jinja2 para renderizar HTML y WeasyPrint / xhtml2pdf para convertir a PDF.
+Trabaja exclusivamente con la tabla `evaluaciones` (modelo Evaluacion).
 """
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
+from collections import defaultdict
 
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
-from app.models.docente import Docente, PersonalPeriodo
-from app.models.puntaje import PuntajeFinal
-from app.etl.registry import PERIODOS, PESOS_MODELO, nivel_from_puntaje
+from app.models.evaluacion import Evaluacion
 
 
-# ── Fallback desde tabla legacy evaluaciones ──────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _legacy_datos(cedula: str, db: Session) -> tuple:
-    """
-    Construye proxies de Docente, perfil, puntaje y periodo_info
-    desde la tabla evaluaciones (legacy) cuando las nuevas tablas están vacías.
-    Retorna (docente, perfil, puntaje, periodo_info) o (None,…) si tampoco hay datos.
-    """
-    try:
-        from app.models.evaluacion import Evaluacion
-    except ImportError:
-        return None, None, None, None
+def nivel_from_puntaje(p) -> str:
+    if p is None:
+        return "Sin datos"
+    p = float(p)
+    if p >= 90:
+        return "Excelente"
+    if p >= 75:
+        return "Bueno"
+    if p >= 60:
+        return "Regular"
+    return "Deficiente"
 
-    ev = (
-        db.query(Evaluacion)
-        .filter(Evaluacion.cedula == cedula)
-        .order_by(Evaluacion.anio.desc(), Evaluacion.id.desc())
-        .first()
-    )
-    if not ev:
-        return None, None, None, None
 
-    # ── Docente proxy ─────────────────────────────────────────────────────────
-    docente_p = type("DocenteP", (), {
-        "cedula":          cedula,
-        "nombre_completo": ev.docente_nombre or "—",
-        "apellidos":       "",
-        "nombres":         ev.docente_nombre or "—",
-        "genero":          ev.sexo or "—",
-    })()
-
-    # ── Perfil proxy ──────────────────────────────────────────────────────────
-    perfil_p = type("PerfilP", (), {
-        "facultad":          ev.facultad or "—",
-        "funcion":           ev.funcion_docente or "—",
-        "dedicacion":        "—",
-        "antiguedad_anos":   ev.antiguedad_anos,
-        "nivel_instruccion": ev.nivel_estudio or "—",
-    })()
-
-    # ── Mapear anio + sistema → período conocido ──────────────────────────────
-    anio_str = str(ev.anio) if ev.anio else None
-    sistema  = ev.sistema or "meipa"
-    candidatos = [p for p in PERIODOS if str(p["anio"]) == anio_str and p["sistema"] == sistema]
-    periodo_info = candidatos[-1] if candidatos else PERIODOS[-1]
-
-    # ── Puntaje proxy ─────────────────────────────────────────────────────────
-    puntaje_100 = ev.puntaje_100 or ev.promedio or 0.0
-    nivel       = ev.nivel_desempeno or nivel_from_puntaje(puntaje_100)
-
-    puntaje_p = type("PuntajeP", (), {
-        "cedula":          cedula,
-        "periodo_codigo":  periodo_info["codigo"],
-        "modelo":          ev.modelo or "docencia",
-        "sistema":         sistema,
-        "puntaje_100":     puntaje_100,
-        "nivel_desempeno": nivel,
-        # Componentes 360 normalizados (nueva nomenclatura)
-        "comp_het_est":    ev.comp_hetero_est or ev.het_estudiantil,
-        "comp_pares":      ev.comp_pares or ev.eval_pares,
-        "comp_cev":        ev.aula_virtual,
-        "comp_auto":       ev.comp_auto or ev.autoevaluacion,
-        "comp_het_dir":    ev.comp_hetero_dir,
-        # Componentes_json vacío para MEIPA legacy (la escala original no coincide)
-        "componentes_json": None,
-    })()
-
-    return docente_p, perfil_p, puntaje_p, periodo_info
-
-LOGO_URL = "https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png"
-
+LOGO_URL    = "https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png"
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 
-# Etiquetas legibles por modelo
 MODELO_LABELS = {
     "docencia":      "Docencia",
     "abp":           "Salud / ABP",
@@ -96,32 +41,36 @@ MODELO_LABELS = {
     "investigacion": "Investigación",
     "vinculacion":   "Vinculación",
     "gestion":       "Gestión",
+    "servicios":     "Salud / Servicios",
+    "meipa":         "MEIPA",
+    "administrativo":"Administrativo",
 }
 
-# Etiquetas de componentes por modelo
-COMP_LABELS = {
-    "docencia":     [("comp_het_est","Het. Estudiantil",50),("comp_pares","Eval. Pares",20),("comp_cev","Entorno Virtual",10),("comp_auto","Autoevaluación",20)],
-    "abp":          [("comp_het_est","Het. Estudiantil (Salud)",50),("comp_pares","Eval. Pares",20),("comp_cev","Entorno Virtual",10),("comp_auto","Autoevaluación",20)],
-    "tecnologado":  [("comp_het_est","Het. Estudiantil",50),("comp_pares","Eval. Pares",20),("comp_cev","Entorno Virtual",10),("comp_auto","Autoevaluación",20)],
-    "posgrado":     [("comp_het_est","Het. Estudiantil Posgrado",60),("comp_auto","Autoevaluación",30),("comp_cev","CEV / Coord. Posgrado",10)],
-    "investigacion":[("comp_het_dir","Het. Dir. Investigación",50),("comp_auto","Autoevaluación",20),("comp_pares","Coevaluación Par",15),("comp_het_est","Het. Decano/Coord.",15)],
-    "vinculacion":  [("comp_het_est","Het. Estudiantil",50),("comp_auto","Autoevaluación",20),("comp_het_dir","Het. Dir. Académico",30)],
-    "gestion":      [("comp_het_dir","Coevalúa. Directivo",50),("comp_het_est","Het. Docentes",30),("comp_auto","Autoevaluación",20)],
+# (campo_en_Evaluacion, etiqueta, peso)
+COMP_LABELS: dict = {
+    "docencia":      [("het_estudiantil","Het. Estudiantil",50),("eval_pares","Eval. Pares",20),("aula_virtual","Entorno Virtual",10),("autoevaluacion","Autoevaluación",20)],
+    "abp":           [("het_estudiantil","Het. Estudiantil (Salud)",50),("eval_pares","Eval. Pares",20),("aula_virtual","Entorno Virtual",10),("autoevaluacion","Autoevaluación",20)],
+    "tecnologado":   [("het_estudiantil","Het. Estudiantil",50),("eval_pares","Eval. Pares",20),("aula_virtual","Entorno Virtual",10),("autoevaluacion","Autoevaluación",20)],
+    "posgrado":      [("het_estudiantil","Het. Estudiantil Posgrado",60),("autoevaluacion","Autoevaluación",30),("aula_virtual","CEV / Coord. Posgrado",10)],
+    "investigacion": [("comp_hetero_dir","Het. Dir. Investigación",50),("comp_auto","Autoevaluación",20),("comp_pares","Coevaluación Par",15),("comp_hetero_est","Het. Decano/Coord.",15)],
+    "vinculacion":   [("comp_hetero_est","Het. Estudiantil",50),("comp_auto","Autoevaluación",20),("comp_hetero_dir","Het. Dir. Académico",30)],
+    "gestion":       [("comp_hetero_dir","Coevalúa. Directivo",50),("comp_hetero_est","Het. Docentes",30),("comp_auto","Autoevaluación",20)],
+    "administrativo":[("comp_hetero_dir","Coevalúa. Directivo",50),("comp_hetero_est","Het. Docentes",30),("comp_auto","Autoevaluación",20)],
+    "servicios":     [("het_estudiantil","Het. Estudiantil (Práctica Hosp.)",100)],
 }
 
-# Para MEIPA los componentes vienen en comp_json
-MEIPA_COMP_LABELS = [
-    ("het_est","Het. Estudiantil (Estud→Doc)",40),
-    ("auto","Autoevaluación",20),
-    ("coord","Coord→Docente",20),
-    ("pares","Eval. Pares",20),
+MEIPA_COMP_KEYS = [
+    ("comp_hetero_est","Het. Estudiantil",40),
+    ("comp_auto","Autoevaluación",20),
+    ("comp_hetero_dir","Coord→Docente",20),
+    ("comp_pares","Eval. Pares",20),
 ]
 
 
-def _fmt_puntaje(val) -> str:
+def _fmt(val) -> str:
     if val is None:
         return "—"
-    return f"{val:.1f}"
+    return f"{float(val):.1f}"
 
 
 def _nivel_css(nivel: str) -> str:
@@ -133,9 +82,10 @@ def _nivel_css(nivel: str) -> str:
     }.get(nivel, "sin-datos")
 
 
-def _antiguedad_str(anos: Optional[float]) -> str:
+def _antiguedad_str(anos) -> str:
     if anos is None:
         return "—"
+    anos = float(anos)
     a = int(anos)
     m = int((anos - a) * 12)
     if a == 0:
@@ -145,129 +95,80 @@ def _antiguedad_str(anos: Optional[float]) -> str:
     return f"{a} años {m} meses"
 
 
-def _get_ultimo_periodo_docente(cedula: str, db: Session) -> Optional[str]:
-    """Devuelve el último período en que el docente tiene puntaje final."""
-    orden = [p["codigo"] for p in reversed(PERIODOS)]
-    for cod in orden:
-        try:
-            existe = db.query(PuntajeFinal).filter_by(cedula=cedula, periodo_codigo=cod).first()
-        except Exception:
-            db.rollback()
-            return None
-        if existe:
-            return cod
-    return None
+# ── Core builders ──────────────────────────────────────────────────────────────
 
-
-def _get_puntaje_actual(cedula: str, periodo_codigo: str, db: Session) -> Optional[PuntajeFinal]:
-    """Obtiene el puntaje principal del docente en el período (prioriza docencia)."""
-    prioridad = ["docencia", "abp", "tecnologado", "posgrado", "investigacion", "vinculacion", "gestion"]
-    for modelo in prioridad:
-        try:
-            p = db.query(PuntajeFinal).filter_by(
-                cedula=cedula, periodo_codigo=periodo_codigo, modelo=modelo
-            ).first()
-        except Exception:
-            db.rollback()
-            return None
-        if p:
-            return p
-    return None
-
-
-def _build_componentes(puntaje: PuntajeFinal) -> list:
-    """Construye la lista de componentes para la tabla del PDF."""
-    modelo = puntaje.modelo
-    sistema = puntaje.sistema
+def _build_componentes(ev: Evaluacion) -> list:
+    """Construye lista de componentes para el PDF desde un registro Evaluacion."""
+    modelo  = ev.modelo  or "docencia"
+    sistema = ev.sistema or "meipa"
 
     componentes = []
+    defs = MEIPA_COMP_KEYS if sistema == "meipa" else COMP_LABELS.get(modelo, COMP_LABELS.get("docencia", []))
 
-    if sistema == "meipa":
-        comp_json = puntaje.componentes_json or {}
-        # Escalar componentes MEIPA: el valor raw es sobre el peso (ej. het_est max 2.0 → peso 40%)
-        for campo, label, peso in MEIPA_COMP_LABELS:
-            raw = comp_json.get(campo)
-            if raw is None:
-                continue
-            # El valor raw de MEIPA es la puntuación en escala del peso (0 a peso/100*5)
-            # Ya viene guardado como fracción de su peso → convertir a 0-100
-            valor_100 = round(min((raw / (peso / 100)) * 100, 100), 1) if raw else 0
-            nivel = nivel_from_puntaje(valor_100)
-            componentes.append({
-                "label":     label,
-                "peso":      peso,
-                "valor_fmt": _fmt_puntaje(valor_100),
-                "pct":       round(min(valor_100, 100), 1),
-                "nivel":     nivel,
-                "nivel_css": _nivel_css(nivel),
-            })
-    else:
-        defs = COMP_LABELS.get(modelo, [])
-        for campo, label, peso in defs:
-            valor = getattr(puntaje, campo, None)
-            if valor is None:
-                continue
-            # Los componentes ya están en escala 0-100 (sobre su peso relativo al modelo)
-            # Para mostrar en la barra, expresar como % del máximo posible del componente
-            pct = round(min(valor, 100), 1)
-            nivel = nivel_from_puntaje(valor)
-            componentes.append({
-                "label":     label,
-                "peso":      peso,
-                "valor_fmt": _fmt_puntaje(valor),
-                "pct":       pct,
-                "nivel":     nivel,
-                "nivel_css": _nivel_css(nivel),
-            })
-
+    for campo, label, peso in defs:
+        valor = getattr(ev, campo, None)
+        if valor is None:
+            continue
+        pct   = round(min(float(valor), 100.0), 1)
+        nivel = nivel_from_puntaje(valor)
+        componentes.append({
+            "label":     label,
+            "peso":      peso,
+            "valor_fmt": _fmt(valor),
+            "pct":       pct,
+            "nivel":     nivel,
+            "nivel_css": _nivel_css(nivel),
+        })
     return componentes
 
 
-def _build_historico(cedula: str, db: Session) -> tuple[list, list]:
+def _build_historico(cedula: str, db: Session) -> Tuple[list, list]:
     """
-    Construye la estructura para la tabla histórica.
+    Construye la tabla histórica (todos los períodos × modelos) para un docente.
     Retorna (periodos_lista, modelos_rows).
     """
-    # Períodos ordenados cronológicamente
-    periodos_info = []
-    for p in PERIODOS:
-        periodos_info.append({
-            "codigo":   p["codigo"],
-            "label":    p["label_corto"],
-            "sistema":  p["sistema"],
-        })
+    evs = (
+        db.query(Evaluacion)
+        .filter(Evaluacion.cedula == cedula, Evaluacion.puntaje_100.isnot(None))
+        .order_by(Evaluacion.anio, Evaluacion.periodo)
+        .all()
+    )
+    if not evs:
+        return [], []
 
-    # Todos los puntajes del docente
-    try:
-        todos = db.query(PuntajeFinal).filter_by(cedula=cedula).all()
-    except Exception:
-        db.rollback()
-        todos = []
-    if not todos:
-        return periodos_info, []
+    # Períodos únicos (ordenados)
+    seen_p: dict = {}
+    for ev in evs:
+        p = ev.periodo or ""
+        if p and p not in seen_p:
+            seen_p[p] = {"periodo": p, "anio": ev.anio or 0, "sistema": ev.sistema or "meipa", "label": p}
+    periodos_list = sorted(seen_p.values(), key=lambda x: (x["anio"], x["periodo"]))
 
-    # Agrupar por modelo
-    modelos_set = sorted(set(p.modelo for p in todos))
+    # Agrupar por modelo → período → lista de puntajes
+    modelo_data: dict = defaultdict(lambda: defaultdict(list))
+    for ev in evs:
+        if ev.periodo and ev.modelo:
+            modelo_data[ev.modelo][ev.periodo].append(ev.puntaje_100)
 
     modelos_rows = []
-    for modelo in modelos_set:
+    for modelo, pdata in sorted(modelo_data.items()):
         celdas = []
-        valores_cronologicos = []
-        for p in periodos_info:
-            pf = next((x for x in todos if x.periodo_codigo == p["codigo"] and x.modelo == modelo), None)
-            valor = pf.puntaje_100 if pf else None
+        vals_crono = []
+        for pinfo in periodos_list:
+            p     = pinfo["periodo"]
+            vals  = pdata.get(p, [])
+            valor = round(sum(vals) / len(vals), 1) if vals else None
             celdas.append({
                 "valor":     valor,
-                "valor_fmt": _fmt_puntaje(valor),
-                "es_actual": False,  # se marca después
+                "valor_fmt": _fmt(valor),
+                "es_actual": False,
             })
             if valor is not None:
-                valores_cronologicos.append(valor)
+                vals_crono.append(valor)
 
-        # Calcular tendencia (último vs penúltimo con datos)
         tendencia = 0.0
-        if len(valores_cronologicos) >= 2:
-            tendencia = round(valores_cronologicos[-1] - valores_cronologicos[-2], 1)
+        if len(vals_crono) >= 2:
+            tendencia = round(vals_crono[-1] - vals_crono[-2], 1)
 
         modelos_rows.append({
             "modelo":        modelo,
@@ -277,291 +178,192 @@ def _build_historico(cedula: str, db: Session) -> tuple[list, list]:
             "tendencia_fmt": f"{abs(tendencia):.1f}",
         })
 
-    return periodos_info, modelos_rows
+    return periodos_list, modelos_rows
 
 
-def _build_ranking(cedula: str, periodo_codigo: str, modelo: str, puntaje_100: float, db: Session) -> dict:
-    """Calcula posición y percentil del docente en la institución."""
+def _build_ranking(cedula: str, periodo: str, modelo: str, puntaje: float, db: Session) -> dict:
+    """Calcula posición y percentil del docente en la institución para ese período/modelo."""
     _no_rank = {"ranking": "—", "percentil": "—", "promedio_inst": None, "diff": None, "diff_str": "—", "diff_color": "#64748b"}
     try:
-        todos = db.query(PuntajeFinal).filter_by(
-            periodo_codigo=periodo_codigo, modelo=modelo
-        ).filter(PuntajeFinal.puntaje_100.isnot(None)).all()
+        rows = (
+            db.query(Evaluacion.cedula, func.avg(Evaluacion.puntaje_100).label("avg_p"))
+            .filter(Evaluacion.periodo == periodo, Evaluacion.modelo == modelo, Evaluacion.puntaje_100.isnot(None))
+            .group_by(Evaluacion.cedula)
+            .all()
+        )
     except Exception:
         db.rollback()
         return _no_rank
 
-    if not todos:
+    if not rows:
         return _no_rank
 
-    puntajes = sorted([p.puntaje_100 for p in todos], reverse=True)
-    promedio = round(sum(puntajes) / len(puntajes), 1)
-    pos = next((i+1 for i, v in enumerate(puntajes) if v <= puntaje_100), len(puntajes))
-    percentil = round(((len(puntajes) - pos) / len(puntajes)) * 100)
-
-    diff = round(puntaje_100 - promedio, 1)
-    diff_color = "#059669" if diff >= 0 else "#dc2626"
+    puntajes  = sorted([float(r.avg_p) for r in rows if r.avg_p is not None], reverse=True)
+    promedio  = round(sum(puntajes) / len(puntajes), 1)
+    pos       = next((i + 1 for i, v in enumerate(puntajes) if v <= puntaje), len(puntajes))
+    percentil = round(((len(puntajes) - pos) / len(puntajes)) * 100) if puntajes else 0
+    diff      = round(puntaje - promedio, 1)
 
     return {
-        "ranking":      f"#{pos} / {len(puntajes)}",
-        "percentil":    f"P{percentil}",
+        "ranking":       f"#{pos} / {len(puntajes)}",
+        "percentil":     f"P{percentil}",
         "promedio_inst": promedio,
-        "diff":         diff,
-        "diff_color":   diff_color,
-        "diff_str":     f"+{diff}" if diff >= 0 else str(diff),
+        "diff":          diff,
+        "diff_color":    "#059669" if diff >= 0 else "#dc2626",
+        "diff_str":      f"+{diff}" if diff >= 0 else str(diff),
     }
 
 
-def generar_pdf_directorio(
-    titulo: str,
-    docentes_data: list,
-) -> bytes:
-    """
-    Genera el PDF de directorio (ranking completo) con diseño profesional.
-    docentes_data: lista de dicts con keys nombre, cedula, facultad, sistema, modelo, puntaje, nivel
-    """
-    from datetime import datetime as _dt
+# ── PDF rendering helper ───────────────────────────────────────────────────────
 
-    MODELO_LABELS_DIR = {
-        "docencia":      "Docencia",
-        "abp":           "Salud/ABP",
-        "posgrado":      "Posgrado",
-        "tecnologado":   "Tecnologado",
-        "investigacion": "Investigación",
-        "vinculacion":   "Vinculación",
-        "gestion":       "Gestión",
-    }
-
-    NIVEL_COLOR = {
-        "Excelente":  "#059669",
-        "Bueno":      "#0056b3",
-        "Regular":    "#d97706",
-        "Deficiente": "#dc2626",
-    }
-
-    def _score_color(p):
-        if p is None:
-            return "#94a3b8"
-        if p >= 90: return "#059669"
-        if p >= 75: return "#0056b3"
-        if p >= 60: return "#d97706"
-        return "#dc2626"
-
-    # KPI summary
-    total = len(docentes_data)
-    puntajes = [float(d.get("puntaje") or 0) for d in docentes_data]
-    promedio = f"{sum(puntajes)/total:.1f}" if total else "0.0"
-    nivel_count = {}
-    for d in docentes_data:
-        n = d.get("nivel") or "Sin datos"
-        nivel_count[n] = nivel_count.get(n, 0) + 1
-
-    n_excelente  = nivel_count.get("Excelente", 0)
-    n_bueno      = nivel_count.get("Bueno", 0)
-    n_regular    = nivel_count.get("Regular", 0)
-    n_deficiente = nivel_count.get("Deficiente", 0)
-
-    # Distribución bars
-    distribucion = []
-    for label, color, key in [
-        ("Excelente",  "#059669", "Excelente"),
-        ("Bueno",      "#0056b3", "Bueno"),
-        ("Regular",    "#d97706", "Regular"),
-        ("Deficiente", "#dc2626", "Deficiente"),
-    ]:
-        n = nivel_count.get(key, 0)
-        pct = round(n / total * 100, 1) if total else 0
-        distribucion.append({"label": label, "n": n, "pct": pct, "color": color})
-
-    # Top 10
-    sorted_docs = sorted(docentes_data, key=lambda d: float(d.get("puntaje") or 0), reverse=True)
-    top10 = []
-    for d in sorted_docs[:10]:
-        p = float(d.get("puntaje") or 0)
-        nombre = d.get("nombre") or ""
-        partes = nombre.split()
-        nombre_corto = " ".join(partes[:3]) if len(partes) >= 3 else nombre
-        color = _score_color(p)
-        top10.append({
-            "nombre_corto": nombre_corto,
-            "puntaje_fmt": f"{p:.1f}",
-            "pct": round(p, 1),
-            "color": color,
-        })
-
-    # Full table rows
-    docentes_ctx = []
-    for d in sorted_docs:
-        p = float(d.get("puntaje") or 0)
-        nivel = d.get("nivel") or "Sin datos"
-        nivel_css = nivel.replace(" ", "-")
-        docentes_ctx.append({
-            "nombre":      d.get("nombre") or "—",
-            "cedula":      d.get("cedula") or "",
-            "facultad":    d.get("facultad") or "—",
-            "sistema":     d.get("sistema") or "",
-            "modelo_label": MODELO_LABELS_DIR.get(d.get("modelo") or "", (d.get("modelo") or "").capitalize()),
-            "puntaje_fmt": f"{p:.1f}",
-            "score_color": _score_color(p),
-            "nivel":       nivel,
-            "nivel_css":   nivel_css,
-        })
-
-    # Título corto para badge
-    titulo_corto = titulo[:20] if len(titulo) > 20 else titulo
-
-    ctx = {
-        "logo_url":        LOGO_URL,
-        "titulo":          titulo,
-        "titulo_corto":    titulo_corto,
-        "fecha_generacion": _dt.now().strftime("%d/%m/%Y %H:%M"),
-        "total":           total,
-        "promedio":        promedio,
-        "n_excelente":     n_excelente,
-        "n_bueno":         n_bueno,
-        "n_regular":       n_regular,
-        "n_deficiente":    n_deficiente,
-        "distribucion":    distribucion,
-        "top10":           top10,
-        "docentes":        docentes_ctx,
-    }
-
-    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    template = env.get_template("reporte_directorio.html")
+def _render_pdf(template_name: str, ctx: dict) -> bytes:
+    env      = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    template = env.get_template(template_name)
     html_str = template.render(**ctx)
 
-    # Convertir a PDF
     try:
         from weasyprint import HTML as WP_HTML
-        pdf_bytes = WP_HTML(string=html_str, base_url=TEMPLATE_DIR).write_pdf()
-        return pdf_bytes
+        return WP_HTML(string=html_str, base_url=TEMPLATE_DIR).write_pdf()
     except Exception:
-        pass
+        pass  # WeasyPrint no disponible → intentar xhtml2pdf
 
     try:
         import io as _io
         from xhtml2pdf import pisa
-        buf = _io.BytesIO()
+        buf    = _io.BytesIO()
         status = pisa.CreatePDF(html_str, dest=buf)
         if status.err:
-            raise RuntimeError("xhtml2pdf falló al generar el PDF de directorio")
+            raise RuntimeError("xhtml2pdf falló al generar el PDF")
         return buf.getvalue()
     except ImportError:
-        raise RuntimeError(
-            "No se pudo generar el PDF. Instala xhtml2pdf: pip install xhtml2pdf"
-        )
+        raise RuntimeError("No se pudo generar el PDF. Instala weasyprint o xhtml2pdf.")
 
 
-def _build_docente_ctx(cedula: str, db: Session) -> Optional[dict]:
-    """
-    Construye el diccionario de contexto para un docente (usado en bulk PDF).
-    Reutiliza la misma lógica que generar_pdf_docente pero retorna el dict en lugar de PDF.
-    Retorna None si no hay datos para el docente.
-    """
-    docente = None
-    try:
-        docente = db.query(Docente).filter_by(cedula=cedula).first()
-    except Exception:
-        db.rollback()
+# ── Contexto de un docente (reutilizable para bulk) ────────────────────────────
 
-    if not docente:
-        docente, perfil_legacy, puntaje_actual, periodo_info = _legacy_datos(cedula, db)
-        if not docente:
-            return None
-        if not puntaje_actual:
-            return None
-        perfil = perfil_legacy
-        periodo_codigo = periodo_info["codigo"]
+_MODELO_PRIO = ["docencia","abp","tecnologado","posgrado","investigacion","vinculacion","gestion","servicios","administrativo","meipa"]
+
+
+def _build_docente_ctx(cedula: str, db: Session, periodo_codigo: Optional[str] = None) -> Optional[dict]:
+    """Construye el dict de contexto para un docente. Retorna None si no hay datos."""
+    evs = (
+        db.query(Evaluacion)
+        .filter(Evaluacion.cedula == cedula)
+        .order_by(Evaluacion.anio.desc(), Evaluacion.periodo.desc())
+        .all()
+    )
+    if not evs:
+        return None
+
+    # Seleccionar período
+    if periodo_codigo:
+        evs_p = [e for e in evs if e.periodo == periodo_codigo]
     else:
-        periodo_codigo = _get_ultimo_periodo_docente(cedula, db)
-        if not periodo_codigo:
-            _, perfil_legacy, puntaje_actual, periodo_info = _legacy_datos(cedula, db)
-            if not puntaje_actual:
-                return None
-            periodo_codigo = periodo_info["codigo"]
-            perfil = perfil_legacy
-        else:
-            periodo_info = next((p for p in PERIODOS if p["codigo"] == periodo_codigo), None)
-            if not periodo_info:
-                return None
+        # Último período disponible
+        latest_p = evs[0].periodo
+        evs_p = [e for e in evs if e.periodo == latest_p]
 
-            perfil = db.query(PersonalPeriodo).filter_by(
-                cedula=cedula, periodo_codigo=periodo_codigo
-            ).first()
-            if not perfil:
-                perfil = db.query(PersonalPeriodo).filter_by(cedula=cedula).first()
+    if not evs_p:
+        evs_p = evs[:1]
 
-            puntaje_actual = _get_puntaje_actual(cedula, periodo_codigo, db)
-            if not puntaje_actual:
-                _, perfil_leg, puntaje_actual, _ = _legacy_datos(cedula, db)
-                if not puntaje_actual:
-                    return None
-                if not perfil:
-                    perfil = perfil_leg
+    # Priorizar modelo
+    ev: Optional[Evaluacion] = None
+    for m in _MODELO_PRIO:
+        ev = next((e for e in evs_p if e.modelo == m), None)
+        if ev:
+            break
+    if not ev:
+        ev = evs_p[0]
 
-    componentes = _build_componentes(puntaje_actual)
-    rank_data   = _build_ranking(cedula, periodo_codigo, puntaje_actual.modelo, puntaje_actual.puntaje_100, db)
-    periodos_lista, historico_modelos = _build_historico(cedula, db)
+    periodo_str = ev.periodo or "—"
+    sistema     = ev.sistema or "meipa"
+    nivel       = ev.nivel_desempeno or nivel_from_puntaje(ev.puntaje_100)
 
-    for row in historico_modelos:
+    componentes                = _build_componentes(ev)
+    rank_data                  = _build_ranking(cedula, periodo_str, ev.modelo or "docencia", float(ev.puntaje_100 or 0), db)
+    periodos_lista, hist_mod   = _build_historico(cedula, db)
+
+    for row in hist_mod:
         for i, p in enumerate(periodos_lista):
-            if p["codigo"] == periodo_codigo:
+            if p["periodo"] == periodo_str:
                 row["celdas"][i]["es_actual"] = True
 
-    nivel = puntaje_actual.nivel_desempeno or "Sin datos"
-    ranking_colors = {
-        "Excelente": "#059669", "Bueno": "#0056b3",
-        "Regular": "#d97706", "Deficiente": "#dc2626",
-    }
-
-    class PerfilProxy:
-        facultad = "—"; funcion = "—"; dedicacion = "—"
-        antiguedad_str = "—"; nivel_instruccion = "—"
-
-    perfil_ctx = PerfilProxy()
-    if perfil:
-        perfil_ctx.facultad          = perfil.facultad or "—"
-        perfil_ctx.funcion           = perfil.funcion or "—"
-        perfil_ctx.dedicacion        = perfil.dedicacion or "—"
-        perfil_ctx.antiguedad_str    = _antiguedad_str(perfil.antiguedad_anos)
-        perfil_ctx.nivel_instruccion = perfil.nivel_instruccion or "—"
+    ranking_colors = {"Excelente": "#059669", "Bueno": "#0056b3", "Regular": "#d97706", "Deficiente": "#dc2626"}
 
     return {
-        "cedula":           docente.cedula,
-        "nombre_completo":  getattr(docente, "nombre_completo", None) or f"{getattr(docente,'apellidos','')} {getattr(docente,'nombres','')}".strip(),
-        "genero":           getattr(docente, "genero", None) or "—",
-        "facultad":         perfil_ctx.facultad,
-        "funcion":          perfil_ctx.funcion,
-        "dedicacion":       perfil_ctx.dedicacion,
-        "antiguedad_str":   perfil_ctx.antiguedad_str,
-        "nivel_instruccion":perfil_ctx.nivel_instruccion,
-        "periodo_label":    periodo_info["label_corto"],
-        "sistema_label":    "Sistema MEIPA" if periodo_info["sistema"] == "meipa" else "Sistema 360°",
-        "sistema_upper":    periodo_info["sistema"].upper(),
-        "puntaje_fmt":      _fmt_puntaje(puntaje_actual.puntaje_100),
-        "nivel_desempeno":  nivel,
-        "modelo_label":     MODELO_LABELS.get(puntaje_actual.modelo, puntaje_actual.modelo),
-        "ranking_str":      rank_data["ranking"],
-        "ranking_color":    ranking_colors.get(nivel, "#64748b"),
-        "percentil_str":    rank_data["percentil"],
-        "promedio_inst_str":_fmt_puntaje(rank_data.get("promedio_inst")),
-        "diff_str":         rank_data.get("diff_str", "—"),
-        "diff_color":       rank_data.get("diff_color", "#64748b"),
-        "componentes":      componentes,
-        "historico":        periodos_lista,
-        "historico_modelos":historico_modelos,
+        "cedula":            cedula,
+        "nombre_completo":   ev.docente_nombre or cedula,
+        "genero":            ev.sexo or "—",
+        "facultad":          ev.facultad or "—",
+        "funcion":           ev.funcion_docente or "—",
+        "dedicacion":        "—",
+        "antiguedad_str":    _antiguedad_str(ev.antiguedad_anos),
+        "nivel_instruccion": ev.nivel_estudio or "—",
+        "periodo_label":     periodo_str,
+        "sistema_label":     "Sistema MEIPA" if sistema == "meipa" else "Sistema 360°",
+        "sistema_upper":     sistema.upper(),
+        "puntaje_fmt":       _fmt(ev.puntaje_100),
+        "nivel_desempeno":   nivel,
+        "modelo_label":      MODELO_LABELS.get(ev.modelo or "docencia", ev.modelo or ""),
+        "ranking_str":       rank_data["ranking"],
+        "ranking_color":     ranking_colors.get(nivel, "#64748b"),
+        "percentil_str":     rank_data["percentil"],
+        "promedio_inst_str": _fmt(rank_data.get("promedio_inst")),
+        "diff_str":          rank_data.get("diff_str", "—"),
+        "diff_color":        rank_data.get("diff_color", "#64748b"),
+        "componentes":       componentes,
+        "historico":         periodos_lista,
+        "historico_modelos": hist_mod,
     }
+
+
+# ── Funciones públicas ─────────────────────────────────────────────────────────
+
+def generar_pdf_docente(cedula: str, db: Session, periodo_codigo: Optional[str] = None) -> bytes:
+    """
+    Genera el PDF individual de un docente desde la tabla evaluaciones.
+    Lanza ValueError si el docente no existe; RuntimeError si falla la renderización.
+    """
+    ctx = _build_docente_ctx(cedula, db, periodo_codigo)
+    if not ctx:
+        raise ValueError(f"Docente {cedula} no encontrado en la base de datos")
+
+    ctx["logo_url"]          = LOGO_URL
+    ctx["fecha_generacion"]  = datetime.now().strftime("%d/%m/%Y %H:%M")
+    ctx["ia_comentario"]     = None
+
+    # El template espera "docente" y "perfil" como objetos/dicts
+    ctx["docente"] = {
+        "cedula":          ctx["cedula"],
+        "nombre_completo": ctx["nombre_completo"],
+        "genero":          ctx["genero"],
+    }
+
+    class _Perfil:
+        pass
+    p = _Perfil()
+    p.facultad          = ctx["facultad"]
+    p.funcion           = ctx["funcion"]
+    p.dedicacion        = ctx["dedicacion"]
+    p.antiguedad_str    = ctx["antiguedad_str"]
+    p.nivel_instruccion = ctx["nivel_instruccion"]
+    ctx["perfil"] = p
+
+    ctx["puntaje_actual"] = {
+        "puntaje_fmt":     ctx["puntaje_fmt"],
+        "nivel_desempeno": ctx["nivel_desempeno"],
+        "modelo_label":    ctx["modelo_label"],
+        "sistema":         ctx.get("sistema_upper", "").lower(),
+    }
+
+    return _render_pdf("reporte_docente.html", ctx)
 
 
 def generar_pdf_bulk_docentes(cedulas: list, db: Session) -> bytes:
-    """
-    Genera un único PDF con una página por docente (mismo diseño que reporte individual).
-    cedulas: lista de cédulas a incluir (en el orden que lleguen).
-    """
-    from datetime import datetime as _dt
-
-    fecha_gen = _dt.now().strftime("%d/%m/%Y %H:%M")
+    """Genera un PDF con una página por docente."""
+    fecha_gen    = datetime.now().strftime("%d/%m/%Y %H:%M")
     docentes_ctx = []
+
     for cedula in cedulas:
         try:
             ctx = _build_docente_ctx(cedula, db)
@@ -569,185 +371,90 @@ def generar_pdf_bulk_docentes(cedulas: list, db: Session) -> bytes:
                 ctx["fecha_generacion"] = fecha_gen
                 docentes_ctx.append(ctx)
         except Exception:
-            pass  # skip docentes sin datos
+            pass  # silently skip
 
     if not docentes_ctx:
         raise ValueError("No se encontraron datos para los docentes solicitados")
 
-    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    template = env.get_template("reporte_bulk_docentes.html")
-    html_str = template.render(logo_url=LOGO_URL, fecha_generacion=fecha_gen, docentes=docentes_ctx)
-
-    try:
-        from weasyprint import HTML as WP_HTML
-        return WP_HTML(string=html_str, base_url=TEMPLATE_DIR).write_pdf()
-    except Exception:
-        pass
-
-    try:
-        import io as _io
-        from xhtml2pdf import pisa
-        buf = _io.BytesIO()
-        status = pisa.CreatePDF(html_str, dest=buf)
-        if status.err:
-            raise RuntimeError("xhtml2pdf falló al generar el PDF bulk")
-        return buf.getvalue()
-    except ImportError:
-        raise RuntimeError("No se pudo generar el PDF. Instala xhtml2pdf: pip install xhtml2pdf")
+    return _render_pdf("reporte_bulk_docentes.html", {
+        "logo_url":         LOGO_URL,
+        "fecha_generacion": fecha_gen,
+        "docentes":         docentes_ctx,
+    })
 
 
-def generar_pdf_docente(
-    cedula: str,
-    db: Session,
-    periodo_codigo: Optional[str] = None,
-) -> bytes:
+def generar_pdf_directorio(titulo: str, docentes_data: list) -> bytes:
     """
-    Genera el PDF de reporte para un docente.
-    Si periodo_codigo es None, usa el último período disponible.
-    Retorna bytes del PDF.
+    Genera el PDF de directorio con el ranking completo de docentes.
+    docentes_data: lista de dicts con nombre, cedula, facultad, sistema, modelo, puntaje, nivel.
     """
-    # ── Intentar con tablas nuevas (ETL v2) ──────────────────────────────────
-    # Las tablas nuevas pueden no existir aún (se crean al arrancar FastAPI)
-    docente = None
-    try:
-        docente = db.query(Docente).filter_by(cedula=cedula).first()
-    except Exception:
-        db.rollback()  # libera la transacción rota antes de seguir
+    from datetime import datetime as _dt
 
-    if not docente:
-        # Fallback: construir todo desde tabla legacy evaluaciones
-        docente, perfil_legacy, puntaje_actual, periodo_info = _legacy_datos(cedula, db)
-        if not docente:
-            raise ValueError(f"Docente {cedula} no encontrado en ninguna fuente de datos")
-        if not puntaje_actual:
-            raise ValueError(f"No hay datos de evaluación para el docente {cedula}")
-        perfil = perfil_legacy
-        periodo_codigo = periodo_info["codigo"]
-    else:
-        # Resolver período desde tablas nuevas
-        if not periodo_codigo:
-            periodo_codigo = _get_ultimo_periodo_docente(cedula, db)
-        if not periodo_codigo:
-            # Docente existe en nueva tabla pero sin puntajes → probar legacy
-            _, perfil_legacy, puntaje_actual, periodo_info = _legacy_datos(cedula, db)
-            if not puntaje_actual:
-                raise ValueError(f"No hay datos de evaluación para el docente {cedula}")
-            periodo_codigo = periodo_info["codigo"]
-            perfil = perfil_legacy
-        else:
-            periodo_info = next((p for p in PERIODOS if p["codigo"] == periodo_codigo), None)
-            if not periodo_info:
-                raise ValueError(f"Período {periodo_codigo} no válido")
+    MODELO_LABELS_DIR = {k: v for k, v in MODELO_LABELS.items()}
+    NIVEL_COLOR       = {"Excelente":"#059669","Bueno":"#0056b3","Regular":"#d97706","Deficiente":"#dc2626"}
 
-            # Perfil del período
-            perfil = db.query(PersonalPeriodo).filter_by(
-                cedula=cedula, periodo_codigo=periodo_codigo
-            ).first()
-            if not perfil:
-                perfil = db.query(PersonalPeriodo).filter_by(cedula=cedula).first()
+    def _score_color(p):
+        if p is None: return "#94a3b8"
+        p = float(p)
+        if p >= 90: return "#059669"
+        if p >= 75: return "#0056b3"
+        if p >= 60: return "#d97706"
+        return "#dc2626"
 
-            # Puntaje principal
-            puntaje_actual = _get_puntaje_actual(cedula, periodo_codigo, db)
-            if not puntaje_actual:
-                # Puntaje no encontrado en nuevas tablas → fallback legacy
-                _, perfil_leg, puntaje_actual, _ = _legacy_datos(cedula, db)
-                if not puntaje_actual:
-                    raise ValueError(f"No hay puntaje para {cedula} en período {periodo_codigo}")
-                if not perfil:
-                    perfil = perfil_leg
+    total      = len(docentes_data)
+    puntajes   = [float(d.get("puntaje") or 0) for d in docentes_data]
+    promedio   = f"{sum(puntajes)/total:.1f}" if total else "0.0"
+    nivel_count: dict = {}
+    for d in docentes_data:
+        n = d.get("nivel") or "Sin datos"
+        nivel_count[n] = nivel_count.get(n, 0) + 1
 
-    # Componentes
-    componentes = _build_componentes(puntaje_actual)
+    distribucion = []
+    for label, key in [("Excelente","Excelente"),("Bueno","Bueno"),("Regular","Regular"),("Deficiente","Deficiente")]:
+        n   = nivel_count.get(key, 0)
+        pct = round(n / total * 100, 1) if total else 0
+        distribucion.append({"label": label, "n": n, "pct": pct, "color": NIVEL_COLOR[key]})
 
-    # Ranking
-    rank_data = _build_ranking(
-        cedula, periodo_codigo, puntaje_actual.modelo, puntaje_actual.puntaje_100, db
-    )
+    sorted_docs = sorted(docentes_data, key=lambda d: float(d.get("puntaje") or 0), reverse=True)
+    top10       = []
+    for d in sorted_docs[:10]:
+        p      = float(d.get("puntaje") or 0)
+        nombre = d.get("nombre") or ""
+        partes = nombre.split()
+        nombre_corto = " ".join(partes[:3]) if len(partes) >= 3 else nombre
+        top10.append({"nombre_corto": nombre_corto, "puntaje_fmt": f"{p:.1f}", "pct": round(p,1), "color": _score_color(p)})
 
-    # Histórico
-    periodos_lista, historico_modelos = _build_historico(cedula, db)
+    docentes_ctx = []
+    for d in sorted_docs:
+        p      = float(d.get("puntaje") or 0)
+        nivel  = d.get("nivel") or "Sin datos"
+        docentes_ctx.append({
+            "nombre":       d.get("nombre") or "—",
+            "cedula":       d.get("cedula") or "",
+            "facultad":     d.get("facultad") or "—",
+            "sistema":      d.get("sistema") or "",
+            "modelo_label": MODELO_LABELS_DIR.get(d.get("modelo") or "", (d.get("modelo") or "").capitalize()),
+            "puntaje_fmt":  f"{p:.1f}",
+            "score_color":  _score_color(p),
+            "nivel":        nivel,
+            "nivel_css":    nivel.replace(" ", "-"),
+        })
 
-    # Marcar período actual en el histórico
-    for row in historico_modelos:
-        for i, p in enumerate(periodos_lista):
-            if p["codigo"] == periodo_codigo:
-                row["celdas"][i]["es_actual"] = True
+    titulo_corto = titulo[:20] if len(titulo) > 20 else titulo
 
-    # Colores por nivel
-    nivel = puntaje_actual.nivel_desempeno or "Sin datos"
-    ranking_colors = {
-        "Excelente": "#059669", "Bueno": "#0056b3",
-        "Regular": "#d97706", "Deficiente": "#dc2626"
-    }
-
-    # Datos del perfil con fallbacks
-    class PerfilProxy:
-        facultad = "—"
-        funcion = "—"
-        dedicacion = "—"
-        antiguedad_str = "—"
-        nivel_instruccion = "—"
-
-    perfil_ctx = PerfilProxy()
-    if perfil:
-        perfil_ctx.facultad = perfil.facultad or "—"
-        perfil_ctx.funcion = perfil.funcion or "—"
-        perfil_ctx.dedicacion = perfil.dedicacion or "—"
-        perfil_ctx.antiguedad_str = _antiguedad_str(perfil.antiguedad_anos)
-        perfil_ctx.nivel_instruccion = perfil.nivel_instruccion or "—"
-
-    # Contexto del template
     ctx = {
-        "logo_url":       LOGO_URL,
-        "periodo_label":  periodo_info["label_corto"],
-        "sistema_label":  "Sistema MEIPA" if periodo_info["sistema"] == "meipa" else "Sistema 360°",
-        "fecha_generacion": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "docente": {
-            "cedula":          docente.cedula,
-            "nombre_completo": docente.nombre_completo or f"{docente.apellidos} {docente.nombres}".strip(),
-            "genero":          docente.genero or "—",
-        },
-        "perfil": perfil_ctx,
-        "puntaje_actual": {
-            "puntaje_fmt":    _fmt_puntaje(puntaje_actual.puntaje_100),
-            "nivel_desempeno": nivel,
-            "modelo_label":   MODELO_LABELS.get(puntaje_actual.modelo, puntaje_actual.modelo),
-            "sistema":        puntaje_actual.sistema or "",
-        },
-        "componentes":    componentes,
-        "ranking_str":    rank_data["ranking"],
-        "ranking_color":  ranking_colors.get(nivel, "#64748b"),
-        "percentil_str":  rank_data["percentil"],
-        "promedio_inst_str": _fmt_puntaje(rank_data.get("promedio_inst")),
-        "diff_str":       rank_data.get("diff_str", "—"),
-        "diff_color":     rank_data.get("diff_color", "#64748b"),
-        "historico":      periodos_lista,
-        "historico_modelos": historico_modelos,
-        "ia_comentario":  None,  # opcional, se puede pasar desde el endpoint
+        "logo_url":          LOGO_URL,
+        "titulo":            titulo,
+        "titulo_corto":      titulo_corto,
+        "fecha_generacion":  _dt.now().strftime("%d/%m/%Y %H:%M"),
+        "total":             total,
+        "promedio":          promedio,
+        "n_excelente":       nivel_count.get("Excelente", 0),
+        "n_bueno":           nivel_count.get("Bueno", 0),
+        "n_regular":         nivel_count.get("Regular", 0),
+        "n_deficiente":      nivel_count.get("Deficiente", 0),
+        "distribucion":      distribucion,
+        "top10":             top10,
+        "docentes":          docentes_ctx,
     }
-
-    # Renderizar HTML
-    env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    template = env.get_template("reporte_docente.html")
-    html_str = template.render(**ctx)
-
-    # Convertir a PDF — intenta WeasyPrint primero, cae a xhtml2pdf
-    try:
-        from weasyprint import HTML as WP_HTML
-        pdf_bytes = WP_HTML(string=html_str, base_url=TEMPLATE_DIR).write_pdf()
-        return pdf_bytes
-    except Exception:
-        pass  # WeasyPrint no disponible (Windows sin GTK, etc.) → usar xhtml2pdf
-
-    try:
-        import io
-        from xhtml2pdf import pisa
-        buf = io.BytesIO()
-        status = pisa.CreatePDF(html_str, dest=buf)
-        if status.err:
-            raise RuntimeError("xhtml2pdf falló al generar el PDF")
-        return buf.getvalue()
-    except ImportError:
-        raise RuntimeError(
-            "No se pudo generar el PDF. Instala xhtml2pdf: pip install xhtml2pdf"
-        )
+    return _render_pdf("reporte_directorio.html", ctx)

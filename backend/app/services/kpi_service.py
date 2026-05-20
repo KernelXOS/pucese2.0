@@ -517,21 +517,222 @@ class KPIService:
             comp_rows.sort(key=lambda x: x['avg_pct'], reverse=True)
             variables_detalle[cfg_key] = comp_rows
 
+        # ── Tendencia por período (string) ────────────────────────────────────
+        def trend_periodo(sistema):
+            q2 = db.query(Evaluacion)
+            if sistema:
+                q2 = q2.filter(Evaluacion.sistema == sistema)
+            if anio:
+                q2 = q2.filter(Evaluacion.anio == anio)
+            rows2 = (
+                q2.with_entities(
+                    Evaluacion.anio,
+                    Evaluacion.periodo,
+                    func.avg(Evaluacion.puntaje_100),
+                    func.count(Evaluacion.id),
+                )
+                .filter(Evaluacion.periodo.isnot(None))
+                .group_by(Evaluacion.anio, Evaluacion.periodo)
+                .order_by(Evaluacion.anio, Evaluacion.periodo)
+                .all()
+            )
+            return [
+                {'anio': r[0], 'periodo': r[1], 'promedio': round(float(r[2]), 2) if r[2] else None, 'n': r[3]}
+                for r in rows2
+            ]
+
+        # ── Por modelo × período ───────────────────────────────────────────────
+        modelos_all = ['docencia','abp','servicios','posgrado','tecnologado','vinculacion','gestion','administrativo','investigacion']
+        por_modelo_por_periodo: dict = {}
+        for m in modelos_all:
+            rows_mp = (
+                db.query(Evaluacion)
+                .filter(
+                    Evaluacion.sistema == '360',
+                    Evaluacion.modelo == m,
+                    Evaluacion.periodo.isnot(None),
+                    Evaluacion.puntaje_100.isnot(None),
+                )
+                .with_entities(
+                    Evaluacion.anio, Evaluacion.periodo,
+                    func.avg(Evaluacion.puntaje_100), func.count(Evaluacion.id),
+                )
+                .group_by(Evaluacion.anio, Evaluacion.periodo)
+                .order_by(Evaluacion.anio, Evaluacion.periodo)
+                .all()
+            )
+            if rows_mp:
+                por_modelo_por_periodo[m] = [
+                    {'anio': r[0], 'periodo': r[1], 'promedio': round(float(r[2]), 2) if r[2] else None, 'n': r[3]}
+                    for r in rows_mp
+                ]
+
+        # ── Género × período ──────────────────────────────────────────────────
+        rows_gp = (
+            q_all.with_entities(
+                Evaluacion.anio, Evaluacion.periodo, Evaluacion.sexo,
+                func.avg(Evaluacion.puntaje_100),
+            )
+            .filter(Evaluacion.periodo.isnot(None), Evaluacion.sexo.isnot(None), Evaluacion.sexo != '')
+            .group_by(Evaluacion.anio, Evaluacion.periodo, Evaluacion.sexo)
+            .order_by(Evaluacion.anio, Evaluacion.periodo)
+            .all()
+        )
+        _gp_map: dict = {}
+        for anio_v, per, sexo, prom in rows_gp:
+            key = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
+            _gp_map.setdefault(per, {'periodo': per, 'anio': anio_v})
+            _gp_map[per][key] = round(float(prom), 2) if prom else None
+        genero_por_periodo = sorted(_gp_map.values(), key=lambda x: (x.get('anio') or 0, x.get('periodo') or ''))
+
+        # ── Edad × período ────────────────────────────────────────────────────
+        rows_ep = (
+            q_all.with_entities(Evaluacion.anio, Evaluacion.periodo, Evaluacion.edad, Evaluacion.puntaje_100)
+            .filter(Evaluacion.periodo.isnot(None), Evaluacion.edad.isnot(None), Evaluacion.puntaje_100.isnot(None))
+            .all()
+        )
+        _ep_map: dict = {}
+        for anio_v, per, edad, pun in rows_ep:
+            if edad is None or pun is None:
+                continue
+            _ep_map.setdefault(per, {'periodo': per, 'anio': anio_v, **{b: [] for b in AGE_BRACKETS}})
+            if edad < 30:    _ep_map[per]['< 30 años'].append(float(pun))
+            elif edad <= 45: _ep_map[per]['31-45 años'].append(float(pun))
+            elif edad <= 60: _ep_map[per]['46-60 años'].append(float(pun))
+            else:            _ep_map[per]['61+ años'].append(float(pun))
+        edad_por_periodo = []
+        for per, d in sorted(_ep_map.items(), key=lambda x: (x[1].get('anio') or 0, x[0])):
+            row = {'periodo': per, 'anio': d.get('anio')}
+            for b in AGE_BRACKETS:
+                vals_b = d.get(b, [])
+                row[b] = round(sum(vals_b)/len(vals_b), 2) if vals_b else None
+            edad_por_periodo.append(row)
+
+        # ── Antigüedad × período ──────────────────────────────────────────────
+        rows_ap = (
+            q_all.with_entities(Evaluacion.anio, Evaluacion.periodo, Evaluacion.antiguedad_anos, Evaluacion.puntaje_100)
+            .filter(Evaluacion.periodo.isnot(None), Evaluacion.antiguedad_anos.isnot(None), Evaluacion.puntaje_100.isnot(None))
+            .all()
+        )
+        _ap_map: dict = {}
+        for anio_v, per, ant, pun in rows_ap:
+            if ant is None or pun is None:
+                continue
+            _ap_map.setdefault(per, {'periodo': per, 'anio': anio_v, **{b: [] for b in ANTIG_BRACKETS}})
+            if ant <= 3:    _ap_map[per]['0-3 años'].append(float(pun))
+            elif ant <= 10: _ap_map[per]['4-10 años'].append(float(pun))
+            elif ant <= 20: _ap_map[per]['11-20 años'].append(float(pun))
+            else:           _ap_map[per]['20+ años'].append(float(pun))
+        antiguedad_por_periodo = []
+        for per, d in sorted(_ap_map.items(), key=lambda x: (x[1].get('anio') or 0, x[0])):
+            row = {'periodo': per, 'anio': d.get('anio')}
+            for b in ANTIG_BRACKETS:
+                vals_b = d.get(b, [])
+                row[b] = round(sum(vals_b)/len(vals_b), 2) if vals_b else None
+            antiguedad_por_periodo.append(row)
+
+        # ── Facultad × período ────────────────────────────────────────────────
+        rows_fp = (
+            q_all.with_entities(
+                Evaluacion.anio, Evaluacion.periodo, Evaluacion.facultad,
+                func.avg(Evaluacion.puntaje_100), func.count(Evaluacion.id),
+            )
+            .filter(Evaluacion.periodo.isnot(None), Evaluacion.facultad.isnot(None), Evaluacion.facultad != '')
+            .group_by(Evaluacion.anio, Evaluacion.periodo, Evaluacion.facultad)
+            .order_by(Evaluacion.anio, Evaluacion.periodo, Evaluacion.facultad)
+            .all()
+        )
+        facultad_por_periodo = [
+            {'anio': r[0], 'periodo': r[1], 'facultad': r[2], 'promedio': round(float(r[3]), 2) if r[3] else None, 'n': r[4]}
+            for r in rows_fp if r[2]
+        ]
+
+        # ── Género×Edad × período ─────────────────────────────────────────────
+        rows_gep = (
+            q_all.with_entities(
+                Evaluacion.anio, Evaluacion.periodo,
+                Evaluacion.sexo, Evaluacion.edad, Evaluacion.puntaje_100
+            )
+            .filter(
+                Evaluacion.periodo.isnot(None),
+                Evaluacion.sexo.isnot(None), Evaluacion.sexo != '',
+                Evaluacion.edad.isnot(None),
+                Evaluacion.puntaje_100.isnot(None),
+            )
+            .all()
+        )
+        _gep: dict = {}  # (periodo, genero, bracket) -> {anio, vals}
+        for anio_v, per, sexo, edad, pun in rows_gep:
+            gkey = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
+            if edad < 30:    bkt = '< 30 años'
+            elif edad <= 45: bkt = '31-45 años'
+            elif edad <= 60: bkt = '46-60 años'
+            else:            bkt = '61+ años'
+            k = (per, gkey, bkt)
+            if k not in _gep:
+                _gep[k] = {'anio': anio_v, 'vals': []}
+            _gep[k]['vals'].append(float(pun))
+        genero_edad_por_periodo = [
+            {'periodo': per, 'anio': d['anio'], 'genero': gen, 'bracket': bkt,
+             'promedio': round(sum(d['vals'])/len(d['vals']), 2) if d['vals'] else None}
+            for (per, gen, bkt), d in sorted(_gep.items(), key=lambda x: (x[1].get('anio') or 0, x[0][0]))
+            if d.get('vals')
+        ]
+
+        # ── Género×Antigüedad × período ───────────────────────────────────────
+        rows_gap = (
+            q_all.with_entities(
+                Evaluacion.anio, Evaluacion.periodo,
+                Evaluacion.sexo, Evaluacion.antiguedad_anos, Evaluacion.puntaje_100
+            )
+            .filter(
+                Evaluacion.periodo.isnot(None),
+                Evaluacion.sexo.isnot(None), Evaluacion.sexo != '',
+                Evaluacion.antiguedad_anos.isnot(None),
+                Evaluacion.puntaje_100.isnot(None),
+            )
+            .all()
+        )
+        _gap: dict = {}
+        for anio_v, per, sexo, ant, pun in rows_gap:
+            gkey = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
+            if ant <= 3:    bkt = '0-3 años'
+            elif ant <= 10: bkt = '4-10 años'
+            elif ant <= 20: bkt = '11-20 años'
+            else:           bkt = '20+ años'
+            k = (per, gkey, bkt)
+            _gap.setdefault(k, {'anio': anio_v, 'vals': []})['vals'].append(float(pun))
+        genero_antiguedad_por_periodo = [
+            {'periodo': per, 'anio': d['anio'], 'genero': gen, 'bracket': bkt,
+             'promedio': round(sum(d['vals'])/len(d['vals']), 2) if d['vals'] else None}
+            for (per, gen, bkt), d in sorted(_gap.items(), key=lambda x: (x[1].get('anio') or 0, x[0][0]))
+            if d.get('vals')
+        ]
+
         return {
-            'meipa':              meipa_overall,
-            '360':                tres60_overall,
-            'por_modelo_360':     por_modelo_360,
-            'tendencia_meipa':    trend('meipa'),
-            'tendencia_360':      trend('360'),
-            'por_facultad':       por_facultad,
-            'por_genero':         por_genero,
-            'por_edad':           por_edad,
-            'por_antiguedad':     por_antiguedad,
-            'genero_edad':        genero_edad,
-            'genero_antiguedad':  genero_antiguedad,
-            'mejores_peores':     mejores_peores,
-            'estadisticas':       estadisticas,
-            'variables_detalle':  variables_detalle,
+            'meipa':                         meipa_overall,
+            '360':                           tres60_overall,
+            'por_modelo_360':                por_modelo_360,
+            'tendencia_meipa':               trend('meipa'),
+            'tendencia_360':                 trend('360'),
+            'tendencia_periodos_meipa':      trend_periodo('meipa'),
+            'tendencia_periodos_360':        trend_periodo('360'),
+            'por_modelo_por_periodo':        por_modelo_por_periodo,
+            'genero_por_periodo':            genero_por_periodo,
+            'edad_por_periodo':              edad_por_periodo,
+            'antiguedad_por_periodo':        antiguedad_por_periodo,
+            'facultad_por_periodo':          facultad_por_periodo,
+            'genero_edad_por_periodo':       genero_edad_por_periodo,
+            'genero_antiguedad_por_periodo': genero_antiguedad_por_periodo,
+            'por_facultad':                  por_facultad,
+            'por_genero':                    por_genero,
+            'por_edad':                      por_edad,
+            'por_antiguedad':                por_antiguedad,
+            'genero_edad':                   genero_edad,
+            'genero_antiguedad':             genero_antiguedad,
+            'mejores_peores':                mejores_peores,
+            'estadisticas':                  estadisticas,
+            'variables_detalle':             variables_detalle,
         }
 
     def get_ranking_docentes(self, db: Session, modelo: str = None, anio: int = None,
