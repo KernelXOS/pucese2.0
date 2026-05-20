@@ -1896,6 +1896,7 @@ export default function App() {
   const [saludSubTab, setSaludSubTab] = useState<'abp'|'servicios'>('abp')
 
   const [kpis, setKpis]               = useState<any>(null)
+  const [serviciosKpis, setServiciosKpis] = useState<any>(null)
   const [ranking, setRanking]         = useState<any[]>([])
   const [demograficos, setDemograficos] = useState<any>(null)
   const [tendencias, setTendencias]   = useState<any[]>([])
@@ -1959,6 +1960,7 @@ export default function App() {
     setLoading(true)
     setKpis(null); setRanking([]); setDemograficos(null)
     setTendencias([]); setAnalytics(null); setComparativo(null); setTodosDocentes([])
+    setServiciosKpis(null)
     try {
       const { modelo, anio, sistemaParam } = getQueryParams()
 
@@ -1970,20 +1972,26 @@ export default function App() {
         setComparativo(compRes.data)
         setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
       } else {
-        const [kpiRes, rankRes, demoRes, tendRes, analyticsRes, todosRes] = await Promise.all([
+        const fetchList: Promise<any>[] = [
           api.getKPIs(modelo, anio, sistemaParam),
           api.getRanking(1000, modelo, anio, sistemaParam),
           api.getDemograficos(modelo, anio, sistemaParam),
           api.getTendencias(modelo, sistemaParam),
           api.getAnalytics(sistemaParam, modelo, anio),
           api.getTodosDocentes(anio, modelo, sistemaParam),
-        ])
+        ]
+        // En Salud/ABP también traer KPIs de Servicios para mostrar barra extra
+        if (sistema === 'salud' && modelo === 'abp') {
+          fetchList.push(api.getKPIs('servicios', anio, '360'))
+        }
+        const [kpiRes, rankRes, demoRes, tendRes, analyticsRes, todosRes, svcRes] = await Promise.all(fetchList)
         setKpis(kpiRes.data)
         setRanking(rankRes.data)
         setDemograficos(demoRes.data)
         setTendencias(tendRes.data)
         setAnalytics(analyticsRes.data)
         setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
+        if (svcRes) setServiciosKpis(svcRes.data)
       }
     } catch (err) {
       console.error(err)
@@ -2661,31 +2669,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ── Selector ABP / Servicios (solo en Salud) ─────────────── */}
-              {sistema === 'salud' && (
-                <div className="flex items-center gap-2 mb-5">
-                  <Heart size={13} className="text-red-400" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Modelo Salud ·</span>
-                  {[
-                    { key: 'abp',       label: 'Docencia ABP',          icon: GraduationCap },
-                    { key: 'servicios', label: 'Servicios Hospitalarios', icon: Stethoscope  },
-                  ].map(opt => (
-                    <button key={opt.key}
-                      onClick={() => setSaludSubTab(opt.key as 'abp'|'servicios')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
-                      style={{
-                        background: saludSubTab === opt.key ? '#dc2626' : '#fef2f2',
-                        color:      saludSubTab === opt.key ? '#fff'    : '#b91c1c',
-                        border:     `1px solid ${saludSubTab === opt.key ? '#dc2626' : '#fecaca'}`,
-                      }}
-                    >
-                      <opt.icon size={11} />
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               {kpis && (
                 <div ref={sistemaRef}>
                   {/* Section header */}
@@ -2772,6 +2755,22 @@ export default function App() {
                           color={COMP_COLORS[i]}
                         />
                       ))}
+                      {/* Servicios Hospitalarios — barra extra solo en Salud/ABP */}
+                      {sistema === 'salud' && serviciosKpis?.componentes?.het_estudiantil && (
+                        <div className="md:col-span-2 pt-3 border-t border-slate-100">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Stethoscope size={11} className="text-red-400" />
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Evaluación complementaria · Prácticas Hospitalarias</span>
+                          </div>
+                          <ComponentBar
+                            label="Servicios Hospitalarios (Het. Est.)"
+                            value={serviciosKpis.componentes.het_estudiantil.promedio || 0}
+                            max={100}
+                            peso={100}
+                            color="#b91c1c"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
