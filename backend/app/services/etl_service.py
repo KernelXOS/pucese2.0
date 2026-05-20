@@ -12,19 +12,23 @@ import numpy as np
 from sqlalchemy.orm import Session
 from app.models.evaluacion import Evaluacion
 
-_HERE    = os.path.dirname(os.path.abspath(__file__))
-_BACKEND = os.path.dirname(os.path.dirname(_HERE))
+# Ruta de datos: busca en múltiples ubicaciones posibles
+_HERE    = os.path.dirname(os.path.abspath(__file__))           # .../app/services
+_BACKEND = os.path.dirname(os.path.dirname(_HERE))              # .../app  (2 niveles)
+_BACKEND3 = os.path.dirname(_BACKEND)                           # .../ (3 niveles, por si acaso)
 
 _DATA_CANDIDATES = [
-    '/app/data',
-    os.path.join(_BACKEND, 'data'),
-    os.path.join(os.getcwd(), 'data'),
-    r'C:\Users\grego\Desktop\DATOS REALES',
-    r'C:\Users\KernelXos\Desktop\DATOS_DOCENTE',
+    '/app/data',                                                 # Railway Docker (WORKDIR=/app)
+    os.path.join(_BACKEND,  'data'),                            # 2 niveles desde services
+    os.path.join(_BACKEND3, 'data'),                            # 3 niveles desde services
+    os.path.join(os.getcwd(), 'data'),                          # Directorio de trabajo
+    r'C:\Users\KernelXos\Desktop\DATOS_DOCENTE',               # Fallback Windows local
 ]
 
-BASE     = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
+BASE = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
 EVAL_DIR = os.path.join(BASE, 'eval_detalladas_2025_02')
+
+print(f"[ETL] BASE resuelto a: {BASE} (existe={os.path.isdir(BASE)})")
 STAFF_REF_DATE = datetime(2025, 1, 1)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -61,6 +65,7 @@ FACULTAD_MAP = {
     'MENTOR':             'Sin clasificar',
     'NO DEFINIDA':        'Sin clasificar',
 }
+
 
 def _map_facultad(text: str) -> str:
     if not text or pd.isna(text):
@@ -246,20 +251,10 @@ class ETLService:
         records += self._source_hetero_xlsx(
             os.path.join(BASE, 'HETEROEVALUACION 202466.xlsx'), '202466', staff)
         records += self._source_360_mecdi_2024(staff)
-
-        # ── 2025-I ────────────────────────────────────────────────────────────
-        eval_dir_01 = os.path.join(BASE, 'eval_detalladas_2025_01')
-        if os.path.exists(eval_dir_01):
-            ms_01 = self._source_eval_detalladas_2025(staff, eval_dir=eval_dir_01)
-            self._merge_csv_hetero_2025(ms_01, staff, csv_code='202556')
-            self._reclassify_by_programa(ms_01)
-            records += self._build_360_records_2025(ms_01, staff, periodo='202501', anio=2025)
-
-        # ── 2025-II ───────────────────────────────────────────────────────────
-        ms_02 = self._source_eval_detalladas_2025(staff, eval_dir=EVAL_DIR)
-        self._merge_csv_hetero_2025(ms_02, staff, csv_code='202566')
-        self._reclassify_by_programa(ms_02)
-        records += self._build_360_records_2025(ms_02, staff, periodo='202502', anio=2025)
+        model_scores = self._source_eval_detalladas_2025(staff)
+        self._merge_csv_hetero_2025(model_scores, staff)
+        self._reclassify_by_programa(model_scores)
+        records += self._build_360_records_2025(model_scores, staff)
 
         # Wipe and reload
         db.query(Evaluacion).delete()
@@ -267,24 +262,6 @@ class ETLService:
         for rec in records:
             db.add(Evaluacion(**self._clean_rec(rec)))
         db.commit()
-
-        # Normalizar códigos de período legacy → etiquetas legibles
-        from sqlalchemy import text as _tx
-        _PNORM = [
-            ('2023-I',  "'202361','202301'"),
-            ('2023-II', "'202366','202302'"),
-            ('2024-I',  "'202461','202401'"),
-            ('2024-II', "'202402','202456','202466'"),
-            ('2025-I',  "'202501'"),
-            ('2025-II', "'202502'"),
-        ]
-        for label, codes in _PNORM:
-            db.execute(_tx(
-                f"UPDATE evaluaciones SET periodo='{label}' "
-                f"WHERE periodo IN ({codes}) AND periodo!='{label}'"
-            ))
-        db.commit()
-
         return len(records)
 
     # ── MEIPA: CONSOLIDADO HETEROEVALUACIÓN ───────────────────────────────────
@@ -789,9 +766,8 @@ class ETLService:
 
     # ── eval_detalladas_2025 ──────────────────────────────────────────────────
 
-    def _source_eval_detalladas_2025(self, staff: dict, eval_dir: str = None) -> dict:
-        target_dir = eval_dir or EVAL_DIR
-        if not os.path.exists(target_dir):
+    def _source_eval_detalladas_2025(self, staff: dict) -> dict:
+        if not os.path.exists(EVAL_DIR):
             return {}
         MAX_CAL = {3: 4, 10: 4, 11: 4, 12: 4, 13: 4}
         # Instrument codes → (modelo, componente, peso)
@@ -834,8 +810,8 @@ class ETLService:
             170:('vinculacion',  'hetero_inv', 15),
         }
 
-        frames = [pd.read_excel(os.path.join(target_dir, f), engine='openpyxl')
-                  for f in os.listdir(target_dir) if f.endswith('.xlsx')]
+        frames = [pd.read_excel(os.path.join(EVAL_DIR, f), engine='openpyxl')
+                  for f in os.listdir(EVAL_DIR) if f.endswith('.xlsx')]
         if not frames:
             return {}
         df = pd.concat(frames, ignore_index=True)
@@ -978,57 +954,22 @@ class ETLService:
             model_scores.pop(k, None)
         model_scores.update(to_add)
 
-        # ── Reverse cleanup: ABP records with non-medical programs → docencia ──
-        # If an ABP record has a program that isn't medical (Medicina/Internado),
-        # it was misclassified because students used ABP instrument forms in error.
-        # Move it back to docencia (or merge with existing docencia entry).
-        abp_to_remove = []
-        abp_to_docencia: dict = {}
-        for (ced, modelo), info in model_scores.items():
-            if modelo != 'abp':
-                continue
-            prog = str(info.get('programa', '')).upper().strip()
-            if any(k in prog for k in ('MEDICINA', 'INTERNADO', 'MÉDIC', 'MEDIC', 'ABP')):
-                continue  # legitimate ABP
-            # Non-medical program in ABP bucket → reclassify to docencia
-            abp_to_remove.append((ced, modelo))
-            doc_key = (ced, 'docencia')
-            if doc_key in model_scores:
-                # Merge non-overlapping scores into existing docencia entry
-                for comp, val in info['scores'].items():
-                    if comp not in model_scores[doc_key]['scores']:
-                        model_scores[doc_key]['scores'][comp] = val
-            elif doc_key in abp_to_docencia:
-                for comp, val in info['scores'].items():
-                    if comp not in abp_to_docencia[doc_key]['scores']:
-                        abp_to_docencia[doc_key]['scores'][comp] = val
-            else:
-                abp_to_docencia[doc_key] = {
-                    'nombre':   info['nombre'],
-                    'programa': info['programa'],
-                    'scores':   dict(info['scores']),
-                }
-        for k in abp_to_remove:
-            model_scores.pop(k, None)
-        model_scores.update(abp_to_docencia)
-
     # ── CSV hetero 2025 ───────────────────────────────────────────────────────
 
-    def _merge_csv_hetero_2025(self, model_scores: dict, staff: dict, csv_code: str = None):
+    def _merge_csv_hetero_2025(self, model_scores: dict, staff: dict):
         INSTR_CSV = {
             _norm_str('Heteroevaluación Grado Nuevo Docencia Esmeraldas'): ('docencia','hetero_est'),
             _norm_str('Heteroevaluación Grado Nuevo Docencia Quito'):      ('docencia','hetero_est'),
             _norm_str('Heteroevalauación Grado Nuevo ABP Quito'):          ('abp','hetero_est'),
             _norm_str('Heteroevaluación Grado Nuevo Vinculación Quito'):   ('vinculacion','hetero_est'),
-            _norm_str('Heteroevalauación Grado Nuevo Servicios Quito'):    ('docencia','hetero_est'),
+            _norm_str('Heteroevalauación Grado Nuevo Servicios Quito'):    ('servicios','hetero_est'),
             _norm_str('Heteroevaluacion Grado Nuevo Docencia Esmeraldas'): ('docencia','hetero_est'),
             _norm_str('Heteroevaluacion Grado Nuevo Docencia Quito'):      ('docencia','hetero_est'),
             _norm_str('Heteroevaluacion Grado Nuevo ABP Quito'):           ('abp','hetero_est'),
         }
-        if csv_code:
-            csv_files = [f for f in os.listdir(BASE) if f.endswith('.csv') and csv_code in f]
-        else:
-            csv_files = [f for f in os.listdir(BASE) if f.endswith('.csv') and ('202566' in f or '202556' in f)]
+        if not os.path.isdir(BASE):
+            return
+        csv_files = [f for f in os.listdir(BASE) if f.endswith('.csv') and ('202566' in f or '202556' in f)]
         frames = []
         for f in csv_files:
             try:
@@ -1074,12 +1015,14 @@ class ETLService:
 
     # ── Build 360 records 2025 ────────────────────────────────────────────────
 
-    def _build_360_records_2025(self, model_scores: dict, staff: dict, periodo: str = '202502', anio: int = 2025) -> list:
+    def _build_360_records_2025(self, model_scores: dict, staff: dict) -> list:
         MODEL_WEIGHTS = {
             # Het.Est(50) + Pares(20) + CEV(10) + Auto(20) = 100
             'docencia':      {'hetero_est':50,'pares':20,'aula':10,'auto':20},
             'abp':           {'hetero_est':50,'pares':20,'aula':10,'auto':20},
             'tecnologado':   {'hetero_est':50,'pares':20,'aula':10,'auto':20},
+            # Salud — Servicios Hospitalarios: sólo Het.Est.(100%)
+            'servicios':     {'hetero_est':100},
             # Het.Est(60) + Auto(30) + CEV(10) = 100
             'posgrado':      {'hetero_est':60,'auto':30,'aula':10},
             # Het.Dir.Inv(50) + Auto(20) + Par(15) + Decano(15) = 100
@@ -1114,7 +1057,7 @@ class ETLService:
             rec = {
                 'docente_nombre': info['nombre'] or self._build_nombre(ced, staff),
                 'facultad':       _MODELO_FACULTAD.get(modelo) or _map_facultad(programa), 'carrera': programa,
-                'periodo': periodo, 'anio': anio, 'modelo': modelo, 'sistema': '360', 'cedula': ced,
+                'periodo': '202502', 'anio': 2025, 'modelo': modelo, 'sistema': '360', 'cedula': ced,
                 'puntaje_100':    puntaje, 'promedio': round(puntaje / 100 * 5, 2),
                 'nivel_desempeno': _nivel_from_puntaje(puntaje),
                 'comp_auto':       round(comp_vals.get('auto', 0), 2),
@@ -1133,6 +1076,10 @@ class ETLService:
                 rec['eval_pares']      = round(comp_vals.get('pares', 0) / 100 * 20, 2)
                 rec['aula_virtual']    = round(comp_vals.get('aula',  0) / 100 * 10, 2)  # CEV peso=10
                 rec['autoevaluacion']  = round(comp_vals.get('auto',  0) / 100 * 20, 2)  # Auto peso=20
+            elif modelo == 'servicios':
+                # Salud — Servicios Hospitalarios: sólo Het.Est.(100%)
+                h = comp_vals.get('hetero_est', 0)
+                rec['het_estudiantil'] = round(h, 2)  # ya es sobre 100
             elif modelo == 'posgrado':
                 # Het.Est(60) + Auto(30) + CEV(10)
                 h = comp_vals.get('hetero_est', 0)

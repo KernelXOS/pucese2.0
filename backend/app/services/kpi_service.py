@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.evaluacion import Evaluacion
-from app.models.docente import PersonalPeriodo
 
 # Weight definitions per model
 MODEL_CONFIG = {
@@ -18,6 +17,8 @@ MODEL_CONFIG = {
     # Coevalúa.Dir(50) + Het.Docentes(30) + Auto(20) = 100
     'gestion':        {'components': [('comp_hetero_dir',50),('comp_hetero_est',30),('comp_auto',20)],                     'label': 'Gestión'},
     'administrativo': {'components': [('comp_hetero_dir',50),('comp_hetero_est',30),('comp_auto',20)],                     'label': 'Administrativo'},
+    # Salud — Servicios Hospitalarios: sólo Heteroevaluación Estudiantil (100%)
+    'servicios':      {'components': [('het_estudiantil',100)],                                                             'label': 'Salud / Servicios'},
 }
 
 MEIPA_MODEL_CONFIG = {
@@ -224,7 +225,7 @@ class KPIService:
         meipa_overall  = avg_for('meipa')
         tres60_overall = avg_for('360')
 
-        modelos_360    = ['docencia', 'abp', 'posgrado', 'tecnologado', 'vinculacion', 'gestion', 'administrativo', 'investigacion']
+        modelos_360    = ['docencia', 'abp', 'servicios', 'posgrado', 'tecnologado', 'vinculacion', 'gestion', 'administrativo', 'investigacion']
         por_modelo_360 = {m: avg_for('360', m) for m in modelos_360}
 
         def trend(sistema):
@@ -238,57 +239,6 @@ class KPIService:
                     .group_by(Evaluacion.anio)\
                     .order_by(Evaluacion.anio).all()
             return [{'anio': r[0], 'promedio': round(r[1], 2) if r[1] else None} for r in rows]
-
-        def trend_periodos(sistema):
-            """Tendencia agrupada por período (ej: 2023-I, 2023-II, 2024-I…)."""
-            q = db.query(Evaluacion)
-            if sistema:
-                q = q.filter(Evaluacion.sistema == sistema)
-            if anio:
-                q = q.filter(Evaluacion.anio == anio)
-            rows = q.with_entities(
-                Evaluacion.periodo,
-                Evaluacion.anio,
-                func.avg(Evaluacion.puntaje_100),
-                func.count(Evaluacion.id),
-            ).filter(
-                Evaluacion.periodo != None,
-                Evaluacion.anio    != None,
-            ).group_by(Evaluacion.periodo, Evaluacion.anio)\
-             .order_by(Evaluacion.anio, Evaluacion.periodo).all()
-            return [
-                {'periodo': r[0], 'anio': r[1],
-                 'promedio': round(r[2], 2) if r[2] else None,
-                 'n': r[3]}
-                for r in rows
-            ]
-
-        def por_modelo_por_periodo_360():
-            """Promedio por (modelo, período) para el gráfico de barras agrupado."""
-            modelos = ['docencia','abp','posgrado','tecnologado','vinculacion','gestion','investigacion']
-            result = {}
-            for m in modelos:
-                q = db.query(Evaluacion).filter(
-                    Evaluacion.sistema == '360',
-                    Evaluacion.modelo  == m,
-                )
-                if anio:
-                    q = q.filter(Evaluacion.anio == anio)
-                rows = q.with_entities(
-                    Evaluacion.periodo,
-                    Evaluacion.anio,
-                    func.avg(Evaluacion.puntaje_100),
-                    func.count(Evaluacion.id),
-                ).filter(Evaluacion.periodo != None, Evaluacion.anio != None)\
-                 .group_by(Evaluacion.periodo, Evaluacion.anio)\
-                 .order_by(Evaluacion.anio, Evaluacion.periodo).all()
-                result[m] = [
-                    {'periodo': r[0], 'anio': r[1],
-                     'promedio': round(r[2], 2) if r[2] else None,
-                     'n': r[3]}
-                    for r in rows
-                ]
-            return result
 
         # ── Base query (all records, optional year filter) ────────────────────
         q_all = db.query(Evaluacion)
@@ -388,142 +338,14 @@ class KPIService:
             for g, brackets in _crossa.items()
         }
 
-        # ── Demografía por período ────────────────────────────────────────────
-        # Género × período
-        gp_rows = (
-            q_all.with_entities(Evaluacion.periodo, Evaluacion.anio, Evaluacion.sexo, func.avg(Evaluacion.puntaje_100))
-            .filter(Evaluacion.periodo != None, Evaluacion.sexo != None, Evaluacion.sexo != '')
-            .group_by(Evaluacion.periodo, Evaluacion.anio, Evaluacion.sexo)
-            .order_by(Evaluacion.anio, Evaluacion.periodo).all()
-        )
-        _gp: dict = {}
-        for periodo, anio_val, sexo, avg_v in gp_rows:
-            gkey = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
-            if periodo not in _gp:
-                _gp[periodo] = {'periodo': periodo, 'anio': anio_val}
-            _gp[periodo][gkey] = round(float(avg_v), 2) if avg_v else None
-        genero_por_periodo = sorted(_gp.values(), key=lambda x: (x.get('anio', 0), x.get('periodo', '')))
-
-        # Edad × período
-        ep_raw = (
-            q_all.with_entities(Evaluacion.periodo, Evaluacion.anio, Evaluacion.edad, Evaluacion.puntaje_100)
-            .filter(Evaluacion.periodo != None, Evaluacion.edad != None, Evaluacion.puntaje_100 != None).all()
-        )
-        _ep: dict = {}
-        for periodo, anio_val, edad, pun in ep_raw:
-            if not periodo or edad is None: continue
-            if edad < 30:    bracket = '< 30 años'
-            elif edad <= 45: bracket = '31-45 años'
-            elif edad <= 60: bracket = '46-60 años'
-            else:            bracket = '61+ años'
-            if periodo not in _ep:
-                _ep[periodo] = {'periodo': periodo, 'anio': anio_val, '_b': {b: [] for b in AGE_BRACKETS}}
-            _ep[periodo]['_b'][bracket].append(float(pun))
-        edad_por_periodo = []
-        for p, d in sorted(_ep.items(), key=lambda x: (x[1].get('anio', 0), x[0])):
-            entry: dict = {'periodo': d['periodo'], 'anio': d['anio']}
-            for b in AGE_BRACKETS:
-                v = d['_b'][b]
-                entry[b] = round(sum(v)/len(v), 2) if v else None
-            edad_por_periodo.append(entry)
-
-        # Antigüedad × período
-        ap_raw = (
-            q_all.with_entities(Evaluacion.periodo, Evaluacion.anio, Evaluacion.antiguedad_anos, Evaluacion.puntaje_100)
-            .filter(Evaluacion.periodo != None, Evaluacion.antiguedad_anos != None, Evaluacion.puntaje_100 != None).all()
-        )
-        _ant: dict = {}
-        for periodo, anio_val, ant, pun in ap_raw:
-            if not periodo or ant is None: continue
-            if ant <= 3:    bracket = '0-3 años'
-            elif ant <= 10: bracket = '4-10 años'
-            elif ant <= 20: bracket = '11-20 años'
-            else:           bracket = '20+ años'
-            if periodo not in _ant:
-                _ant[periodo] = {'periodo': periodo, 'anio': anio_val, '_b': {b: [] for b in ANTIG_BRACKETS}}
-            _ant[periodo]['_b'][bracket].append(float(pun))
-        antiguedad_por_periodo = []
-        for p, d in sorted(_ant.items(), key=lambda x: (x[1].get('anio', 0), x[0])):
-            entry2: dict = {'periodo': d['periodo'], 'anio': d['anio']}
-            for b in ANTIG_BRACKETS:
-                v = d['_b'][b]
-                entry2[b] = round(sum(v)/len(v), 2) if v else None
-            antiguedad_por_periodo.append(entry2)
-
-        # ── Género × Edad × período ───────────────────────────────────────────
-        gep_raw = (
-            q_all.with_entities(Evaluacion.periodo, Evaluacion.anio, Evaluacion.sexo,
-                                Evaluacion.edad, Evaluacion.puntaje_100)
-            .filter(Evaluacion.periodo != None, Evaluacion.sexo != None,
-                    Evaluacion.edad != None, Evaluacion.puntaje_100 != None).all()
-        )
-        _gep: dict = {}
-        _gep_meta: dict = {}
-        for periodo, anio_val, sexo, edad, pun in gep_raw:
-            if not periodo: continue
-            gkey = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
-            if edad < 30:    bkt = '< 30 años'
-            elif edad <= 45: bkt = '31-45 años'
-            elif edad <= 60: bkt = '46-60 años'
-            else:            bkt = '61+ años'
-            _gep.setdefault((periodo, gkey, bkt), []).append(float(pun))
-            _gep_meta[periodo] = anio_val
-        genero_edad_por_periodo = [
-            {'periodo': k[0], 'anio': _gep_meta.get(k[0]), 'genero': k[1], 'bracket': k[2],
-             'promedio': round(sum(v)/len(v), 2) if v else None}
-            for k, v in sorted(_gep.items(), key=lambda x: (_gep_meta.get(x[0][0], 0), x[0][0]))
-        ]
-
-        # ── Género × Antigüedad × período ─────────────────────────────────────
-        gap_raw = (
-            q_all.with_entities(Evaluacion.periodo, Evaluacion.anio, Evaluacion.sexo,
-                                Evaluacion.antiguedad_anos, Evaluacion.puntaje_100)
-            .filter(Evaluacion.periodo != None, Evaluacion.sexo != None,
-                    Evaluacion.antiguedad_anos != None, Evaluacion.puntaje_100 != None).all()
-        )
-        _gap: dict = {}
-        _gap_meta: dict = {}
-        for periodo, anio_val, sexo, ant, pun in gap_raw:
-            if not periodo: continue
-            gkey = _GENERO_NORM.get(str(sexo).lower().strip(), str(sexo).strip())
-            if ant <= 3:    bkt = '0-3 años'
-            elif ant <= 10: bkt = '4-10 años'
-            elif ant <= 20: bkt = '11-20 años'
-            else:           bkt = '20+ años'
-            _gap.setdefault((periodo, gkey, bkt), []).append(float(pun))
-            _gap_meta[periodo] = anio_val
-        genero_antiguedad_por_periodo = [
-            {'periodo': k[0], 'anio': _gap_meta.get(k[0]), 'genero': k[1], 'bracket': k[2],
-             'promedio': round(sum(v)/len(v), 2) if v else None}
-            for k, v in sorted(_gap.items(), key=lambda x: (_gap_meta.get(x[0][0], 0), x[0][0]))
-        ]
-
-        # ── Facultad × período ────────────────────────────────────────────────
-        fp_rows = (
-            q_all.with_entities(
-                Evaluacion.periodo, Evaluacion.anio,
-                Evaluacion.facultad,
-                func.avg(Evaluacion.puntaje_100),
-                func.count(Evaluacion.id),
-            )
-            .filter(Evaluacion.periodo != None, Evaluacion.facultad != None, Evaluacion.facultad != '')
-            .group_by(Evaluacion.periodo, Evaluacion.anio, Evaluacion.facultad)
-            .order_by(Evaluacion.anio, Evaluacion.periodo)
-            .all()
-        )
-        facultad_por_periodo = [
-            {'periodo': r[0], 'anio': r[1], 'facultad': r[2],
-             'promedio': round(float(r[3]), 2) if r[3] else None, 'n': r[4]}
-            for r in fp_rows if r[2]
-        ]
-
         # ── Mejores y Peores por modelo 360 ──────────────────────────────────
         RANKING_MODELS = {
-            'Pregrado':      'docencia',
-            'Salud / ABP':   'abp',
-            'Vinculación':   'vinculacion',
-            'Investigación': 'investigacion',
-            'Gestión':       'gestion',
+            'Pregrado':             'docencia',
+            'Salud / ABP':          'abp',
+            'Salud / Servicios':    'servicios',
+            'Vinculación':          'vinculacion',
+            'Investigación':        'investigacion',
+            'Gestión':              'gestion',
         }
         mejores_peores = {}
         for label, modelo in RANKING_MODELS.items():
@@ -597,7 +419,7 @@ class KPIService:
             '360':   _desc(_puntajes('360')),
             'por_modelo': {
                 m: _desc(_puntajes('360', m))
-                for m in ['docencia', 'abp', 'vinculacion', 'investigacion', 'gestion', 'tecnologado', 'posgrado']
+                for m in ['docencia', 'abp', 'servicios', 'vinculacion', 'investigacion', 'gestion', 'tecnologado', 'posgrado']
             },
         }
 
@@ -615,6 +437,9 @@ class KPIService:
                 ('eval_pares',      'Evaluación por Pares',          20),
                 ('aula_virtual',    'Aula Virtual / CEV',            10),
                 ('autoevaluacion',  'Autoevaluación',                20),
+            ]),
+            '360_servicios': ('360', 'servicios', [
+                ('het_estudiantil', 'Het. Estudiantil (Hosp.)',     100),
             ]),
             '360_vinculacion': ('360', 'vinculacion', [
                 ('comp_hetero_est', 'Het. Estudiantil',              100),
@@ -698,15 +523,6 @@ class KPIService:
             'por_modelo_360':     por_modelo_360,
             'tendencia_meipa':    trend('meipa'),
             'tendencia_360':      trend('360'),
-            'tendencia_periodos_meipa': trend_periodos('meipa'),
-            'tendencia_periodos_360':  trend_periodos('360'),
-            'por_modelo_por_periodo':  por_modelo_por_periodo_360(),
-            'genero_por_periodo':      genero_por_periodo,
-            'edad_por_periodo':        edad_por_periodo,
-            'antiguedad_por_periodo':  antiguedad_por_periodo,
-            'facultad_por_periodo':           facultad_por_periodo,
-            'genero_edad_por_periodo':        genero_edad_por_periodo,
-            'genero_antiguedad_por_periodo':  genero_antiguedad_por_periodo,
             'por_facultad':       por_facultad,
             'por_genero':         por_genero,
             'por_edad':           por_edad,
@@ -744,7 +560,7 @@ class KPIService:
          .order_by(func.avg(Evaluacion.puntaje_100).desc())\
          .limit(limit).all()
 
-        result = [{
+        return [{
             'nombre':          r[0],
             'facultad':        r[1],
             'periodo':         r[2],
@@ -763,31 +579,9 @@ class KPIService:
             'nivel':           r[15] or 'Sin datos',
             'cedula':          r[16] or '',
             'sistema':         r[17] or '',
-            'fecha_ingreso':   None,
         } for r in ranking]
 
-        # Enriquecer con fecha_ingreso desde personal_periodo (más reciente por cédula)
-        cedulas = [r['cedula'] for r in result if r['cedula']]
-        if cedulas:
-            fi_rows = (
-                db.query(PersonalPeriodo.cedula, PersonalPeriodo.fecha_ingreso)
-                .filter(
-                    PersonalPeriodo.cedula.in_(cedulas),
-                    PersonalPeriodo.fecha_ingreso.isnot(None),
-                )
-                .order_by(PersonalPeriodo.periodo_codigo.desc())
-                .all()
-            )
-            fi_map: dict = {}
-            for ced, fi in fi_rows:
-                if ced not in fi_map:
-                    fi_map[ced] = fi.isoformat() if fi else None
-            for r in result:
-                r['fecha_ingreso'] = fi_map.get(r['cedula'])
-
-        return result
-
-    def get_todos_docentes(self, db: Session, anio: int = None, modelo: str = None, sistema: str = None) -> list:
+    def get_todos_docentes(self, db: Session, anio: int = None) -> list:
         """All teachers grouped by (cedula, sistema, modelo) with per-component normalized %."""
         _COMP_CFG: dict = {
             ('360', 'docencia'):     [('het_estudiantil',50),('eval_pares',20),('aula_virtual',10),('autoevaluacion',20)],
@@ -798,6 +592,7 @@ class KPIService:
             ('360', 'investigacion'):[('comp_hetero_dir',100),('comp_pares',100),('comp_hetero_est',100),('comp_auto',100)],
             ('360', 'gestion'):      [('comp_hetero_dir',100),('comp_hetero_est',100),('comp_auto',100)],
             ('360', 'administrativo'):[('comp_hetero_dir',100),('comp_hetero_est',100),('comp_auto',100)],
+            ('360', 'servicios'):    [('het_estudiantil',100)],
             ('meipa', 'docencia'):   [('comp_hetero_est',100),('comp_hetero_dir',100),('comp_pares',100),('comp_auto',100)],
         }
         _COMP_LABELS: dict = {
@@ -829,10 +624,6 @@ class KPIService:
         )
         if anio:
             q = q.filter(Evaluacion.anio == anio)
-        if modelo:
-            q = q.filter(Evaluacion.modelo == modelo)
-        if sistema:
-            q = q.filter(Evaluacion.sistema == sistema)
 
         from collections import defaultdict
         groups: dict = defaultdict(list)
@@ -862,119 +653,18 @@ class KPIService:
 
             componentes.sort(key=lambda x: x['pct'], reverse=True)
             result.append({
-                'nombre':      nombre,
-                'cedula':      ced or '',
-                'sistema':     sis or '',
-                'modelo':      mod or '',
-                'facultad':    facultad,
-                'puntaje':     puntaje,
-                'nivel':       nivel,
+                'nombre':   nombre,
+                'cedula':   ced or '',
+                'sistema':  sis or '',
+                'modelo':   mod or '',
+                'facultad': facultad,
+                'puntaje':  puntaje,
+                'nivel':    nivel,
                 'componentes': componentes,
-                'fecha_ingreso': None,
             })
 
         result.sort(key=lambda x: x['puntaje'], reverse=True)
-
-        # Enriquecer con fecha_ingreso
-        cedulas = [r['cedula'] for r in result if r['cedula']]
-        if cedulas:
-            fi_rows = (
-                db.query(PersonalPeriodo.cedula, PersonalPeriodo.fecha_ingreso)
-                .filter(
-                    PersonalPeriodo.cedula.in_(cedulas),
-                    PersonalPeriodo.fecha_ingreso.isnot(None),
-                )
-                .order_by(PersonalPeriodo.periodo_codigo.desc())
-                .all()
-            )
-            fi_map: dict = {}
-            for ced2, fi in fi_rows:
-                if ced2 not in fi_map:
-                    fi_map[ced2] = fi.isoformat() if fi else None
-            for r in result:
-                r['fecha_ingreso'] = fi_map.get(r['cedula'])
-
         return result
-
-    def get_competencias_docente(self, db: Session, cedula: str) -> dict:
-        """Desglose de competencias por docente a partir de RespuestaRaw (360°) y PuntajeFinal (MEIPA)."""
-        from app.models.respuesta import RespuestaRaw
-        from app.models.puntaje import PuntajeFinal
-        from app.models.instrumento import Instrumento
-
-        # Mapa instrumento code → descripción
-        instr_map = {r.cod: r.descripcion for r in db.query(Instrumento).all()}
-
-        # ── 360°: competencias desde RespuestaRaw ────────────────────────────
-        rows_360 = (
-            db.query(
-                RespuestaRaw.competencia,
-                RespuestaRaw.cod_instrumento,
-                RespuestaRaw.periodo_codigo,
-                func.avg(RespuestaRaw.calificacion).label('avg_cal'),
-                func.count(RespuestaRaw.id).label('n'),
-            )
-            .filter(
-                RespuestaRaw.cedula_evaluado == cedula,
-                RespuestaRaw.competencia.isnot(None),
-                RespuestaRaw.competencia != '',
-                RespuestaRaw.calificacion.isnot(None),
-            )
-            .group_by(
-                RespuestaRaw.competencia,
-                RespuestaRaw.cod_instrumento,
-                RespuestaRaw.periodo_codigo,
-            )
-            .order_by(RespuestaRaw.periodo_codigo.desc(), func.avg(RespuestaRaw.calificacion).desc())
-            .all()
-        )
-
-        competencias_360 = [
-            {
-                'competencia':    comp,
-                'instrumento':    instr_map.get(cod_inst, f'Instrumento {cod_inst}'),
-                'cod_instrumento': cod_inst,
-                'periodo':        periodo,
-                'pct':            round(min(100.0, float(avg_cal) / 4.0 * 100), 1),
-                'n':              n,
-            }
-            for comp, cod_inst, periodo, avg_cal, n in rows_360
-            if comp and avg_cal is not None
-        ]
-
-        # ── MEIPA: componentes desde PuntajeFinal ────────────────────────────
-        _MEIPA_LABELS = {
-            'comp_het_est': 'Heteroevaluación Estudiantil',
-            'comp_auto':    'Autoevaluación',
-            'comp_het_dir': 'Coordinador → Docente',
-            'comp_pares':   'Evaluación de Pares',
-        }
-        meipa_rows = (
-            db.query(PuntajeFinal)
-            .filter(PuntajeFinal.cedula == cedula, PuntajeFinal.sistema == 'meipa')
-            .order_by(PuntajeFinal.periodo_codigo.desc())
-            .all()
-        )
-        competencias_meipa = []
-        for pf in meipa_rows:
-            for attr, label in _MEIPA_LABELS.items():
-                val = getattr(pf, attr, None)
-                if val is not None:
-                    competencias_meipa.append({
-                        'competencia':    label,
-                        'instrumento':    'MEIPA — Evaluación Docente',
-                        'cod_instrumento': 'meipa',
-                        'periodo':        pf.periodo_codigo,
-                        'pct':            round(float(val), 1),
-                        'n':              1,
-                    })
-
-        return {
-            '360':          competencias_360,
-            'meipa':        competencias_meipa,
-            'total_360':    len(competencias_360),
-            'total_meipa':  len(competencias_meipa),
-        }
 
     def get_docentes_criticos(self, db: Session, modelo: str = None, anio: int = None,
                                threshold: float = 3.5, sistema: str = None):

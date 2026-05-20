@@ -6,7 +6,7 @@ import {
   FileText, Search, BookOpen, Star, CheckCircle, AlertCircle, XCircle,
   Microscope, Heart, Link2, Briefcase, GraduationCap, Calendar,
   Activity, UserCheck, Menu, Bell, LogOut, ChevronDown, ChevronRight,
-  LayoutDashboard, Building2, Cpu, Download, FileSpreadsheet, Loader2,
+  LayoutDashboard, Building2, Cpu, Download, FileSpreadsheet, Loader2, Stethoscope,
 } from 'lucide-react'
 
 const LOGO_URL = 'https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png'
@@ -27,6 +27,7 @@ const TAB_COMP_LABELS: Record<string, {label: string; max: number}[]> = {
   // Docencia, ABP, Tecnologado: Het.Est(50) + Pares(20) + CEV(10) + Auto(20)
   docencia:       [{label:'Het. Estudiantil',max:50},{label:'Eval. Pares',max:20},{label:'CEV / Entorno Virtual',max:10},{label:'Autoevaluación',max:20}],
   abp:            [{label:'Het. Estudiantil (Med.)',max:50},{label:'Eval. Pares',max:20},{label:'CEV / Entorno Virtual',max:10},{label:'Autoevaluación',max:20}],
+  servicios:      [{label:'Het. Estudiantil (Práctica Hosp.)',max:100}],
   tecnologado:    [{label:'Het. Estudiantil',max:50},{label:'Eval. Pares',max:20},{label:'CEV / Entorno Virtual',max:10},{label:'Autoevaluación',max:20}],
   // Posgrado: Het.Est(60) + Auto(30) + CEV(10) — solo 3 componentes
   posgrado:       [{label:'Het. Estudiantil Posgrado',max:60},{label:'Autoevaluación',max:30},{label:'CEV / Coord. Posgrado',max:10}],
@@ -44,6 +45,7 @@ const TAB_COMP_LABELS: Record<string, {label: string; max: number}[]> = {
 const TAB_COMP_KEYS: Record<string, string[]> = {
   docencia:       ['het_estudiantil','eval_pares','aula_virtual','autoevaluacion'],
   abp:            ['het_estudiantil','eval_pares','aula_virtual','autoevaluacion'],
+  servicios:      ['het_estudiantil'],
   tecnologado:    ['het_estudiantil','eval_pares','aula_virtual','autoevaluacion'],
   posgrado:       ['het_estudiantil','autoevaluacion','aula_virtual'],          // sin pares
   vinculacion:    ['comp_hetero_est','comp_auto','comp_hetero_dir','comp_pares'],
@@ -1948,9 +1950,9 @@ export default function App() {
   const getQueryParams = useCallback(() => {
     if (sistema === 'overview') return { modelo: undefined,  anio: activeAnio, sistemaParam: undefined }
     if (sistema === 'meipa')    return { modelo: 'docencia', anio: activeAnio, sistemaParam: 'meipa'  }
-    if (sistema === 'salud')    return { modelo: 'abp',      anio: activeAnio, sistemaParam: '360'    }
+    if (sistema === 'salud')    return { modelo: saludSubTab, anio: activeAnio, sistemaParam: '360'    }
     return { modelo: activeTab, anio: activeAnio, sistemaParam: '360' }
-  }, [sistema, activeTab, activeAnio])
+  }, [sistema, activeTab, activeAnio, saludSubTab])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -2029,11 +2031,13 @@ export default function App() {
   // Which tab config to use for displays
   const currentTabCfg = sistema === 'meipa'
     ? { id:'meipa', label:'MEIPA — Docencia', icon:UserCheck, color:'#6366f1', desc:'Het.40 · Auto.20 · Coord.20 · Par.20' }
-    : sistema === 'salud'
-      ? { id:'abp', label:'Salud — Docencia (ABP)', icon:Heart, color:'#dc2626', desc:'Het.Est.50 · Par.20 · CEV.10 · Auto.20' }
-      : (TABS_360.find(t => t.id === activeTab) || TABS_360[0])
+    : sistema === 'salud' && saludSubTab === 'servicios'
+      ? { id:'servicios', label:'Salud — Servicios Hospitalarios', icon:Heart, color:'#b91c1c', desc:'Het. Estudiantil (Práctica Hosp.) · 100%' }
+      : sistema === 'salud'
+        ? { id:'abp', label:'Salud — Docencia (ABP)', icon:Heart, color:'#dc2626', desc:'Het.Est.50 · Par.20 · CEV.10 · Auto.20' }
+        : (TABS_360.find(t => t.id === activeTab) || TABS_360[0])
 
-  const _tabKey = sistema === 'meipa' ? 'meipa' : sistema === 'salud' ? 'abp' : activeTab
+  const _tabKey = sistema === 'meipa' ? 'meipa' : sistema === 'salud' ? saludSubTab : activeTab
   const compLabels = TAB_COMP_LABELS[_tabKey] || TAB_COMP_LABELS['docencia']
   const compKeys   = TAB_COMP_KEYS[_tabKey]   || TAB_COMP_KEYS['docencia']
   const componentes= kpis?.componentes || {}
@@ -2133,6 +2137,7 @@ export default function App() {
   const [expandedMEIPA, setExpandedMEIPA] = useState(true)
   const [expanded360, setExpanded360]     = useState(true)
   const [expandedSalud, setExpandedSalud] = useState(true)
+  const [saludSubTab, setSaludSubTab]     = useState<'abp'|'servicios'>('abp')
 
   const SIDEBAR_W = sidebarOpen ? 268 : 68
 
@@ -2443,21 +2448,35 @@ export default function App() {
                     </button>
                   )
                 })}
-                {/* ABP shown as Docencia */}
-                <div style={{ marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                {/* Sub-modelos Salud */}
+                <div style={{ marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:1 }}>
                   <button
-                    onClick={() => handleSistemaChange('salud')}
+                    onClick={() => { handleSistemaChange('salud'); setSaludSubTab('abp') }}
                     className="w-full flex items-center gap-2.5 text-left rounded-lg transition-all"
                     style={{
                       padding:'5px 10px',
-                      color: sistema === 'salud' ? '#fff' : 'rgba(255,255,255,0.38)',
-                      background: sistema === 'salud' ? 'rgba(220,38,38,0.2)' : 'transparent',
-                      fontSize: 11.5, fontWeight: sistema === 'salud' ? 600 : 400,
+                      color: sistema === 'salud' && saludSubTab === 'abp' ? '#fff' : 'rgba(255,255,255,0.38)',
+                      background: sistema === 'salud' && saludSubTab === 'abp' ? 'rgba(220,38,38,0.2)' : 'transparent',
+                      fontSize: 11.5, fontWeight: sistema === 'salud' && saludSubTab === 'abp' ? 600 : 400,
                     }}
                   >
-                    <GraduationCap size={11} style={{ color: sistema === 'salud' ? '#fca5a5' : 'rgba(255,255,255,0.25)', flexShrink:0 }} />
+                    <GraduationCap size={11} style={{ color: sistema === 'salud' && saludSubTab === 'abp' ? '#fca5a5' : 'rgba(255,255,255,0.25)', flexShrink:0 }} />
                     <span>Docencia (ABP)</span>
-                    {sistema === 'salud' && <span style={{ width:4, height:4, borderRadius:'50%', background:'#f87171', flexShrink:0, marginLeft:'auto' }} />}
+                    {sistema === 'salud' && saludSubTab === 'abp' && <span style={{ width:4, height:4, borderRadius:'50%', background:'#f87171', flexShrink:0, marginLeft:'auto' }} />}
+                  </button>
+                  <button
+                    onClick={() => { handleSistemaChange('salud'); setSaludSubTab('servicios') }}
+                    className="w-full flex items-center gap-2.5 text-left rounded-lg transition-all"
+                    style={{
+                      padding:'5px 10px',
+                      color: sistema === 'salud' && saludSubTab === 'servicios' ? '#fff' : 'rgba(255,255,255,0.38)',
+                      background: sistema === 'salud' && saludSubTab === 'servicios' ? 'rgba(185,28,28,0.25)' : 'transparent',
+                      fontSize: 11.5, fontWeight: sistema === 'salud' && saludSubTab === 'servicios' ? 600 : 400,
+                    }}
+                  >
+                    <Stethoscope size={11} style={{ color: sistema === 'salud' && saludSubTab === 'servicios' ? '#fca5a5' : 'rgba(255,255,255,0.25)', flexShrink:0 }} />
+                    <span>Servicios Hospitalarios</span>
+                    {sistema === 'salud' && saludSubTab === 'servicios' && <span style={{ width:4, height:4, borderRadius:'50%', background:'#ef4444', flexShrink:0, marginLeft:'auto' }} />}
                   </button>
                 </div>
               </div>
