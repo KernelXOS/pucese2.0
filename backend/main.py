@@ -51,13 +51,16 @@ async def auto_seed():
         traceback.print_exc()
 
 # Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # En producción, especificar los dominios permitidos
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# En producción detrás de Apache, CORS lo maneja Apache para evitar headers duplicados
+import os as _os
+if not _os.environ.get('DISABLE_CORS'):
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(api_router, prefix="/api/v1")
 
