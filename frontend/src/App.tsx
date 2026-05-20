@@ -1981,8 +1981,9 @@ export default function App() {
           api.getTodosDocentes(anio, modelo, sistemaParam),
         ]
         // En Salud/ABP también traer KPIs de Servicios para mostrar barra extra
+        // (si no hay datos de servicios, silenciar el error para no romper el Promise.all)
         if (sistema === 'salud' && modelo === 'abp') {
-          fetchList.push(api.getKPIs('servicios', anio, '360'))
+          fetchList.push(api.getKPIs('servicios', anio, '360').catch(() => null))
         }
         const [kpiRes, rankRes, demoRes, tendRes, analyticsRes, todosRes, svcRes] = await Promise.all(fetchList)
         setKpis(kpiRes.data)
