@@ -92,4 +92,8 @@ export const api = {
   // ── Competencias y Preguntas (Vista General) ────────────────────────────────
   getCompetenciasPreguntas: () =>
     axios.get(`${EVAL}/competencias-preguntas`),
+
+  // ── Desempeño por variables demográficas ────────────────────────────────────
+  getDesempenoPorVariables: (anio?: number, sistema?: string, modelo?: string) =>
+    axios.get(`${EVAL}/desempeno-variables?${params({ anio, sistema, modelo })}`),
 };

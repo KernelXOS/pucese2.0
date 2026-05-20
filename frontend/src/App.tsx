@@ -1381,6 +1381,99 @@ const MODELO_COLOR: Record<string, string> = {
 }
 const SISTEMA_COLOR: Record<string, string> = { meipa:'#6d28d9', '360':'#0f5ca8' }
 
+// ── DesempenoPorVariables ─────────────────────────────────────────────────────
+function DesempenoPorVariables({ data }: { data: any }) {
+  const pctColor = (v: number) => v >= 90 ? '#059669' : v >= 80 ? '#0056b3' : v >= 70 ? '#d97706' : '#dc2626'
+
+  const MiniTable = ({ title, icon, rows }: { title: string; icon: string; rows: { categoria: string; promedio: number; n: number }[] }) => {
+    if (!rows || rows.length === 0) return null
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/60">
+          <span className="text-base">{icon}</span>
+          <span className="text-[11px] font-black text-slate-700 uppercase tracking-[0.1em]">{title}</span>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {rows.map((r, i) => (
+            <div key={i} className="px-4 py-2.5 flex items-center gap-3">
+              <span className="text-[10px] font-black text-slate-400 w-5 tabular-nums">{i + 1}</span>
+              <span className="flex-1 text-[11px] text-slate-700 font-medium truncate">{r.categoria}</span>
+              <span className="text-[9px] text-slate-400 tabular-nums shrink-0">{r.n} doc.</span>
+              <div className="w-20 flex items-center gap-1.5 shrink-0">
+                <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${Math.min(r.promedio, 100)}%`, background: pctColor(r.promedio) }} />
+                </div>
+                <span className="text-[10px] font-black tabular-nums w-9 text-right" style={{ color: pctColor(r.promedio) }}>{r.promedio}%</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const HeroCard = ({ label, sub, docente, accent }: { label: string; sub: string; docente: any; accent: string }) => {
+    if (!docente) return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex items-center justify-center min-h-[100px]">
+        <p className="text-[10px] text-slate-400 italic">Sin datos disponibles</p>
+      </div>
+    )
+    return (
+      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: `${accent}30`, borderTopWidth: 3, borderTopColor: accent }}>
+        <div className="px-5 py-3 flex items-start gap-3">
+          <div className="p-2 rounded-xl shrink-0" style={{ background: `${accent}12` }}>
+            <Award size={18} style={{ color: accent }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] mb-0.5" style={{ color: accent }}>{label}</p>
+            <p className="text-[11px] font-black text-slate-800 truncate uppercase leading-tight">{docente.nombre}</p>
+            <p className="text-[9px] text-slate-400 mt-0.5">{sub} · {docente.facultad || 'Sin facultad'}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[22px] font-black tabular-nums leading-none" style={{ color: pctColor(docente.puntaje) }}>{docente.puntaje}</p>
+            <p className="text-[8px] text-slate-400 font-semibold">/ 100</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-xl bg-emerald-50">
+          <BarChart3 size={18} className="text-emerald-600" />
+        </div>
+        <div>
+          <h3 className="text-sm font-black text-slate-800">Desempeño por Variables</h3>
+          <p className="text-[11px] text-slate-400">Promedio de puntaje agrupado por tipo de contrato, género, función y formación</p>
+        </div>
+      </div>
+
+      {/* Hero cards: mejor TC / TP */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Destacados por tipo de contrato</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <HeroCard label="Mejor Docente — Tiempo Completo" sub="TC" docente={data.mejor_tc} accent="#059669" />
+          <HeroCard label="Mejor Docente — Tiempo Parcial"  sub="TP" docente={data.mejor_tp} accent="#0056b3" />
+        </div>
+      </div>
+
+      {/* Mini tables */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Promedios por categoría</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MiniTable title="Tipo de contrato" icon="⏱️" rows={data.tiempo_servicio || []} />
+          <MiniTable title="Género"            icon="👥" rows={data.sexo || []} />
+          <MiniTable title="Función docente"   icon="🎓" rows={data.funcion || []} />
+          <MiniTable title="Nivel de estudio"  icon="📚" rows={data.nivel_estudio || []} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CompetenciasPreguntas ──────────────────────────────────────────────────────
 function CompetenciasPreguntas({ data }: { data: any }) {
   const periodos: string[] = data.periodos || []
@@ -1522,6 +1615,8 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
   const [search, setSearch]           = useState('')
   const [filterSis, setFilterSis]     = useState('todos')
   const [filterMod, setFilterMod]     = useState('todos')
+  const [filterFun, setFilterFun]     = useState('todos')
+  const [filterTC,  setFilterTC]      = useState('todos')
   const [sortBy, setSortBy]           = useState<'puntaje'|'nombre'>('puntaje')
   const [expanded, setExpanded]       = useState<string | null>(null)
   const [page, setPage]               = useState(1)
@@ -1628,7 +1723,8 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
     setGeneratingPDF(false)
   }
 
-  const modelos = Array.from(new Set(docentes.map(d => d.modelo))).sort()
+  const modelos   = Array.from(new Set(docentes.map(d => d.modelo))).sort()
+  const funciones = Array.from(new Set(docentes.map(d => d.funcion_docente).filter(Boolean))).sort()
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -1636,11 +1732,17 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
       .filter(d => {
         if (!context && filterSis !== 'todos' && d.sistema !== filterSis) return false
         if (!context && filterMod !== 'todos' && d.modelo !== filterMod) return false
+        if (filterFun !== 'todos' && (d.funcion_docente || '').toLowerCase() !== filterFun.toLowerCase()) return false
+        if (filterTC !== 'todos') {
+          const ts = (d.tiempo_servicio || '').toLowerCase()
+          if (filterTC === 'tc' && !ts.includes('completo')) return false
+          if (filterTC === 'tp' && !ts.includes('parcial'))  return false
+        }
         if (q && !d.nombre?.toLowerCase().includes(q) && !d.cedula?.includes(q) && !d.facultad?.toLowerCase().includes(q)) return false
         return true
       })
       .sort((a, b) => sortBy === 'puntaje' ? b.puntaje - a.puntaje : a.nombre.localeCompare(b.nombre))
-  }, [docentes, search, filterSis, filterMod, sortBy, context])
+  }, [docentes, search, filterSis, filterMod, filterFun, filterTC, sortBy, context])
 
   const total   = filtered.length
   const visible = filtered.slice(0, page * PAGE)
@@ -1720,6 +1822,21 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
             className="text-[11px] font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white outline-none text-slate-600">
             <option value="todos">Todos los modelos</option>
             {modelos.map(m => <option key={m} value={m}>{m.charAt(0).toUpperCase()+m.slice(1)}</option>)}
+          </select>
+        )}
+        {/* TC/TP */}
+        <select value={filterTC} onChange={e => { setFilterTC(e.target.value); setPage(1) }}
+          className="text-[11px] font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white outline-none text-slate-600">
+          <option value="todos">TC y TP</option>
+          <option value="tc">Tiempo Completo</option>
+          <option value="tp">Tiempo Parcial</option>
+        </select>
+        {/* Función */}
+        {funciones.length > 0 && (
+          <select value={filterFun} onChange={e => { setFilterFun(e.target.value); setPage(1) }}
+            className="text-[11px] font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white outline-none text-slate-600">
+            <option value="todos">Todas las funciones</option>
+            {funciones.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         )}
         {/* Sort */}
@@ -1871,13 +1988,27 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                       Componentes del Modelo — {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)} · {d.sistema === 'meipa' ? 'MEIPA' : '360/MECDI'}
                     </p>
-                    {d.n_evaluadores ? (
-                      <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ background:'#eff6ff', color:'#0056b3', border:'1px solid #bfdbfe' }}>
-                        <span>👥</span>
-                        <span>{d.n_evaluadores} estudiantes evaluaron</span>
-                      </span>
-                    ) : null}
+                    <div className="flex flex-wrap gap-1.5">
+                      {d.tiempo_servicio && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background:'#f0fdf4', color:'#059669', border:'1px solid #bbf7d0' }}>
+                          ⏱️ {d.tiempo_servicio}
+                        </span>
+                      )}
+                      {d.funcion_docente && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background:'#faf5ff', color:'#7c3aed', border:'1px solid #e9d5ff' }}>
+                          🎓 {d.funcion_docente}
+                        </span>
+                      )}
+                      {d.n_evaluadores ? (
+                        <span className="flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background:'#eff6ff', color:'#0056b3', border:'1px solid #bfdbfe' }}>
+                          <span>👥</span>
+                          <span>{d.n_evaluadores} estudiantes evaluaron</span>
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="space-y-2 mb-4">
                     {(d.componentes || []).map((c: any, ci: number) => {
@@ -2054,6 +2185,7 @@ export default function App() {
   const [analytics, setAnalytics]     = useState<any>(null)
   const [comparativo, setComparativo]       = useState<any>(null)
   const [compPreguntas, setCompPreguntas]   = useState<any>(null)
+  const [desempVars, setDesempVars]         = useState<any>(null)
   const [todosDocentes, setTodosDocentes]   = useState<any[]>([])
   const [aiAnalysis, setAiAnalysis]         = useState('')
   const [loading, setLoading]               = useState(true)
@@ -2117,14 +2249,16 @@ export default function App() {
       const { modelo, anio, sistemaParam } = getQueryParams()
 
       if (sistema === 'overview') {
-        const [compRes, todosRes, cpRes] = await Promise.all([
+        const [compRes, todosRes, cpRes, dvRes] = await Promise.all([
           api.getComparativo(anio),
           api.getTodosDocentes(anio, undefined, undefined),
           api.getCompetenciasPreguntas().catch(() => null),
+          api.getDesempenoPorVariables(anio).catch(() => null),
         ])
         setComparativo(compRes.data)
         setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
         if (cpRes) setCompPreguntas(cpRes.data)
+        if (dvRes) setDesempVars(dvRes.data)
       } else {
         const fetchList: Promise<any>[] = [
           api.getKPIs(modelo, anio, sistemaParam),
@@ -2784,6 +2918,9 @@ export default function App() {
                   </>
                 )
               })()}
+              {/* ── Desempeño por Variables ──────────────────────────────── */}
+              {desempVars && <DesempenoPorVariables data={desempVars} />}
+
               {todosDocentes.length > 0 && (
                 <TodosDocentesPanel docentes={todosDocentes} />
               )}

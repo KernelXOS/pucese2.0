@@ -133,6 +133,17 @@ def get_todos_docentes(
     return kpi_service.get_todos_docentes(db, anio=anio)
 
 
+@router.get("/desempeno-variables")
+def get_desempeno_variables(
+    db: Session = Depends(get_db),
+    anio: Optional[int] = None,
+    sistema: Optional[str] = None,
+    modelo: Optional[str] = None,
+):
+    """Desempeño promedio agrupado por tiempo_servicio, sexo, función y nivel_estudio."""
+    return kpi_service.get_desempeno_por_variables(db, anio=anio, sistema=sistema, modelo=modelo)
+
+
 @router.get("/competencias-preguntas")
 def get_competencias_preguntas():
     """Ranking de competencias y preguntas (mejor/peor) por periodo, leído de eval_detalladas."""

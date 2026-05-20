@@ -652,17 +652,21 @@ class KPIService:
                 componentes.append({'label': label, 'pct': pct})
 
             componentes.sort(key=lambda x: x['pct'], reverse=True)
-            n_ev = next((r.n_evaluadores for r in recs if r.n_evaluadores and r.n_evaluadores > 0), None)
+            n_ev         = next((r.n_evaluadores for r in recs if r.n_evaluadores and r.n_evaluadores > 0), None)
+            funcion_doc  = next((r.funcion_docente for r in recs if r.funcion_docente), None)
+            tiempo_serv  = next((r.tiempo_servicio  for r in recs if r.tiempo_servicio),  None)
             result.append({
-                'nombre':       nombre,
-                'cedula':       ced or '',
-                'sistema':      sis or '',
-                'modelo':       mod or '',
-                'facultad':     facultad,
-                'puntaje':      puntaje,
-                'nivel':        nivel,
-                'componentes':  componentes,
-                'n_evaluadores': n_ev,
+                'nombre':          nombre,
+                'cedula':          ced or '',
+                'sistema':         sis or '',
+                'modelo':          mod or '',
+                'facultad':        facultad,
+                'puntaje':         puntaje,
+                'nivel':           nivel,
+                'componentes':     componentes,
+                'n_evaluadores':   n_ev,
+                'funcion_docente': funcion_doc,
+                'tiempo_servicio': tiempo_serv,
             })
 
         result.sort(key=lambda x: x['puntaje'], reverse=True)
@@ -895,6 +899,83 @@ class KPIService:
             'preguntas_top':     top_preg,
             'preguntas_peor':    worst_preg,
         }
+
+
+    # ── Desempeño por variables demográficas ──────────────────────────────────
+    def get_desempeno_por_variables(
+        self, db: Session,
+        anio: int = None, sistema: str = None, modelo: str = None
+    ) -> dict:
+        """
+        Agrupa el puntaje_100 por tiempo_servicio, sexo, funcion_docente,
+        nivel_estudio y devuelve promedios + mejores docentes TC y TP.
+        """
+        from collections import defaultdict
+
+        q = db.query(Evaluacion).filter(
+            Evaluacion.puntaje_100.isnot(None),
+            Evaluacion.puntaje_100 > 0,
+        )
+        if anio:    q = q.filter(Evaluacion.anio    == anio)
+        if sistema: q = q.filter(Evaluacion.sistema == sistema)
+        if modelo:  q = q.filter(Evaluacion.modelo  == modelo)
+
+        recs = q.all()
+
+        def _group(key_fn):
+            groups: dict = defaultdict(list)
+            for r in recs:
+                k = key_fn(r)
+                if k and str(k).strip():
+                    groups[str(k).strip()].append(r.puntaje_100)
+            return sorted(
+                [{'categoria': k, 'promedio': round(sum(v)/len(v), 1), 'n': len(v)}
+                 for k, v in groups.items()],
+                key=lambda x: x['promedio'], reverse=True
+            )
+
+        # Mejor docente por tipo de contrato (TC / TP)
+        ced_info: dict = defaultdict(lambda: {'puntajes': [], 'nombre': '', 'ts': '', 'facultad': ''})
+        for r in recs:
+            k = r.cedula or r.docente_nombre or ''
+            ced_info[k]['puntajes'].append(r.puntaje_100)
+            if r.docente_nombre and not str(r.docente_nombre).startswith('CED-'):
+                ced_info[k]['nombre'] = r.docente_nombre
+            if r.tiempo_servicio:
+                ced_info[k]['ts'] = r.tiempo_servicio
+            if r.facultad:
+                ced_info[k]['facultad'] = r.facultad
+
+        mejor_tc = mejor_tp = None
+        for ced, info in ced_info.items():
+            if not info['puntajes']:
+                continue
+            avg = round(sum(info['puntajes']) / len(info['puntajes']), 1)
+            ts  = (info.get('ts') or '').lower()
+            entry = {
+                'nombre':   info['nombre'] or ced,
+                'cedula':   ced,
+                'facultad': info['facultad'],
+                'puntaje':  avg,
+            }
+            if 'completo' in ts:
+                if not mejor_tc or avg > mejor_tc['puntaje']:
+                    mejor_tc = entry
+            elif 'parcial' in ts:
+                if not mejor_tp or avg > mejor_tp['puntaje']:
+                    mejor_tp = entry
+
+        return {
+            'tiempo_servicio': _group(lambda r: r.tiempo_servicio),
+            'sexo':            _group(lambda r: r.sexo),
+            'funcion':         _group(lambda r: r.funcion_docente),
+            'nivel_estudio':   _group(lambda r: r.nivel_estudio),
+            'mejor_tc':        mejor_tc,
+            'mejor_tp':        mejor_tp,
+        }
+
+    # ── get_todos_docentes actualizado con funcion_docente + tiempo_servicio ──
+    # (ya existe arriba — solo agregamos campos al resultado)
 
 
 kpi_service = KPIService()
