@@ -3,6 +3,8 @@
 .env.local
 .env.production
 backend/.env
+backend/.env.prod          # Ignorar el .env.prod real (tiene keys secretas)
+# backend/.env.prod.example se SÍ trackea (es la plantilla sin keys)
 
 # ── Python ─────────────────────────────────────────────────────────────────
 __pycache__/
@@ -24,18 +26,6 @@ frontend/dist/
 frontend/.env.local
 frontend/.env.production
 node_modules/
-
-# ── Base de datos local ─────────────────────────────────────────────────────
-# evaluacion.db se incluye para que Railway tenga datos
-*.sqlite
-*.sqlite3
-
-# ── Archivos generados ───────────────────────────────────────────────────────
-*.pdf
-backend/test_output.pdf
-
-# ── Claude Code (worktrees internos) ────────────────────────────────────────
-.claude/
 
 # ── IDE / OS ────────────────────────────────────────────────────────────────
 .vscode/

@@ -1,0 +1,55 @@
+# docker-compose.prod.yml — Producción en VPS Contabo
+# Red y volúmenes con nombres únicos para no colisionar con otros proyectos
+# Puerto externo: 8001 (no usa el 8000 que puede estar ocupado)
+
+version: '3.9'
+
+networks:
+  eval_docente_net:
+    name: eval_docente_net
+
+volumes:
+  eval_docente_postgres:
+    name: eval_docente_postgres
+
+services:
+
+  # ── Base de datos ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: eval_docente_db
+    restart: unless-stopped
+    networks:
+      - eval_docente_net
+    volumes:
+      - eval_docente_postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER:     evaluser
+      POSTGRES_PASSWORD: evalpass2025
+      POSTGRES_DB:       evaluacion_docente
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evaluser -d evaluacion_docente"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend FastAPI ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eval_docente_api
+    restart: unless-stopped
+    networks:
+      - eval_docente_net
+    ports:
+      - "8001:8000"          # 8001 externo → 8000 interno (no pisa otros servicios)
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env.prod  # Crea este archivo desde .env.prod.example
+    environment:
+      DATABASE_URL: postgresql://evaluser:evalpass2025@db:5432/evaluacion_docente
+    volumes:
+      - ./backend/data:/app/data:ro   # Archivos Excel (solo lectura)
