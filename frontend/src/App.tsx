@@ -2661,6 +2661,31 @@ export default function App() {
                 </div>
               )}
 
+              {/* ── Selector ABP / Servicios (solo en Salud) ─────────────── */}
+              {sistema === 'salud' && (
+                <div className="flex items-center gap-2 mb-5">
+                  <Heart size={13} className="text-red-400" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Modelo Salud ·</span>
+                  {[
+                    { key: 'abp',       label: 'Docencia ABP',          icon: GraduationCap },
+                    { key: 'servicios', label: 'Servicios Hospitalarios', icon: Stethoscope  },
+                  ].map(opt => (
+                    <button key={opt.key}
+                      onClick={() => setSaludSubTab(opt.key as 'abp'|'servicios')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                      style={{
+                        background: saludSubTab === opt.key ? '#dc2626' : '#fef2f2',
+                        color:      saludSubTab === opt.key ? '#fff'    : '#b91c1c',
+                        border:     `1px solid ${saludSubTab === opt.key ? '#dc2626' : '#fecaca'}`,
+                      }}
+                    >
+                      <opt.icon size={11} />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {kpis && (
                 <div ref={sistemaRef}>
                   {/* Section header */}
