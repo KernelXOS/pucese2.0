@@ -102,7 +102,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 
       {/* ── RIGHT: login panel ──────────────────────────────────────────── */}
       <div className="flex flex-col items-center justify-center w-full lg:w-[460px] lg:flex-none px-8 py-12 relative overflow-hidden"
-        style={{ background: 'rgba(5,12,28,0.82)', backdropFilter: 'blur(18px)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+        style={{ background: 'rgba(5,12,28,0.45)', backdropFilter: 'blur(24px)', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
 
         {/* Subtle glow top-right */}
         <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
