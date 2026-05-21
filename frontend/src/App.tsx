@@ -46,20 +46,21 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   const BG_IMAGE = '/campus.jpg'
 
   return (
-    <div className="min-h-screen flex" style={{ fontFamily: 'inherit' }}>
+    <div className="min-h-screen flex relative overflow-hidden" style={{ fontFamily: 'inherit' }}>
 
-      {/* ── LEFT: campus photo panel ────────────────────────────────────── */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden">
-        {/* Photo */}
-        <img
-          src={BG_IMAGE}
-          alt="Campus PUCESE"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ objectPosition: 'center' }}
-        />
-        {/* Dark overlay gradient */}
-        <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(150deg, rgba(0,20,60,0.72) 0%, rgba(0,40,100,0.45) 60%, rgba(0,10,30,0.80) 100%)' }} />
+      {/* ── FULL SCREEN background photo ───────────────────────────────── */}
+      <img
+        src={BG_IMAGE}
+        alt="Campus PUCESE"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ objectPosition: 'center' }}
+      />
+      {/* Dark overlay over entire screen */}
+      <div className="absolute inset-0"
+        style={{ background: 'linear-gradient(150deg, rgba(0,20,60,0.68) 0%, rgba(0,30,80,0.50) 50%, rgba(0,10,30,0.82) 100%)' }} />
+
+      {/* ── LEFT: branding content (over the photo) ─────────────────────── */}
+      <div className="hidden lg:flex flex-1 relative">
 
         {/* Bottom-left branding */}
         <div className="absolute bottom-0 left-0 right-0 p-12 text-white"
@@ -101,7 +102,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 
       {/* ── RIGHT: login panel ──────────────────────────────────────────── */}
       <div className="flex flex-col items-center justify-center w-full lg:w-[460px] lg:flex-none px-8 py-12 relative overflow-hidden"
-        style={{ background: 'linear-gradient(160deg, #07101f 0%, #0c1a30 60%, #0a1628 100%)' }}>
+        style={{ background: 'rgba(5,12,28,0.82)', backdropFilter: 'blur(18px)', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
 
         {/* Subtle glow top-right */}
         <div className="absolute top-0 right-0 w-64 h-64 pointer-events-none"
