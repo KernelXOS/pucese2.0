@@ -83,17 +83,14 @@ async def auto_seed():
         print(f"[ETL] Error durante el seed automático: {e}")
         traceback.print_exc()
 
-# Configurar CORS
-# En producción detrás de Apache, CORS lo maneja Apache para evitar headers duplicados
-import os as _os
-if not _os.environ.get('DISABLE_CORS'):
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Configurar CORS — siempre activo, FastAPI maneja headers directamente
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(api_router, prefix="/api/v1")
 
