@@ -83,7 +83,8 @@ async def auto_seed():
         print(f"[ETL] Error durante el seed automático: {e}")
         traceback.print_exc()
 
-# Configurar CORS — siempre activo, FastAPI maneja headers directamente
+# Configurar CORS
+import os as _os
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
