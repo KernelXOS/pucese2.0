@@ -2431,37 +2431,37 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
       const { modelo, anio, sistemaParam } = getQueryParams()
 
       if (sistema === 'overview') {
+        // Each call is individually resilient — one failure won't blank the whole dashboard
         const [compRes, todosRes, cpRes, dvRes] = await Promise.all([
-          api.getComparativo(anio),
-          api.getTodosDocentes(anio, undefined, undefined),
+          api.getComparativo(anio).catch(e => { console.error('[fetch] comparativo:', e); return { data: null } }),
+          api.getTodosDocentes(anio, undefined, undefined).catch(e => { console.error('[fetch] todos-docentes:', e); return { data: [] } }),
           api.getCompetenciasPreguntas().catch(() => null),
           api.getDesempenoPorVariables(anio).catch(() => null),
         ])
-        setComparativo(compRes.data)
-        setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
+        if (compRes?.data) setComparativo(compRes.data)
+        setTodosDocentes(Array.isArray(todosRes?.data) ? todosRes.data : [])
         if (cpRes) setCompPreguntas(cpRes.data)
         if (dvRes) setDesempVars(dvRes.data)
       } else {
+        const noop = (label: string) => (e: any) => { console.error(`[fetch] ${label}:`, e); return null }
         const fetchList: Promise<any>[] = [
-          api.getKPIs(modelo, anio, sistemaParam),
-          api.getRanking(1000, modelo, anio, sistemaParam),
-          api.getDemograficos(modelo, anio, sistemaParam),
-          api.getTendencias(modelo, sistemaParam),
-          api.getAnalytics(sistemaParam, modelo, anio),
-          api.getTodosDocentes(anio, modelo, sistemaParam),
+          api.getKPIs(modelo, anio, sistemaParam).catch(noop('kpis')),
+          api.getRanking(1000, modelo, anio, sistemaParam).catch(noop('ranking')),
+          api.getDemograficos(modelo, anio, sistemaParam).catch(noop('demograficos')),
+          api.getTendencias(modelo, sistemaParam).catch(noop('tendencias')),
+          api.getAnalytics(sistemaParam, modelo, anio).catch(noop('analytics')),
+          api.getTodosDocentes(anio, modelo, sistemaParam).catch(noop('todos')),
         ]
-        // En Salud/ABP también traer KPIs de Servicios para mostrar barra extra
-        // (si no hay datos de servicios, silenciar el error para no romper el Promise.all)
         if (sistema === 'salud' && modelo === 'abp') {
           fetchList.push(api.getKPIs('servicios', anio, '360').catch(() => null))
         }
         const [kpiRes, rankRes, demoRes, tendRes, analyticsRes, todosRes, svcRes] = await Promise.all(fetchList)
-        setKpis(kpiRes.data)
-        setRanking(rankRes.data)
-        setDemograficos(demoRes.data)
-        setTendencias(tendRes.data)
-        setAnalytics(analyticsRes.data)
-        setTodosDocentes(Array.isArray(todosRes.data) ? todosRes.data : [])
+        if (kpiRes)      setKpis(kpiRes.data)
+        if (rankRes)     setRanking(rankRes.data)
+        if (demoRes)     setDemograficos(demoRes.data)
+        if (tendRes)     setTendencias(tendRes.data)
+        if (analyticsRes) setAnalytics(analyticsRes.data)
+        setTodosDocentes(Array.isArray(todosRes?.data) ? todosRes.data : [])
         if (svcRes) setServiciosKpis(svcRes.data)
       }
     } catch (err) {
@@ -2487,11 +2487,18 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   }
 
   const runETL = async () => {
+    setProcessing(true)
     try {
-      setProcessing(true)
+      // 1) Trigger the actual ETL to (re)load data from Excel files on the server
+      await api.processETL()
+      // 2) Refresh all charts with the freshly-loaded data
       await fetchData()
-    } catch { alert('Error actualizando datos') }
-    setProcessing(false)
+    } catch (err) {
+      console.error('[runETL]', err)
+      alert('Error al cargar los datos. Verifica que el servidor esté activo.')
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const runAnalysisIA = async () => {
@@ -3085,6 +3092,29 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1e40af] animate-spin" />}
               </div>
               <div ref={comparativoRef}>
+                {/* ── Estado vacío: no hay datos en la BD ────────────────── */}
+                {!loading && (!comparativo || ((comparativo.meipa?.n ?? 0) === 0 && (comparativo['360']?.n ?? 0) === 0)) && (
+                  <div className="flex flex-col items-center justify-center py-24 text-center">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+                      style={{ background:'rgba(0,86,179,0.07)', border:'1.5px dashed #93c5fd' }}>
+                      <BarChart3 size={28} style={{ color:'#3b82f6', opacity:.6 }} />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-700 mb-1">No hay datos cargados</h3>
+                    <p className="text-xs text-slate-400 max-w-xs mb-6">
+                      La base de datos está vacía. Haz clic en <strong>Cargar datos</strong> para procesar los archivos de evaluación.
+                    </p>
+                    <button
+                      onClick={runETL}
+                      disabled={processing}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60"
+                      style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)', boxShadow:'0 4px 14px rgba(0,86,179,0.35)' }}
+                    >
+                      {processing
+                        ? <><Loader2 size={14} className="animate-spin" /> Cargando datos…</>
+                        : <><RefreshCw size={14} /> Cargar datos</>}
+                    </button>
+                  </div>
+                )}
                 <ComparativoPanel comparativo={comparativo} />
               {comparativo?.mejores_peores && Object.keys(comparativo.mejores_peores).length > 0 && (
                 <MejoresPeoresPanel mejoresPeores={comparativo.mejores_peores} />
