@@ -11,12 +11,20 @@ Base.metadata.create_all(bind=engine)
 # ── Migraciones ligeras: añadir columnas nuevas si no existen ─────────────
 def _run_migrations():
     from sqlalchemy import text
-    cols = [
+    statements = [
         "ALTER TABLE evaluaciones ADD COLUMN IF NOT EXISTS n_evaluadores INTEGER",
+        "CREATE INDEX IF NOT EXISTS idx_ev_sistema ON evaluaciones(sistema)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_modelo ON evaluaciones(modelo)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_anio ON evaluaciones(anio)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_periodo ON evaluaciones(periodo)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_cedula ON evaluaciones(cedula)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_sis_mod ON evaluaciones(sistema, modelo)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_sexo ON evaluaciones(sexo)",
+        "CREATE INDEX IF NOT EXISTS idx_ev_facultad ON evaluaciones(facultad)",
     ]
     try:
         with engine.connect() as conn:
-            for sql in cols:
+            for sql in statements:
                 conn.execute(text(sql))
             conn.commit()
     except Exception as e:
@@ -25,6 +33,21 @@ def _run_migrations():
 _run_migrations()
 
 app = FastAPI(title=settings.PROJECT_NAME)
+
+def _seed_admin_user(db):
+    """Crea el usuario admin si no existe."""
+    try:
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        existing = db.query(User).filter(User.username == 'admin@pucese.edu.ec').first()
+        if not existing:
+            db.add(User(username='admin@pucese.edu.ec', hashed_password=get_password_hash('Admin23@1'), role='admin', is_active=True))
+            db.commit()
+            print("[SEED] Admin user created: admin@pucese.edu.ec")
+        else:
+            print("[SEED] Admin user already exists — skipping.")
+    except Exception as e:
+        print(f"[SEED] Error creando admin user: {e}")
 
 @app.on_event("startup")
 async def auto_seed():
@@ -45,6 +68,8 @@ async def auto_seed():
             print(f"[ETL] ✅ {total} registros cargados.")
         else:
             print(f"[ETL] BD completa ({total_count} registros, {count_360} de tipo 360, {count_servicios} servicios) — omitiendo seed.")
+
+        _seed_admin_user(db)
         db.close()
     except Exception as e:
         print(f"[ETL] Error durante el seed automático: {e}")

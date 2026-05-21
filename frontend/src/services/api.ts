@@ -6,6 +6,46 @@ const BASE = _RAW.endsWith('/evaluacion') ? _RAW.slice(0, -'/evaluacion'.length)
 const EVAL = `${BASE}/evaluacion`;
 const DOC  = `${BASE}/docentes`;
 const ETL  = `${BASE}/etl`;
+const AUTH = `${BASE}/auth`;
+
+// ── Auth token helpers ─────────────────────────────────────────────────────────
+const TOKEN_KEY = 'pucese_token'
+const USER_KEY  = 'pucese_user'
+
+export const authStore = {
+  getToken:        () => localStorage.getItem(TOKEN_KEY),
+  setToken:        (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clearToken:      () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY) },
+  isAuthenticated: () => !!localStorage.getItem(TOKEN_KEY),
+  getUser:         () => localStorage.getItem(USER_KEY) || 'Administrador',
+  setUser:         (u: string) => localStorage.setItem(USER_KEY, u),
+}
+
+// ── Axios interceptor: add Bearer token to every request ──────────────────────
+axios.interceptors.request.use(config => {
+  const token = authStore.getToken()
+  if (token) {
+    config.headers = config.headers || {}
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+  return config
+})
+
+// ── Axios interceptor: handle 401 → clear token (force re-login) ─────────────
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err?.response?.status === 401) {
+      // Only clear if it's not the login endpoint itself
+      const url: string = err?.config?.url || ''
+      if (!url.includes('/auth/login')) {
+        authStore.clearToken()
+        window.location.reload()
+      }
+    }
+    return Promise.reject(err)
+  }
+)
 
 function params(opts: Record<string, string | number | undefined>) {
   const p: Record<string, string> = {};
@@ -16,6 +56,16 @@ function params(opts: Record<string, string | number | undefined>) {
 }
 
 export const api = {
+  // ── Auth ──────────────────────────────────────────────────────────────────────
+  login: (username: string, password: string) => {
+    const form = new URLSearchParams()
+    form.append('username', username)
+    form.append('password', password)
+    return axios.post(`${AUTH}/login`, form, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+  },
+
   // ── Legacy (compatibilidad con dashboard actual) ───────────────────────────
   getKPIs: (modelo?: string, anio?: number, sistema?: string) =>
     axios.get(`${EVAL}/kpis/institucionales?${params({ modelo, anio, sistema })}`),

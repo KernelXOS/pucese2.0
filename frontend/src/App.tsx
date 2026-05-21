@@ -1,15 +1,186 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Plot from 'react-plotly.js'
-import { api } from './services/api'
+import { api, authStore } from './services/api'
 import {
   BarChart3, Users, TrendingUp, BrainCircuit, RefreshCw, Award,
   FileText, Search, BookOpen, Star, CheckCircle, AlertCircle, XCircle,
   Microscope, Heart, Link2, Briefcase, GraduationCap, Calendar,
   Activity, UserCheck, Menu, Bell, LogOut, ChevronDown, ChevronRight,
   LayoutDashboard, Building2, Cpu, Download, FileSpreadsheet, Loader2, Stethoscope,
+  Eye, EyeOff, Lock, Mail,
 } from 'lucide-react'
 
 const LOGO_URL = 'https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png'
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Login Page
+// ══════════════════════════════════════════════════════════════════════════════
+function LoginPage({ onLogin }: { onLogin: () => void }) {
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [showPwd,  setShowPwd]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || !password.trim()) {
+      setError('Ingresa tu correo y contraseña.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await api.login(email.trim(), password)
+      authStore.setToken(res.data.access_token)
+      authStore.setUser(email.trim())
+      onLogin()
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail
+      setError(msg || 'Correo o contraseña incorrectos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e38 50%, #0d2347 100%)' }}>
+
+      {/* Background decorative circles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-10"
+          style={{ background: 'radial-gradient(circle, #4da6e8, transparent)' }} />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full opacity-8"
+          style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+      </div>
+
+      <div className="relative w-full max-w-sm">
+
+        {/* Card */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(20px)', boxShadow:'0 32px 64px rgba(0,0,0,0.5)' }}>
+
+          {/* Top accent line */}
+          <div className="h-[3px] w-full" style={{ background:'linear-gradient(90deg, #0056b3, #4da6e8, #6366f1)' }} />
+
+          <div className="p-8">
+            {/* Logo */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="rounded-2xl p-3 mb-4" style={{ background:'rgba(255,255,255,0.95)', boxShadow:'0 8px 24px rgba(0,0,0,0.3)' }}>
+                <img src={LOGO_URL} alt="PUCESE" className="object-contain" style={{ height: 56, width: 56 }} />
+              </div>
+              <div className="text-center">
+                <p className="font-black text-white tracking-tight" style={{ fontSize: 20, letterSpacing:'-0.02em' }}>PUCE · Esmeraldas</p>
+                <p className="font-bold uppercase tracking-widest" style={{ color:'#4da6e8', fontSize: 10, letterSpacing:'0.22em', marginTop: 2 }}>Evaluación Docente</p>
+                <p className="mt-1" style={{ color:'rgba(255,255,255,0.35)', fontSize: 11 }}>Sistema de Análisis Institucional</p>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Email */}
+              <div>
+                <label className="block text-[11px] font-bold mb-1.5 uppercase tracking-widest" style={{ color:'rgba(255,255,255,0.5)' }}>
+                  Correo institucional
+                </label>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'rgba(255,255,255,0.3)' }} />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError('') }}
+                    placeholder="usuario@pucese.edu.ec"
+                    autoComplete="username"
+                    className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
+                    style={{
+                      background:'rgba(255,255,255,0.06)',
+                      border:'1px solid rgba(255,255,255,0.1)',
+                      color:'#fff',
+                      fontSize: 13,
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = '#4da6e8'; e.currentTarget.style.background = 'rgba(77,166,232,0.08)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-[11px] font-bold mb-1.5 uppercase tracking-widest" style={{ color:'rgba(255,255,255,0.5)' }}>
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'rgba(255,255,255,0.3)' }} />
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError('') }}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className="w-full pl-9 pr-10 py-3 rounded-xl text-sm outline-none transition-all"
+                    style={{
+                      background:'rgba(255,255,255,0.06)',
+                      border:'1px solid rgba(255,255,255,0.1)',
+                      color:'#fff',
+                      fontSize: 13,
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = '#4da6e8'; e.currentTarget.style.background = 'rgba(77,166,232,0.08)' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                  />
+                  <button type="button" onClick={() => setShowPwd(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-80 transition-opacity"
+                    style={{ color:'#fff' }}>
+                    {showPwd ? <EyeOff size={14}/> : <Eye size={14}/>}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold"
+                  style={{ background:'rgba(220,38,38,0.12)', border:'1px solid rgba(220,38,38,0.25)', color:'#fca5a5' }}>
+                  <AlertCircle size={13} className="flex-shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60 mt-2"
+                style={{
+                  background: loading ? 'rgba(77,166,232,0.4)' : 'linear-gradient(135deg, #0056b3, #1a7fc1)',
+                  boxShadow: loading ? 'none' : '0 8px 24px rgba(0,86,179,0.4)',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Ingresando…
+                  </span>
+                ) : 'Ingresar al sistema'}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <p className="text-center mt-6" style={{ color:'rgba(255,255,255,0.2)', fontSize: 10 }}>
+              © 2025 PUCESE · Dirección de Calidad y Acreditación
+            </p>
+          </div>
+        </div>
+
+        {/* Version badge */}
+        <p className="text-center mt-4 font-black tracking-widest uppercase" style={{ color:'rgba(255,255,255,0.12)', fontSize: 9 }}>
+          Evaluación Docente IA · v4.0
+        </p>
+      </div>
+    </div>
+  )
+}
 
 // ── Model tabs (for 360) ──────────────────────────────────────────────────────
 const TABS_360 = [
@@ -2171,6 +2342,17 @@ const PERIODO_TO_ANIO: Record<string, number> = {
 // Main App
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
+  // ── Auth guard ─────────────────────────────────────────────────────────────
+  const [isAuth, setIsAuth] = useState(authStore.isAuthenticated())
+
+  if (!isAuth) {
+    return <LoginPage onLogin={() => setIsAuth(true)} />
+  }
+
+  return <AppDashboard onLogout={() => { authStore.clearToken(); setIsAuth(false) }} />
+}
+
+function AppDashboard({ onLogout }: { onLogout: () => void }) {
   // Sistema selector: 'overview' | 'meipa' | '360' | 'salud'
   const [sistema, setSistema]         = useState<'overview'|'meipa'|'360'|'salud'>('overview')
   const [activeTab, setActiveTab]     = useState('docencia')  // for 360 sub-model
@@ -2866,10 +3048,24 @@ export default function App() {
                     {(sistema === 'overview' ? exportingComp : exportingVista) ? 'Exportando…' : 'Exportar'}
                   </span>
                 </button>
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all"
-                  style={{ background:'#e53e3e' }}>
+                {/* User badge */}
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{ background:'#f1f5f9', border:'1px solid #e2e8f0' }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0"
+                    style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)' }}>
+                    A
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-600 max-w-[120px] truncate">
+                    {authStore.getUser()}
+                  </span>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                  style={{ background:'#e53e3e' }}
+                  title="Cerrar sesión">
                   <LogOut size={13} />
-                  <span>Cerrar sesión</span>
+                  <span>Salir</span>
                 </button>
               </div>
             </div>

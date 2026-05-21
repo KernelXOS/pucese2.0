@@ -1,6 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.evaluacion import Evaluacion
+import time as _time
+
+_kpi_cache: dict = {}
+_CACHE_TTL = 300  # 5 minutes
 
 # Weight definitions per model
 MODEL_CONFIG = {
@@ -209,6 +213,11 @@ class KPIService:
 
     def get_comparativo(self, db: Session, anio: int = None) -> dict:
         """Full overview: MEIPA vs 360, models, trends, faculty, gender, age, seniority, cross-analysis."""
+        cache_key = f"comparativo_{anio}"
+        _now = _time.time()
+        if cache_key in _kpi_cache and _now - _kpi_cache[cache_key]['ts'] < _CACHE_TTL:
+            return _kpi_cache[cache_key]['data']
+
         _GENERO_NORM = {
             'mujer': 'Mujer', 'femenino': 'Mujer', 'f': 'Mujer',
             'hombre': 'Hombre', 'masculino': 'Hombre', 'm': 'Hombre',
@@ -709,7 +718,7 @@ class KPIService:
             if d.get('vals')
         ]
 
-        return {
+        _result = {
             'meipa':                         meipa_overall,
             '360':                           tres60_overall,
             'por_modelo_360':                por_modelo_360,
@@ -734,6 +743,8 @@ class KPIService:
             'estadisticas':                  estadisticas,
             'variables_detalle':             variables_detalle,
         }
+        _kpi_cache[cache_key] = {'data': _result, 'ts': _now}
+        return _result
 
     def get_ranking_docentes(self, db: Session, modelo: str = None, anio: int = None,
                               limit: int = 1000, sistema: str = None):
@@ -1103,6 +1114,9 @@ class KPIService:
             'preguntas_peor':    worst_preg,
         }
 
+
+    def clear_cache(self):
+        _kpi_cache.clear()
 
     # ── Desempeño por variables demográficas ──────────────────────────────────
     def get_desempeno_por_variables(
