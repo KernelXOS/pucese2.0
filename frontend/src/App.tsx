@@ -2489,13 +2489,20 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const runETL = async () => {
     setProcessing(true)
     try {
-      // 1) Trigger the actual ETL to (re)load data from Excel files on the server
+      // 1) Kick off the ETL in background (returns immediately, ~30-60s to complete)
       await api.processETL()
-      // 2) Refresh all charts with the freshly-loaded data
+      // 2) Poll every 5s until ETL finishes or 90s timeout
+      for (let i = 0; i < 18; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        const st = await api.getETLStatus().catch(() => null)
+        if (st?.data?.running === false) break   // ETL done
+      }
+      // 3) Full data refresh
       await fetchData()
     } catch (err) {
       console.error('[runETL]', err)
-      alert('Error al cargar los datos. Verifica que el servidor esté activo.')
+      // Still try a refresh even if trigger failed
+      await fetchData().catch(() => {})
     } finally {
       setProcessing(false)
     }

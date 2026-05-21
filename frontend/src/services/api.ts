@@ -98,6 +98,7 @@ export const api = {
     axios.get(`${EVAL}/todos-docentes?${params({ anio, modelo, sistema })}`),
 
   processETL: () => axios.post(`${EVAL}/etl/process`),
+  getETLStatus: () => axios.get(`${EVAL}/etl/status`),
 
   consultaIA: (pregunta: string, anio?: number) =>
     axios.post(`${EVAL}/consulta-ia`, { pregunta, anio }),

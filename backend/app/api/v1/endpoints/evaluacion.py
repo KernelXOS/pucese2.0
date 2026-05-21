@@ -2,10 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from app.db.session import get_db
+from app.db.session import get_db, SessionLocal
 from app.services.kpi_service import kpi_service
 from app.services.gemini_service import gemini_service
 from app.services.etl_service import etl_service
+import threading
+
+_etl_status: dict = {"running": False, "last_count": None, "last_error": None}
 
 
 class ConsultaRequest(BaseModel):
@@ -16,12 +19,37 @@ router = APIRouter()
 
 
 @router.post("/etl/process")
-def process_evaluaciones(db: Session = Depends(get_db)):
-    try:
-        count = etl_service.process_all_files(db)
-        return {"message": f"Procesamiento completado. {count} registros nuevos."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def process_evaluaciones():
+    """Trigger ETL in a background thread (returns immediately — poll /etl/status)."""
+    global _etl_status
+    if _etl_status["running"]:
+        return {"message": "ETL ya está en progreso. Espera unos segundos.", "running": True}
+
+    def _run():
+        global _etl_status
+        _etl_status["running"] = True
+        _etl_status["last_error"] = None
+        db = SessionLocal()
+        try:
+            count = etl_service.process_all_files(db)
+            _etl_status["last_count"] = count
+            print(f"[ETL/bg] ✅ {count} registros cargados.")
+        except Exception as e:
+            _etl_status["last_error"] = str(e)
+            print(f"[ETL/bg] ❌ Error: {e}")
+        finally:
+            db.close()
+            _etl_status["running"] = False
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    return {"message": "ETL iniciado en segundo plano. Los datos estarán listos en ~30-60s.", "running": True}
+
+
+@router.get("/etl/status")
+def etl_status():
+    """Check if background ETL is still running."""
+    return _etl_status
 
 
 @router.get("/kpis/institucionales")
