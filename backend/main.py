@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 from app.db.session import engine, SessionLocal
 from app.models.evaluacion import Base
+from app.models.user import User          # importar ANTES de create_all
 from app.core.config import settings
 
-# Crear las tablas en la base de datos
+# Crear TODAS las tablas (evaluaciones + users)
 Base.metadata.create_all(bind=engine)
 
 # ── Migraciones ligeras: añadir columnas nuevas si no existen ─────────────
