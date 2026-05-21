@@ -53,7 +53,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
         src={BG_IMAGE}
         alt="Campus PUCESE"
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ objectPosition: 'center' }}
+        style={{ objectPosition: 'center 20%' }}
       />
       {/* Dark overlay over entire screen */}
       <div className="absolute inset-0"
