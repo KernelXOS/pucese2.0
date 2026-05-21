@@ -52,23 +52,30 @@ def _seed_admin_user(db):
 
 @app.on_event("startup")
 async def auto_seed():
-    """Corre el ETL completo si faltan datos 360 o la BD está vacía."""
+    """Corre el ETL completo si faltan datos o la BD está incompleta."""
     import traceback
     try:
-        from app.services.etl_service import etl_service
+        from app.services.etl_service import etl_service, BASE
         from app.models.evaluacion import Evaluacion
+        import os as _os
         db = SessionLocal()
-        total_count       = db.query(Evaluacion).count()
-        count_360         = db.query(Evaluacion).filter(Evaluacion.sistema == '360').count()
-        count_servicios   = db.query(Evaluacion).filter(Evaluacion.sistema == '360', Evaluacion.modelo == 'servicios').count()
-        print(f"[ETL] BD actual: {total_count} total, {count_360} registros 360/MECDI, {count_servicios} servicios")
+        total_count     = db.query(Evaluacion).count()
+        count_meipa     = db.query(Evaluacion).filter(Evaluacion.sistema == 'meipa').count()
+        count_360       = db.query(Evaluacion).filter(Evaluacion.sistema == '360').count()
+        count_servicios = db.query(Evaluacion).filter(Evaluacion.sistema == '360', Evaluacion.modelo == 'servicios').count()
+        data_dir_ok     = _os.path.isdir(BASE)
+        print(f"[ETL] BD actual: {total_count} total | meipa={count_meipa} | 360={count_360} | servicios={count_servicios}")
+        print(f"[ETL] Directorio de datos: {BASE} (existe={data_dir_ok})")
 
-        if total_count == 0 or count_360 == 0 or count_servicios == 0:
-            print("[ETL] Faltan datos (o modelo 'servicios' aún no cargado) — procesando todos los archivos de data/...")
+        needs_etl = (total_count == 0 or count_meipa == 0 or count_360 == 0 or count_servicios == 0)
+        if needs_etl and data_dir_ok:
+            print("[ETL] Datos incompletos — procesando todos los archivos de data/...")
             total = etl_service.process_all_files(db)
-            print(f"[ETL] ✅ {total} registros cargados.")
+            print(f"[ETL] Resultado: {total} registros.")
+        elif needs_etl and not data_dir_ok:
+            print(f"[ETL] ⚠️  Datos incompletos PERO directorio {BASE} NO existe — omitiendo ETL para proteger la BD.")
         else:
-            print(f"[ETL] BD completa ({total_count} registros, {count_360} de tipo 360, {count_servicios} servicios) — omitiendo seed.")
+            print(f"[ETL] BD completa — omitiendo seed (para forzar recarga usa POST /api/v1/evaluacion/etl/process).")
 
         _seed_admin_user(db)
         db.close()

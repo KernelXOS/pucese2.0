@@ -256,12 +256,19 @@ class ETLService:
         self._reclassify_by_programa(model_scores)
         records += self._build_360_records_2025(model_scores, staff)
 
+        # Safety: never wipe if no records were loaded (protects against missing data dir)
+        if not records:
+            print("[ETL] ⚠️  0 registros generados — BD NO se modifica (verifica que /app/data esté montada).")
+            return 0
+
         # Wipe and reload
+        print(f"[ETL] Cargando {len(records)} registros en BD...")
         db.query(Evaluacion).delete()
         db.commit()
         for rec in records:
             db.add(Evaluacion(**self._clean_rec(rec)))
         db.commit()
+        print(f"[ETL] ✅ {len(records)} registros guardados.")
         return len(records)
 
     # ── MEIPA: CONSOLIDADO HETEROEVALUACIÓN ───────────────────────────────────
