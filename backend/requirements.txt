@@ -14,7 +14,7 @@ google-genai
 httpx
 python-multipart
 python-jose[cryptography]
-passlib[bcrypt]
-bcrypt
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
 jinja2
 xhtml2pdf
