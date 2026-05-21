@@ -82,7 +82,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 
           {/* Stat pills */}
           <div className="flex gap-3 mt-6">
-            {[['MEIPA', 'Evaluación interna'],['360°','Heteroevaluación'],['IA','Análisis inteligente']].map(([tag, desc]) => (
+            {[['MEIPA', 'Evaluación interna'],['360°','Heteroevaluación'],['SIGA','Gestión académica']].map(([tag, desc]) => (
               <div key={tag} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}>
                 <p style={{ fontSize: 13, fontWeight: 800, color: '#7ec8f0' }}>{tag}</p>
                 <p style={{ fontSize: 10, opacity: 0.6 }}>{desc}</p>
