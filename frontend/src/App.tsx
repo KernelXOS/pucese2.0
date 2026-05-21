@@ -74,7 +74,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
             </div>
           </div>
           <h1 style={{ fontSize: 34, fontWeight: 900, lineHeight: 1.1, marginBottom: 10, letterSpacing: '-0.03em' }}>
-            Sistema de Evaluación<br />Docente IA
+            Sistema de Evaluación<br />Docente SIGA
           </h1>
           <p style={{ fontSize: 14, opacity: 0.7, maxWidth: 360, lineHeight: 1.6 }}>
             Plataforma institucional de análisis y seguimiento del desempeño académico basada en inteligencia artificial.
