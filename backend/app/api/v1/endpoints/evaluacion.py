@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -6,7 +7,7 @@ from app.db.session import get_db, SessionLocal
 from app.services.kpi_service import kpi_service
 from app.services.gemini_service import gemini_service
 from app.services.etl_service import etl_service
-import threading
+import io, threading
 
 _etl_status: dict = {"running": False, "last_count": None, "last_error": None}
 
@@ -179,6 +180,38 @@ def get_competencias_preguntas():
     if not data:
         raise HTTPException(status_code=404, detail="No hay datos de preguntas disponibles")
     return data
+
+
+@router.get("/reporte-general.pdf")
+def reporte_general_pdf(
+    db:      Session      = Depends(get_db),
+    sistema: Optional[str] = None,
+    modelo:  Optional[str] = None,
+    periodo: Optional[str] = None,
+):
+    """
+    Genera y descarga un PDF con el informe general completo.
+    Filtra por sistema (meipa|360|salud), modelo y/o período.
+    Sin filtros → informe institucional unificado (todos los sistemas).
+    """
+    from app.services.pdf_service import generar_pdf_reporte_general
+    from datetime import datetime as _dt
+    try:
+        pdf_bytes = generar_pdf_reporte_general(db, sistema=sistema, modelo=modelo, periodo=periodo)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo generar el reporte: {e}")
+
+    parts = [p for p in [sistema, modelo, periodo] if p]
+    tag   = "_".join(parts) if parts else "institucional"
+    filename = f"InformeGeneral_{tag}_{_dt.now().strftime('%Y%m%d')}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/consulta-ia")

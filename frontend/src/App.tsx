@@ -2716,6 +2716,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const sistemaRef       = useRef<HTMLDivElement>(null)
   const [exportingComp, setExportingComp]   = useState(false)
   const [exportingVista, setExportingVista] = useState(false)
+  const [exportingInforme, setExportingInforme] = useState(false)
 
   // ── Períodos v2 ────────────────────────────────────────────────────────────
   const [periodos, setPeriodos]           = useState<any[]>([])
@@ -2749,6 +2750,22 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
       alert('Error al generar el PDF. Intenta de nuevo.')
     } finally {
       setPdfLoading(null)
+    }
+  }
+
+  const handleDescargarInforme = async (sistemaOpt?: string, modeloOpt?: string) => {
+    if (exportingInforme) return
+    setExportingInforme(true)
+    try {
+      await api.descargarInformeGeneral({
+        sistema: sistemaOpt,
+        modelo:  modeloOpt,
+        periodo: periodoActivo || undefined,
+      })
+    } catch {
+      alert('Error al generar el informe general. Intenta de nuevo.')
+    } finally {
+      setExportingInforme(false)
     }
   }
 
@@ -3438,12 +3455,38 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
           {/* ── OVERVIEW / COMPARATIVO ─────────────────────────────────────── */}
           {sistema === 'overview' && (
             <>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
                   <h2 className="text-base font-bold text-slate-800">Vista Comparativa — MEIPA vs 360</h2>
                   <p className="text-[11px] text-slate-400">Análisis cruzado de ambos sistemas de evaluación docente</p>
                 </div>
                 {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1e40af] animate-spin" />}
+              </div>
+
+              {/* ── Banner Informe General Institucional ──────────────────── */}
+              <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-xl border"
+                style={{ background:'linear-gradient(135deg,#0f172a 0%,#0056b3 100%)', borderColor:'#1e40af' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background:'rgba(255,255,255,0.12)' }}>
+                    <FileText size={20} style={{ color:'#93c5fd' }}/>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-black text-white leading-tight">Informe General Institucional</p>
+                    <p className="text-[10px] mt-0.5" style={{ color:'rgba(255,255,255,0.55)' }}>
+                      PDF completo con todos los evaluados, tendencias, ranking y estadísticas — MEIPA + 360°
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDescargarInforme(undefined, undefined)}
+                  disabled={exportingInforme}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all disabled:opacity-60 active:scale-95"
+                  style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)' }}
+                >
+                  {exportingInforme ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
+                  <span>{exportingInforme ? 'Generando…' : 'Descargar PDF'}</span>
+                </button>
               </div>
               <div ref={comparativoRef}>
                 {/* ── Estado vacío: no hay datos en la BD ────────────────── */}
@@ -3549,6 +3592,40 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     </div>
                     {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1e40af] animate-spin" />}
                   </div>
+
+                  {/* ── Informe General banner ──────────────────────────── */}
+                  {(() => {
+                    const tc = currentTabCfg
+                    const sistemaOpt = sistema === 'meipa' ? 'meipa' : sistema === 'salud' ? '360' : '360'
+                    const modeloOpt  = sistema === 'meipa' ? 'docencia' : sistema === 'salud' ? saludSubTab : activeTab
+                    const labelInf   = `Informe General — ${tc.label}`
+                    return (
+                      <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-xl border"
+                        style={{ background:`linear-gradient(135deg,${tc.color}ee 0%,${tc.color}aa 100%)`, borderColor:`${tc.color}60` }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background:'rgba(255,255,255,0.15)' }}>
+                            <FileText size={20} style={{ color:'#fff' }}/>
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-black text-white leading-tight">{labelInf}</p>
+                            <p className="text-[10px] mt-0.5" style={{ color:'rgba(255,255,255,0.65)' }}>
+                              PDF completo: todos los evaluados, todos los períodos, estadísticas y tendencias
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDescargarInforme(sistemaOpt, modeloOpt)}
+                          disabled={exportingInforme}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all disabled:opacity-60 active:scale-95"
+                          style={{ background:'rgba(255,255,255,0.22)', border:'1px solid rgba(255,255,255,0.3)' }}
+                        >
+                          {exportingInforme ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
+                          <span>{exportingInforme ? 'Generando…' : 'Descargar PDF'}</span>
+                        </button>
+                      </div>
+                    )
+                  })()}
 
                   {/* KPI Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">

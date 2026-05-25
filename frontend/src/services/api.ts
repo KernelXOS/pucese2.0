@@ -147,4 +147,24 @@ export const api = {
   // ── Desempeño por variables demográficas ────────────────────────────────────
   getDesempenoPorVariables: (anio?: number, sistema?: string, modelo?: string) =>
     axios.get(`${EVAL}/desempeno-variables?${params({ anio, sistema, modelo })}`),
+
+  /** Descarga el PDF del informe general (todo, o filtrado por sistema/modelo/periodo). */
+  descargarInformeGeneral: async (opts: {
+    sistema?: string; modelo?: string; periodo?: string; filename?: string
+  } = {}): Promise<void> => {
+    const { sistema, modelo, periodo, filename } = opts
+    const url = `${EVAL}/reporte-general.pdf?${params({ sistema, modelo, periodo })}`
+    const resp = await axios.get(url, { responseType: 'blob' })
+    const blob = new Blob([resp.data], { type: 'application/pdf' })
+    const href = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = href
+    a.download = filename
+      || resp.headers['content-disposition']?.split('filename="')[1]?.replace('"', '')
+      || `InformeGeneral.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(href)
+  },
 };

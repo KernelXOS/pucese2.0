@@ -656,6 +656,219 @@ def generar_pdf_bulk_docentes(cedulas: list, db: Session) -> bytes:
     })
 
 
+def _svg_tendencia_general(tendencias: list) -> str:
+    """SVG de línea de tendencia para el informe general."""
+    if not tendencias:
+        return ""
+    n = len(tendencias)
+    w, h = 500, 130
+    pad_l, pad_r, pad_t, pad_b = 30, 20, 15, 35
+    cw = w - pad_l - pad_r
+    ch = h - pad_t - pad_b
+    vals = [float(t.get("promedio", 0)) for t in tendencias]
+    min_v = max(0.0, min(vals) - 5)
+    max_v = min(100.0, max(vals) + 5)
+    rng = max_v - min_v or 1
+
+    def px(i): return pad_l + (i / max(n - 1, 1)) * cw
+    def py(v): return pad_t + ch - (v - min_v) / rng * ch
+
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" style="font-family:Arial,sans-serif;">']
+    # guías
+    for tick in [60, 70, 80, 90, 100]:
+        if min_v <= tick <= max_v + 1:
+            y = py(tick)
+            c = "#10b981" if tick == 90 else "#f1f5f9"
+            lines.append(f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w - pad_r}" y2="{y:.1f}" stroke="{c}" stroke-width="{"1.2" if tick==90 else "1"}" stroke-dasharray="{"4,3" if tick==90 else "none"}"/>')
+            lines.append(f'<text x="{pad_l - 3}" y="{y + 3:.1f}" text-anchor="end" font-size="6" fill="#94a3b8">{tick}</text>')
+    # polilínea de área
+    pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(vals))
+    close_pts = f"{px(n-1):.1f},{pad_t + ch} {pad_l},{pad_t + ch}"
+    lines.append(f'<polygon points="{pts} {close_pts}" fill="#0056b3" opacity="0.07"/>')
+    lines.append(f'<polyline points="{pts}" fill="none" stroke="#0056b3" stroke-width="2" stroke-linejoin="round"/>')
+    # puntos + valores
+    for i, (t, v) in enumerate(zip(tendencias, vals)):
+        x, y = px(i), py(v)
+        c = "#059669" if v >= 90 else "#0056b3" if v >= 75 else "#d97706" if v >= 60 else "#dc2626"
+        lines.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="white" stroke="{c}" stroke-width="2"/>')
+        lines.append(f'<text x="{x:.1f}" y="{y - 7:.1f}" text-anchor="middle" font-size="6.5" font-weight="800" fill="{c}">{v:.1f}</text>')
+        lbl = str(t.get("label", ""))[-8:]
+        lines.append(f'<text x="{x:.1f}" y="{h - 5}" text-anchor="middle" font-size="6" fill="#64748b">{lbl}</text>')
+    lines.append('</svg>')
+    return "\n".join(lines)
+
+
+def generar_pdf_reporte_general(
+    db: Session,
+    sistema: Optional[str] = None,
+    modelo: Optional[str] = None,
+    periodo: Optional[str] = None,
+) -> bytes:
+    """
+    Genera un informe general completo con KPIs, distribución, tendencias,
+    tabla completa de evaluados, top10 y docentes críticos.
+    """
+    from collections import defaultdict as _dd
+    from statistics import median as _median
+
+    # ── Query base ────────────────────────────────────────────────────────
+    q = db.query(Evaluacion).filter(Evaluacion.puntaje_100.isnot(None))
+    if sistema:
+        q = q.filter(Evaluacion.sistema == sistema)
+    if modelo:
+        q = q.filter(Evaluacion.modelo == modelo)
+    if periodo:
+        q = q.filter(Evaluacion.periodo == periodo)
+
+    evs = q.order_by(Evaluacion.puntaje_100.desc()).all()
+    if not evs:
+        raise ValueError("No hay datos para el filtro especificado")
+
+    # ── Deduplicar por (cedula, modelo, periodo) ──────────────────────────
+    seen: dict = {}
+    for ev in evs:
+        k = f"{ev.cedula}|{ev.modelo}|{ev.periodo}"
+        if k not in seen:
+            seen[k] = ev
+    evs_unique = sorted(seen.values(), key=lambda e: float(e.puntaje_100 or 0), reverse=True)
+
+    # ── KPIs globales ─────────────────────────────────────────────────────
+    puntajes = [float(ev.puntaje_100) for ev in evs_unique]
+    total     = len(puntajes)
+    promedio  = round(sum(puntajes) / total, 1)
+    med_val   = round(_median(puntajes), 1)
+    max_p     = round(max(puntajes), 1)
+    min_p     = round(min(puntajes), 1)
+
+    nivel_cnt: dict = _dd(int)
+    for p in puntajes:
+        nivel_cnt[nivel_from_puntaje(p)] += 1
+
+    pct_exc  = round(nivel_cnt["Excelente"]  / total * 100, 1)
+    pct_bue  = round(nivel_cnt["Bueno"]      / total * 100, 1)
+    pct_reg  = round(nivel_cnt["Regular"]    / total * 100, 1)
+    pct_def  = round(nivel_cnt["Deficiente"] / total * 100, 1)
+
+    # ── Tendencias por período ────────────────────────────────────────────
+    per_data: dict = _dd(list)
+    for ev in evs_unique:
+        if ev.periodo:
+            per_data[ev.periodo].append(float(ev.puntaje_100))
+    tendencias = []
+    for per_cod, vals in sorted(per_data.items()):
+        tendencias.append({
+            "periodo": per_cod,
+            "label":   _norm_periodo(per_cod),
+            "promedio": round(sum(vals) / len(vals), 1),
+            "n":        len(vals),
+        })
+
+    # ── Por modelo ────────────────────────────────────────────────────────
+    mod_data: dict = _dd(list)
+    mod_sis:  dict = {}
+    for ev in evs_unique:
+        if ev.modelo:
+            mod_data[ev.modelo].append(float(ev.puntaje_100))
+            mod_sis[ev.modelo] = ev.sistema or "—"
+    por_modelo = []
+    for mod, vals in sorted(mod_data.items()):
+        sis = mod_sis.get(mod, "—")
+        por_modelo.append({
+            "modelo":       mod,
+            "label":        MODELO_LABELS.get(mod, mod.capitalize()),
+            "sistema_label": "MEIPA" if sis == "meipa" else "360/MECDI",
+            "promedio":     round(sum(vals) / len(vals), 1),
+            "n":            len(vals),
+        })
+
+    # ── Lista docentes completa ───────────────────────────────────────────
+    def _sc(p):
+        p = float(p)
+        if p >= 90: return "#059669"
+        if p >= 75: return "#0056b3"
+        if p >= 60: return "#d97706"
+        return "#dc2626"
+
+    docentes_list = []
+    for ev in evs_unique:
+        p     = float(ev.puntaje_100)
+        nivel = nivel_from_puntaje(p)
+        docentes_list.append({
+            "nombre":       ev.docente_nombre or "—",
+            "cedula":       ev.cedula or "—",
+            "facultad":     ev.facultad or ev.carrera or "—",
+            "modelo_label": MODELO_LABELS.get(ev.modelo or "", ev.modelo or ""),
+            "sistema":      (ev.sistema or "—").upper(),
+            "periodo_label": _norm_periodo(ev.periodo or ""),
+            "puntaje_fmt":  _fmt(ev.puntaje_100),
+            "puntaje_float": p,
+            "nivel":        nivel,
+            "nivel_css":    _nivel_css(nivel),
+            "score_color":  _sc(p),
+        })
+
+    top10   = docentes_list[:10]
+    criticos = [d for d in docentes_list if d["puntaje_float"] < 70]
+
+    # ── Títulos ───────────────────────────────────────────────────────────
+    if sistema == "meipa":
+        titulo    = "Informe General — Sistema MEIPA"
+        subtitulo = "Evaluación Docente Integral"
+        sis_label = "MEIPA"
+    elif sistema == "360":
+        if modelo:
+            titulo    = f"Informe General — {MODELO_LABELS.get(modelo, modelo.capitalize())}"
+            subtitulo = "Sistema 360° / MECDI"
+        else:
+            titulo    = "Informe General — Sistema 360° / MECDI"
+            subtitulo = "Todos los modelos del sistema 360"
+        sis_label = "360° / MECDI"
+    elif sistema == "salud":
+        titulo    = "Informe General — Salud"
+        subtitulo = "Docencia ABP y Servicios Hospitalarios"
+        sis_label = "Salud"
+    else:
+        titulo    = "Informe General Institucional"
+        subtitulo = "MEIPA + 360° / MECDI · Todos los sistemas"
+        sis_label = None
+
+    mod_label = MODELO_LABELS.get(modelo or "", "") if modelo else None
+
+    per_label = _norm_periodo(periodo) if periodo else "Todos los períodos"
+
+    ctx = {
+        "logo_url":          LOGO_URL,
+        "fecha_generacion":  datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "titulo":            titulo,
+        "subtitulo":         subtitulo,
+        "periodo_label":     per_label,
+        "sistema_label":     sis_label,
+        "modelo_label":      mod_label,
+        "total":             total,
+        "promedio":          f"{promedio:.1f}",
+        "promedio_float":    promedio,
+        "nivel_gral":        nivel_from_puntaje(promedio),
+        "mediana":           f"{med_val:.1f}",
+        "max_puntaje":       f"{max_p:.1f}",
+        "min_puntaje":       f"{min_p:.1f}",
+        "n_excelente":       nivel_cnt["Excelente"],
+        "n_bueno":           nivel_cnt["Bueno"],
+        "n_regular":         nivel_cnt["Regular"],
+        "n_deficiente":      nivel_cnt["Deficiente"],
+        "pct_excelente":     pct_exc,
+        "pct_bueno":         pct_bue,
+        "pct_regular":       pct_reg,
+        "pct_deficiente":    pct_def,
+        "tendencias":        tendencias,
+        "svg_tendencia":     _svg_tendencia_general(tendencias),
+        "por_modelo":        por_modelo,
+        "docentes":          docentes_list,
+        "top10":             top10,
+        "criticos":          criticos,
+    }
+    return _render_pdf("reporte_general.html", ctx)
+
+
 def generar_pdf_directorio(titulo: str, docentes_data: list) -> bytes:
     """
     Genera el PDF de directorio con el ranking completo de docentes.
