@@ -1065,69 +1065,70 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         const pctColor = (v: number) => v >= 90 ? '#059669' : v >= 80 ? '#0056b3' : v >= 70 ? '#d97706' : '#dc2626'
 
-        // ── Heatmap: todas las unidades × todos los períodos ──────────────
-        // Y = unidades ordenadas por promedio (de mayor a menor)
-        const yLabels = avgByFac.map(f => f.fac.length > 35 ? f.fac.slice(0,33)+'…' : f.fac)
-        const zValues = avgByFac.map(({ fac }) =>
-          periodLabels.map(p => facMap[fac]?.[p] ?? null)
-        )
-        const heatmapTrace = [{
-          type: 'heatmap' as const,
-          x: periodLabels,
-          y: yLabels,
-          z: zValues,
-          colorscale: [
-            [0,    '#dc2626'],
-            [0.55, '#f59e0b'],
-            [0.75, '#3b82f6'],
-            [0.88, '#10b981'],
-            [1,    '#065f46'],
-          ] as any,
-          zmin: 60, zmax: 100,
-          showscale: true,
-          colorbar: {
-            title: { text:'Puntaje', side:'right' as const, font:{size:9} },
-            thickness: 12, len: 0.8,
-            tickfont:{ size:8 }, tickvals:[60,70,80,90,100],
-            ticktext:['60','70','80','90','100'],
+        // ── Barras horizontales: todas las unidades por último período con datos ──
+        const lastPeriod = periodLabels[periodLabels.length - 1]
+        const barData = avgByFac
+          .map(({ fac, avg }) => ({ fac, avg, last: facMap[fac]?.[lastPeriod] ?? avg }))
+          .sort((a, b) => b.avg - a.avg)
+
+        const barTrace = [{
+          type: 'bar' as const,
+          orientation: 'h' as const,
+          x: barData.map(d => d.avg),
+          y: barData.map(d => d.fac.length > 40 ? d.fac.slice(0,38)+'…' : d.fac),
+          marker: {
+            color: barData.map(d => d.avg >= 90 ? '#059669' : d.avg >= 80 ? '#0056b3' : d.avg >= 70 ? '#d97706' : '#dc2626'),
+            opacity: 0.85,
           },
-          hovertemplate: '<b>%{y}</b><br>%{x}<br><b>%{z:.1f}</b>/100<extra></extra>',
-          xgap: 2, ygap: 1,
+          text: barData.map(d => `${d.avg.toFixed(1)}`),
+          textposition: 'outside' as const,
+          textfont: { size: 8, family: 'Inter' },
+          hovertemplate: '<b>%{y}</b><br>Promedio: <b>%{x:.1f}</b>/100<extra></extra>',
         }]
 
-        const hmHeight = Math.max(420, avgByFac.length * 16)
+        const barHeight = Math.max(400, barData.length * 22)
 
         return (
           <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-            {/* Header */}
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
               <TrendingUp size={14} style={{ color:'#0f5ca8', opacity:0.8 }} />
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Análisis Temporal ·</span>
-              <h3 className="text-[13px] font-bold text-slate-700">Desempeño por Período — Escuelas / Unidades</h3>
+              <h3 className="text-[13px] font-bold text-slate-700">Ranking de Escuelas / Unidades — Promedio General</h3>
               <span className="ml-auto text-[9px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">{avgByFac.length} unidades · {periodLabels.length} períodos</span>
             </div>
 
             <div className="p-5 space-y-5">
-              {/* Heatmap todas las unidades */}
               <div>
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-1">
-                  Mapa de calor — Todas las unidades por período <span className="text-slate-300 font-normal ml-2">🟩 ≥90 · 🟦 ≥80 · 🟧 ≥70 · 🟥 &lt;70</span>
+                  Todas las unidades ordenadas por promedio general
+                  <span className="ml-3 font-normal text-slate-300">🟩 ≥90 · 🟦 ≥80 · 🟧 ≥70 · 🟥 &lt;70</span>
                 </p>
-                <Plot data={heatmapTrace} layout={{
-                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'white',
+                <Plot data={barTrace} layout={{
+                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'#fafbfc',
                   font: { family:'Inter', size:9 },
-                  margin: { t:8, b:50, l:220, r:70 },
+                  margin: { t:8, b:30, l:230, r:50 },
                   xaxis: {
-                    type:'category' as const,
-                    tickfont:{ size:10, color:'#334155' },
-                    side:'bottom' as const,
-                    tickangle:-30,
+                    range: [55, 105],
+                    gridcolor:'#e8edf2', zeroline:false,
+                    tickfont:{ size:9, color:'#94a3b8' },
+                    ticksuffix:'%',
+                    showgrid: true,
                   },
                   yaxis: {
                     tickfont:{ size:9, color:'#334155' },
-                    autorange:'reversed' as const,
+                    autorange: 'reversed' as const,
                   },
-                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:`${hmHeight}px`}} />
+                  shapes:[{
+                    type:'line', x0:90, x1:90, y0:0, y1:1, yref:'paper',
+                    line:{ color:'#10b981', width:1.5, dash:'dot' },
+                  }],
+                  annotations:[{
+                    x:90, xref:'x', y:0, yref:'paper', text:'Meta<br>90%',
+                    showarrow:false, xanchor:'left', yanchor:'top',
+                    font:{size:8,color:'#10b981',family:'Inter'},
+                  }],
+                  showlegend: false,
+                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:`${barHeight}px`}} />
               </div>
 
               {/* Ranking table */}
