@@ -26,7 +26,8 @@ _DATA_CANDIDATES = [
 ]
 
 BASE = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
-EVAL_DIR = os.path.join(BASE, 'eval_detalladas_2025_02')
+EVAL_DIR      = os.path.join(BASE, 'eval_detalladas_2025_02')
+POSGRADO_DIR  = os.path.join(BASE, 'posgrado')
 
 print(f"[ETL] BASE resuelto a: {BASE} (existe={os.path.isdir(BASE)})")
 STAFF_REF_DATE = datetime(2025, 1, 1)
@@ -255,6 +256,7 @@ class ETLService:
         self._merge_csv_hetero_2025(model_scores, staff)
         self._reclassify_by_programa(model_scores)
         records += self._build_360_records_2025(model_scores, staff)
+        records += self._source_posgrado_historico(staff)
 
         # Safety: never wipe if no records were loaded (protects against missing data dir)
         if not records:
@@ -1127,6 +1129,196 @@ class ETLService:
                 rec['aula_virtual']    = round(comp_vals.get('aula', 0) / 100 * 10, 2)
                 rec['autoevaluacion']  = round(comp_vals.get('auto', 0) / 100 * 30, 2)
             recs.append(rec)
+        return recs
+
+
+    # ── POSGRADO HISTÓRICO (2023-2025) ────────────────────────────────────────
+    def _source_posgrado_historico(self, staff: dict) -> list:
+        """
+        Lee datos de evaluaciones de posgrado desde BASE/posgrado/:
+          - CSV con columnas NUM_DOCU / SVRTSR3_TERM_CODE / PUNTAJE / PESO → heteroevaluación
+          - XLSX con columnas usuario_evaluado / periodo_evaluacion / calificacion / peso → autoevaluación
+        Genera registros sistema='360', modelo='posgrado' para cada (cedula, periodo) encontrado.
+        """
+        if not os.path.isdir(POSGRADO_DIR):
+            print(f"[ETL] Posgrado dir no encontrado: {POSGRADO_DIR} — omitiendo datos históricos.")
+            return []
+
+        print(f"[ETL] Procesando datos históricos de posgrado desde {POSGRADO_DIR}...")
+
+        # ── 1) Heteroevaluación desde CSVs ────────────────────────────────────
+        hetero: dict = {}  # (ced, periodo) → {puntaje, nombre, anio, dept, nresp}
+
+        for fname in os.listdir(POSGRADO_DIR):
+            if not fname.lower().endswith('.csv'):
+                continue
+            fpath = os.path.join(POSGRADO_DIR, fname)
+            try:
+                df_h = pd.read_csv(fpath, encoding='latin1', sep=';', on_bad_lines='skip')
+            except Exception:
+                try:
+                    df_h = pd.read_csv(fpath, encoding='utf-8-sig', sep=';', on_bad_lines='skip')
+                except Exception:
+                    continue
+
+            # Necesitamos: cedula, periodo, puntaje, peso, pregunta
+            col_doc   = next((c for c in df_h.columns if 'num_docu'       in c.lower()), None)
+            col_term  = next((c for c in df_h.columns if 'term_code'      in c.lower()), None)
+            col_punt  = next((c for c in df_h.columns if c.lower() == 'puntaje'), None)
+            col_peso  = next((c for c in df_h.columns if c.lower() == 'peso' and 'total' not in c.lower()), None)
+            col_preg  = next((c for c in df_h.columns if 'cod_pregunta'   in c.lower()), None)
+            col_last  = next((c for c in df_h.columns if 'last_name'      in c.lower()), None)
+            col_first = next((c for c in df_h.columns if 'first_name'     in c.lower()), None)
+            col_dept  = next((c for c in df_h.columns if 'stvdept_desc'   in c.lower()), None)
+            col_nresp = next((c for c in df_h.columns if 'numero_respuestas' in c.lower()), None)
+
+            if not (col_doc and col_term and col_punt):
+                continue  # archivo sin estructura esperada (e.g. CSV1 sin puntaje)
+
+            df_h['_ced']    = df_h[col_doc].astype(str).str.strip().str.lstrip('0')
+            df_h['_per']    = df_h[col_term].astype(str).str.strip()
+            df_h['_anio']   = df_h['_per'].apply(
+                lambda p: int(str(p)[:4]) if len(str(p)) >= 4 and str(p)[:4].isdigit() else 2023)
+            df_h['_punt']   = pd.to_numeric(
+                df_h[col_punt].astype(str).str.replace(',', '.', regex=False), errors='coerce')
+            df_h['_peso']   = pd.to_numeric(df_h[col_peso], errors='coerce').fillna(1) if col_peso else 1.0
+            df_h['_nom']    = (
+                df_h[col_last].astype(str).str.strip() + ' ' +
+                df_h[col_first].astype(str).str.strip()
+            ).str.strip() if (col_last and col_first) else ''
+            df_h['_dept']   = df_h[col_dept].astype(str).str.strip() if col_dept else ''
+            df_h['_nresp']  = pd.to_numeric(df_h[col_nresp], errors='coerce') if col_nresp else np.nan
+            df_h['_preg']   = df_h[col_preg].astype(str) if col_preg else '__'
+
+            df_valid = df_h.dropna(subset=['_punt'])
+
+            # Dedup: promedio de PUNTAJE por (cedula, periodo, pregunta)
+            df_dd = df_valid.groupby(['_ced', '_per', '_preg']).agg(
+                punt_q=('_punt',  'mean'),
+                peso=  ('_peso',  'first'),
+                anio=  ('_anio',  'first'),
+                nombre=('_nom',   'first'),
+                dept=  ('_dept',  'first'),
+                nresp= ('_nresp', 'max'),
+            ).reset_index()
+
+            # Promedio ponderado por (cedula, periodo)
+            for (ced, per), grp in df_dd.groupby(['_ced', '_per']):
+                if not ced or ced in ('nan', ''):
+                    continue
+                peso_sum = grp['peso'].sum()
+                if peso_sum == 0:
+                    continue
+                puntaje = float((grp['punt_q'] * grp['peso']).sum() / peso_sum)
+                nresp_v = grp['nresp'].max()
+                hetero[(ced, per)] = {
+                    'puntaje': round(puntaje, 2),
+                    'nombre':  str(grp['nombre'].iloc[0]).strip(),
+                    'anio':    int(grp['anio'].iloc[0]),
+                    'dept':    str(grp['dept'].iloc[0]).strip(),
+                    'nresp':   int(nresp_v) if nresp_v and not pd.isna(nresp_v) else None,
+                }
+
+        # ── 2) Autoevaluación desde XLSXs ────────────────────────────────────
+        auto: dict = {}  # (ced, periodo) → {puntaje, nombre}
+
+        for fname in os.listdir(POSGRADO_DIR):
+            if not fname.lower().endswith('.xlsx'):
+                continue
+            fpath = os.path.join(POSGRADO_DIR, fname)
+            try:
+                df_a = pd.read_excel(fpath, engine='openpyxl')
+            except Exception:
+                continue
+
+            if 'usuario_evaluado' not in df_a.columns:
+                continue
+
+            col_per_a = next((c for c in df_a.columns if 'periodo' in c.lower()), None)
+            col_cal   = next((c for c in df_a.columns if 'calificacion' in c.lower()), None)
+            col_pes_a = next((c for c in df_a.columns if c.lower() == 'peso'), None)
+            col_ap    = next((c for c in df_a.columns if 'apellidos_evaluado' in c.lower()), None)
+            col_nm    = next((c for c in df_a.columns if 'nombres_evaluado'   in c.lower()), None)
+
+            if not (col_per_a and col_cal and col_pes_a):
+                continue
+
+            df_a['_ced']  = df_a['usuario_evaluado'].astype(str).str.strip().str.lstrip('0')
+            df_a['_per']  = df_a[col_per_a].astype(str).str.strip()
+            df_a['_cal']  = pd.to_numeric(df_a[col_cal], errors='coerce').fillna(0)
+            df_a['_peso'] = pd.to_numeric(df_a[col_pes_a], errors='coerce').fillna(0)
+            # Instrumento 8: escala 1–4; contrib = (cal/4)*peso → suma = puntaje sobre 100
+            df_a['_contrib'] = (df_a['_cal'] / 4.0) * df_a['_peso']
+            df_a['_nom'] = (
+                df_a[col_ap].astype(str).str.strip() + ' ' +
+                df_a[col_nm].astype(str).str.strip()
+            ).str.strip() if (col_ap and col_nm) else ''
+
+            for (ced, per), grp in df_a.groupby(['_ced', '_per']):
+                if not ced or ced in ('nan', ''):
+                    continue
+                auto_score = float(grp['_contrib'].sum())
+                auto[(ced, per)] = {
+                    'puntaje': round(min(auto_score, 100.0), 2),
+                    'nombre':  str(grp['_nom'].iloc[0]).strip(),
+                }
+
+        # ── 3) Construir registros fusionando hetero + auto ───────────────────
+        recs = []
+        all_keys = set(hetero.keys()) | set(auto.keys())
+
+        for (ced, per) in all_keys:
+            h = hetero.get((ced, per))
+            a = auto.get((ced, per))
+
+            anio = h['anio'] if h else (
+                int(str(per)[:4]) if len(str(per)) >= 4 and str(per)[:4].isdigit() else 2023)
+            dept        = h['dept']    if h else ''
+            nresp       = h.get('nresp') if h else None
+            nombre_raw  = (h['nombre'] if h else '') or (a['nombre'] if a else '')
+
+            s      = staff.get(ced, {})
+            nombre = self._build_nombre(ced, staff, nombre_raw)
+
+            # Puntaje: Het.Est(60%) + Auto(30%) + CEV(10%) → sin CEV escalamos a 90%
+            het_p  = h['puntaje'] if h else 0.0
+            aut_p  = a['puntaje'] if a else 0.0
+
+            if h and a:
+                puntaje = round((het_p * 0.60 + aut_p * 0.30) / 0.90, 2)
+            elif h:
+                puntaje = round(het_p, 2)
+            elif a:
+                puntaje = round(aut_p, 2)
+            else:
+                continue
+
+            puntaje = min(puntaje, 100.0)
+
+            recs.append({
+                'docente_nombre':  nombre,
+                'facultad':        'Posgrado',
+                'carrera':         dept,
+                'periodo':         str(per),
+                'anio':            anio,
+                'modelo':          'posgrado',
+                'sistema':         '360',
+                'cedula':          ced,
+                'puntaje_100':     round(puntaje, 2),
+                'promedio':        round(puntaje / 100 * 5, 2),
+                'nivel_desempeno': _nivel_from_puntaje(puntaje),
+                'het_estudiantil': round(het_p / 100 * 60, 2),
+                'autoevaluacion':  round(aut_p / 100 * 30, 2),
+                'comp_hetero_est': round(het_p, 2),
+                'comp_auto':       round(aut_p, 2),
+                'sexo':            s.get('genero', ''),
+                'antiguedad_anos': s.get('antiguedad_anos'),
+                'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
+                'archivo_fuente':  'posgrado/historico',
+                'n_evaluadores':   nresp,
+            })
+
+        print(f"[ETL] Posgrado histórico: {len(recs)} registros ({len(hetero)} hetero, {len(auto)} auto).")
         return recs
 
 
