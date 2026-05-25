@@ -26,10 +26,11 @@ _DATA_CANDIDATES = [
 ]
 
 BASE = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
-EVAL_DIR      = os.path.join(BASE, 'eval_detalladas_2025_02')
+EVAL_DIR        = os.path.join(BASE, 'eval_detalladas_2025_02')
 EVAL_DIR_202501 = os.path.join(BASE, 'eval_detalladas_202501')
 EVAL_DIR_202402 = os.path.join(BASE, 'eval_det_202402')
-POSGRADO_DIR  = os.path.join(BASE, 'posgrado')
+POSGRADO_DIR    = os.path.join(BASE, 'posgrado')
+PUCESE_DATA_DIR = os.path.join(BASE, 'pucese_data')
 
 print(f"[ETL] BASE resuelto a: {BASE} (existe={os.path.isdir(BASE)})")
 STAFF_REF_DATE = datetime(2025, 1, 1)
@@ -292,6 +293,26 @@ class ETLService:
         records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202501, '202501', 2025)
         # eval_det_202402 no se procesa — ya está cubierto por _source_360_mecdi_2024
         records += self._source_pucetec_hetero(staff)
+        records += self._source_meipa_pucese_data(staff)
+
+        # ── Deduplicación: ante mismo (cedula, periodo, modelo, sistema)
+        # quedarse con el registro más completo (más componentes llenos)
+        _COMP_FIELDS = ['comp_auto', 'comp_pares', 'comp_hetero_dir', 'comp_hetero_est',
+                        'het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion']
+        def _completeness(r):
+            return sum(1 for f in _COMP_FIELDS if r.get(f) not in (None, 0.0, 0))
+
+        seen_keys: dict = {}
+        for rec in records:
+            key = (
+                str(rec.get('cedula', '')).strip(),
+                str(rec.get('periodo', '')).strip(),
+                str(rec.get('modelo', '')).strip(),
+                str(rec.get('sistema', '')).strip(),
+            )
+            if key not in seen_keys or _completeness(rec) > _completeness(seen_keys[key]):
+                seen_keys[key] = rec
+        records = list(seen_keys.values())
 
         # ── Post-procesamiento demográfico ──────────────────────────────────
         # Para todos los registros: rellenar tiempo_servicio / nivel_estudio / sexo
@@ -1661,6 +1682,203 @@ class ETLService:
             })
 
         print(f"[ETL] PUCETEC hetero: {len(recs)} registros.")
+        return recs
+
+    # ── MEIPA componentes completos (PUCESE DATA) ─────────────────────────────
+    def _source_meipa_pucese_data(self, staff: dict) -> list:
+        """
+        Lee los archivos de PUCESE DATA (pucese_data/) que contienen los
+        4 componentes MEIPA completos para grado (202301, 202302, 202401):
+          - hetero.xlsx   → Het.Estudiantil (40%) — también datos demográficos
+          - *_Eval.xlsx   → sheets: autoevaluacion(20%), pares(20%), coordinador(20%)
+        Calificación 1-5 → normalizada a 0-100.
+        Genera registros sistema='meipa', modelo='docencia'.
+        """
+        if not os.path.isdir(PUCESE_DATA_DIR):
+            return []
+
+        print(f"[ETL] MEIPA PUCESE DATA: procesando {PUCESE_DATA_DIR} ...")
+
+        # ── 1. Het.Estudiantil desde hetero.xlsx ─────────────────────────
+        het_scores: dict = {}   # (ced, periodo) → {'puntaje':float, 'nombre':str, demo:{}}
+        hetero_path = os.path.join(PUCESE_DATA_DIR, 'hetero.xlsx')
+        if os.path.exists(hetero_path):
+            try:
+                xl = pd.ExcelFile(hetero_path)
+                for sh in xl.sheet_names:
+                    df_h = pd.read_excel(hetero_path, sheet_name=sh)
+                    col_doc  = next((c for c in df_h.columns if 'num_docu' in c.lower()), None)
+                    col_term = next((c for c in df_h.columns if 'term_code' in c.lower()), None)
+                    col_punt = next((c for c in df_h.columns if c.upper() == 'PUNTAJE'), None)
+                    col_peso = next((c for c in df_h.columns if c.upper() == 'PESO' and 'TOTAL' not in c.upper()), None)
+                    col_preg = next((c for c in df_h.columns if 'cod_pregunta' in c.lower()), None)
+                    col_last = next((c for c in df_h.columns if 'last_name' in c.lower()), None)
+                    col_frst = next((c for c in df_h.columns if 'first_name' in c.lower()), None)
+                    col_gen  = next((c for c in df_h.columns if c.upper() == 'GENDER'), None)
+                    col_ded  = next((c for c in df_h.columns if c.upper() == 'DED_TIME'), None)
+                    col_ant  = next((c for c in df_h.columns if c.upper() == 'ANTIQUE'), None)
+                    col_age  = next((c for c in df_h.columns if c.upper() == 'AGE'), None)
+                    if not (col_doc and col_term and col_punt):
+                        continue
+                    df_h['_ced']  = df_h[col_doc].astype(str).str.strip().str.lstrip('0')
+                    df_h['_per']  = df_h[col_term].astype(str).str.strip()
+                    df_h['_punt'] = pd.to_numeric(
+                        df_h[col_punt].astype(str).str.replace(',', '.', regex=False), errors='coerce')
+                    df_h['_peso'] = pd.to_numeric(df_h[col_peso], errors='coerce').fillna(1) if col_peso else 1.0
+                    df_h['_preg'] = df_h[col_preg].astype(str) if col_preg else '__'
+                    df_h['_nom']  = (df_h[col_last].astype(str).str.strip() + ' ' +
+                                     df_h[col_frst].astype(str).str.strip()).str.strip() if (col_last and col_frst) else ''
+
+                    df_valid = df_h.dropna(subset=['_punt'])
+                    df_dd = df_valid.groupby(['_ced', '_per', '_preg']).agg(
+                        punt_q=('_punt', 'mean'),
+                        peso=('_peso', 'first'),
+                    ).reset_index()
+
+                    for (ced, per), grp in df_dd.groupby(['_ced', '_per']):
+                        if not ced or ced in ('nan',):
+                            continue
+                        ps = grp['peso'].sum()
+                        puntaje = float((grp['punt_q'] * grp['peso']).sum() / ps) if ps > 0 else 0.0
+                        puntaje = min(round(puntaje, 2), 100.0)
+                        # Demo data (first row for this docente/periodo)
+                        mask = (df_h['_ced'] == ced) & (df_h['_per'] == per)
+                        row0 = df_h[mask].iloc[0] if mask.any() else None
+                        demo = {}
+                        if row0 is not None:
+                            if col_gen:  demo['sexo']   = _clean_nombre(str(row0.get(col_gen, ''))) or ''
+                            if col_ded:  demo['ded']    = str(row0.get(col_ded, '')).strip().upper()
+                            if col_ant:  demo['antique']= str(row0.get(col_ant, '')).strip()
+                            if col_age:
+                                try: demo['edad'] = int(float(row0.get(col_age, 0)))
+                                except: pass
+                        het_scores[(ced, per)] = {
+                            'puntaje': puntaje,
+                            'nombre':  df_h[mask]['_nom'].iloc[0] if mask.any() else '',
+                            'demo':    demo,
+                        }
+            except Exception as e:
+                print(f"[ETL] hetero.xlsx error: {e}")
+
+        # ── 2. Auto / Pares / Coordinador desde *_Eval.xlsx / *_Eva.xlsx ─
+        #       calificacion 1-5 → avg/5 * 100
+        comp_scores: dict = {}  # (ced, periodo) → {'auto': float, 'pares': float, 'coord': float}
+
+        def _score_sheet(df_s, col_ced_name, col_cal_name) -> dict:
+            """(ced, periodo) → promedio 0-100"""
+            result = {}
+            df_s['_ced'] = df_s[col_ced_name].astype(str).str.strip().str.lstrip('0')
+            df_s['_per'] = df_s['periodo_evaluacion'].astype(str).str.strip()
+            df_s['_cal'] = pd.to_numeric(df_s[col_cal_name], errors='coerce')
+            for (ced, per), grp in df_s.dropna(subset=['_cal']).groupby(['_ced', '_per']):
+                if not ced or ced in ('nan',):
+                    continue
+                avg = grp['_cal'].mean()
+                result[(ced, per)] = round(min(avg / 5 * 100, 100.0), 2)
+            return result
+
+        eval_files = [f for f in os.listdir(PUCESE_DATA_DIR)
+                      if (f.endswith('_Eval.xlsx') or f.endswith('_Eva.xlsx')) and f != 'hetero.xlsx']
+        for fname in eval_files:
+            fpath = os.path.join(PUCESE_DATA_DIR, fname)
+            try:
+                xl = pd.ExcelFile(fpath)
+                for sh in xl.sheet_names:
+                    df_s = pd.read_excel(fpath, sheet_name=sh)
+                    if 'periodo_evaluacion' not in df_s.columns or 'usuario_evaluado' not in df_s.columns:
+                        continue
+                    cal_col = next((c for c in df_s.columns if 'calificacion' in c.lower()), None)
+                    if not cal_col:
+                        continue
+                    scores = _score_sheet(df_s, 'usuario_evaluado', cal_col)
+                    sh_lower = sh.lower()
+                    comp = ('auto'  if 'auto' in sh_lower else
+                            'pares' if 'par'  in sh_lower else
+                            'coord' if 'coord' in sh_lower else None)
+                    if not comp:
+                        continue
+                    for key, val in scores.items():
+                        if key not in comp_scores:
+                            comp_scores[key] = {}
+                        # If same period already has value, average them
+                        if comp in comp_scores[key]:
+                            comp_scores[key][comp] = round((comp_scores[key][comp] + val) / 2, 2)
+                        else:
+                            comp_scores[key][comp] = val
+            except Exception as e:
+                print(f"[ETL] {fname} error: {e}")
+
+        # ── 3. Construir registros MEIPA completos ────────────────────────
+        all_keys = set(het_scores.keys()) | set(comp_scores.keys())
+        recs = []
+        for (ced, per) in all_keys:
+            het_info   = het_scores.get((ced, per), {})
+            comps      = comp_scores.get((ced, per), {})
+            het_puntaje= het_info.get('puntaje', 0.0)
+            auto_p     = comps.get('auto',  0.0)
+            pares_p    = comps.get('pares', 0.0)
+            coord_p    = comps.get('coord', 0.0)
+            demo       = het_info.get('demo', {})
+
+            # MEIPA: Het(40) + Auto(20) + Coord(20) + Pares(20) = 100
+            # Solo considerar componentes disponibles
+            total_peso, total_score = 0, 0.0
+            if het_puntaje:  total_score += het_puntaje * 40;  total_peso += 40
+            if auto_p:       total_score += auto_p * 20;        total_peso += 20
+            if coord_p:      total_score += coord_p * 20;       total_peso += 20
+            if pares_p:      total_score += pares_p * 20;       total_peso += 20
+            if total_peso == 0:
+                continue
+            puntaje_100 = round(total_score / total_peso, 2)
+
+            # Determinar periodo normalizado (202301→'202301', 202361→'202301' etc.)
+            try:
+                anio = int(str(per)[:4])
+            except:
+                anio = 2023
+            periodo_norm = str(per)
+
+            s = staff.get(ced, {})
+            nombre_raw = str(het_info.get('nombre', '')).strip()
+
+            # Demo: preferir hetero.xlsx, luego staff lookup
+            sexo_val = demo.get('sexo') or s.get('genero', '')
+            ded_raw  = demo.get('ded',  '') or s.get('tiempo_dedicacion', '')
+            ts_val   = _map_tiempo_servicio(ded_raw)
+            niv_val  = s.get('nivel_instruccion', '')
+            edad_val = demo.get('edad')
+            # Antigüedad desde ANTIQUE string p.ej. "4 AÑOS 3 MESES"
+            antig_val = s.get('antiguedad_anos')
+            if not antig_val and demo.get('antique'):
+                antig_val = _parse_antiguedad(demo['antique'])
+
+            recs.append({
+                'docente_nombre':  self._build_nombre(ced, staff, nombre_raw),
+                'facultad':        s.get('unidad_org', '') or '',
+                'carrera':         '',
+                'periodo':         periodo_norm,
+                'anio':            anio,
+                'modelo':          'docencia',
+                'sistema':         'meipa',
+                'cedula':          ced,
+                'puntaje_100':     puntaje_100,
+                'promedio':        round(puntaje_100 / 100 * 5, 2),
+                'nivel_desempeno': _nivel_from_puntaje(puntaje_100),
+                'comp_hetero_est': round(het_puntaje, 2),
+                'comp_auto':       round(auto_p, 2),
+                'comp_pares':      round(pares_p, 2),
+                'comp_hetero_dir': round(coord_p, 2),
+                'sexo':            sexo_val,
+                'edad':            edad_val,
+                'tiempo_servicio': ts_val,
+                'antiguedad_anos': antig_val,
+                'nivel_estudio':   niv_val,
+                'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
+                'archivo_fuente':  'pucese_data/meipa_completo',
+            })
+
+        print(f"[ETL] MEIPA PUCESE DATA: {len(recs)} registros completos "
+              f"({len(het_scores)} het, {len(comp_scores)} comp).")
         return recs
 
 
