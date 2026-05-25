@@ -1020,50 +1020,172 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
       {/* ── Row 3: Facultades por período ────────────────────────────────── */}
       {facultadPorPeriodo.length > 0 && (() => {
-        // pivot: { facultad -> { periodo -> promedio } }
-        const periodoSet: string[] = []
-        const facMap: Record<string, Record<string, number|null>> = {}
-        for (const row of facultadPorPeriodo) {
-          if (!periodoSet.includes(row.periodo)) periodoSet.push(row.periodo)
-          if (!facMap[row.facultad]) facMap[row.facultad] = {}
-          facMap[row.facultad][row.periodo] = row.promedio
+        // ── Normalizar período a etiqueta legible ──
+        const normPeriodo = (p: string): string => {
+          const s = String(p).trim()
+          const y = s.slice(0, 4)
+          const suf = parseInt(s.slice(4) || '0')
+          if (suf === 1 || suf === 2)   return suf === 1 ? `I-${y}` : `II-${y}`
+          if (suf >= 10 && suf <= 20)   return `TEC-I-${y}`
+          if (suf >= 51 && suf <= 57)   return `Posg-I-${y}`
+          if (suf >= 60 && suf <= 68)   return `I-${y}`
+          if (suf >= 69 && suf <= 80)   return `II-${y}`
+          return `${y}-${suf}`
         }
-        // sort periods by anio then periodo string
-        const periodosSorted = periodoSet // already ordered from backend (ORDER BY anio, periodo)
-        // palette for up to 15 facultades
-        const FAC_COLORS = [
-          '#0f5ca8','#047857','#b45309','#6d28d9','#be123c',
-          '#0891b2','#15803d','#c2410c','#7c3aed','#9f1239',
-          '#1d4ed8','#065f46','#92400e','#5b21b6','#881337',
-        ]
+
+        // pivot con períodos normalizados (agrupar por label = promedio weighted)
+        const labelAcc: Record<string, Record<string, number[]>> = {}
+        for (const row of facultadPorPeriodo) {
+          const lbl = normPeriodo(row.periodo)
+          if (!labelAcc[lbl]) labelAcc[lbl] = {}
+          if (!labelAcc[lbl][row.facultad]) labelAcc[lbl][row.facultad] = []
+          labelAcc[lbl][row.facultad].push(row.promedio)
+        }
+        // Ordered unique labels (I-2023 < II-2023 < TEC-I < Posg-I …)
+        const labelOrder = ['I-2023','TEC-I-2023','Posg-I-2023','II-2023','I-2024','TEC-I-2024','Posg-I-2024','II-2024','I-2025','TEC-I-2025','Posg-I-2025','II-2025']
+        const periodLabels = labelOrder.filter(l => labelAcc[l])
+
+        const facMap: Record<string, Record<string, number>> = {}
+        for (const lbl of periodLabels) {
+          for (const [fac, vals] of Object.entries(labelAcc[lbl])) {
+            if (!facMap[fac]) facMap[fac] = {}
+            facMap[fac][lbl] = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10
+          }
+        }
+
+        // Ranking: avg across all periods
         const facultades = Object.keys(facMap)
-        const traces = facultades.map((fac, i) => ({
+        const avgByFac = facultades.map(f => ({
+          fac: f,
+          avg: Math.round(Object.values(facMap[f]).reduce((a,b)=>a+b,0)/Object.values(facMap[f]).length*10)/10,
+          n: Object.values(facMap[f]).length,
+          last: facMap[f][periodLabels[periodLabels.length-1]] ?? null,
+          first: facMap[f][periodLabels[0]] ?? null,
+        })).sort((a,b) => b.avg - a.avg)
+
+        const TOP_N = 8
+        const top8 = avgByFac.slice(0, TOP_N)
+
+        const FAC_COLORS = [
+          '#0f5ca8','#059669','#d97706','#7c3aed','#dc2626',
+          '#0891b2','#15803d','#c2410c','#9333ea','#be123c',
+        ]
+        const pctColor = (v: number) => v >= 90 ? '#059669' : v >= 80 ? '#0056b3' : v >= 70 ? '#d97706' : '#dc2626'
+
+        const traces = top8.map(({ fac }, i) => ({
           type: 'scatter' as const,
           mode: 'lines+markers' as const,
-          name: fac,
-          x: periodosSorted,
-          y: periodosSorted.map(p => facMap[fac][p] ?? null),
-          line: { color: FAC_COLORS[i % FAC_COLORS.length], width: 2.2 },
-          marker: { color: FAC_COLORS[i % FAC_COLORS.length], size: 7, symbol: 'circle' },
+          name: fac.length > 28 ? fac.slice(0,26)+'…' : fac,
+          x: periodLabels,
+          y: periodLabels.map(p => facMap[fac][p] ?? null),
+          line: { color: FAC_COLORS[i], width: 2.5 },
+          marker: { color: FAC_COLORS[i], size: 8, symbol: 'circle' },
           connectgaps: false,
-          hovertemplate: `<b>${fac}</b><br>%{x}<br>%{y:.1f}/100<extra></extra>`,
+          hovertemplate: `<b>${fac}</b><br>%{x}<br><b>%{y:.1f}</b>/100<extra></extra>`,
         }))
+
         const allVals = facultadPorPeriodo.map((r:any) => r.promedio).filter(Boolean)
-        const yMin = allVals.length ? Math.max(0, Math.floor(Math.min(...allVals)) - 5) : 60
+        const yMin = allVals.length ? Math.max(55, Math.floor(Math.min(...allVals)) - 3) : 60
+
         return (
-          <ChartCard title="Ranking de Unidades Académicas — Evolución por Período" sub="Facultades / Carreras">
-            <Plot data={traces} layout={{
-              autosize: true, paper_bgcolor:'white', plot_bgcolor:'white',
-              font: { family:'Inter', size:9 },
-              margin: { t:10, b:50, l:42, r:10 },
-              xaxis: { type:'category' as const, tickfont:{ size:9, color:'#1e293b' }, showgrid:false, zeroline:false },
-              yaxis: { gridcolor:'#f0f4f8', range:[yMin, 102], tickfont:{ size:8, color:'#94a3b8' }, showgrid:true, zeroline:false },
-              legend: { orientation:'h' as const, y:-0.20, font:{ size:8 }, traceorder:'normal' },
-              showlegend: true,
-              shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90,
-                line:{ color:'#10b981', width:1.2, dash:'dot' } }],
-            }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'380px'}} />
-          </ChartCard>
+          <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+            {/* Header */}
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
+              <TrendingUp size={14} style={{ color:'#0f5ca8', opacity:0.8 }} />
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Análisis Temporal ·</span>
+              <h3 className="text-[13px] font-bold text-slate-700">Evolución por Período — Escuelas / Unidades</h3>
+              <span className="ml-auto text-[9px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">{avgByFac.length} unidades · {periodLabels.length} períodos</span>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Líneas top 8 */}
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-2">Top {TOP_N} unidades — Tendencia por período</p>
+                <Plot data={traces} layout={{
+                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'#fafbfc',
+                  font: { family:'Inter', size:9 },
+                  margin: { t:8, b:40, l:42, r:12 },
+                  xaxis: {
+                    type:'category' as const,
+                    tickfont:{ size:10, color:'#334155', family:'Inter' },
+                    showgrid:false, zeroline:false,
+                    tickangle: -30,
+                  },
+                  yaxis: {
+                    gridcolor:'#e8edf2', range:[yMin, 102],
+                    tickfont:{ size:9, color:'#94a3b8' },
+                    showgrid:true, zeroline:false,
+                    ticksuffix:'%',
+                  },
+                  legend: { orientation:'h' as const, y:-0.28, font:{ size:9, family:'Inter' }, traceorder:'normal', bgcolor:'transparent' },
+                  showlegend: true,
+                  shapes:[
+                    { type:'rect', x0:0, x1:1, xref:'paper', y0:90, y1:102,
+                      fillcolor:'#d1fae5', opacity:0.18, line:{width:0} },
+                    { type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90,
+                      line:{ color:'#10b981', width:1.5, dash:'dot' } },
+                  ],
+                  annotations:[{
+                    x:1, xref:'paper', y:90, yref:'y', text:'Meta 90%',
+                    showarrow:false, xanchor:'right', font:{size:8,color:'#10b981',family:'Inter'},
+                    bgcolor:'white', bordercolor:'#10b981', borderwidth:1, borderpad:2,
+                  }],
+                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'340px'}} />
+              </div>
+
+              {/* Ranking table */}
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-2">Ranking completo — Promedio general</p>
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr style={{ background:'#f8fafc' }}>
+                        <th className="text-left py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em] w-8">#</th>
+                        <th className="text-left py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Unidad / Escuela</th>
+                        {periodLabels.map(p => (
+                          <th key={p} className="text-center py-2.5 px-2 font-black text-slate-500 uppercase tracking-[0.06em] whitespace-nowrap">{p}</th>
+                        ))}
+                        <th className="text-center py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Prom.</th>
+                        <th className="text-center py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Tend.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {avgByFac.map(({ fac, avg, first, last }, idx) => {
+                        const trend = last !== null && first !== null ? last - first : null
+                        return (
+                          <tr key={fac} className={`hover:bg-slate-50/60 transition-colors ${idx < TOP_N ? 'bg-blue-50/20' : ''}`}>
+                            <td className="py-2 px-3 font-black tabular-nums" style={{ color: idx < 3 ? '#0f5ca8' : '#94a3b8' }}>
+                              {idx < 3 ? ['🥇','🥈','🥉'][idx] : idx + 1}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-slate-700 max-w-[200px] truncate">{fac}</td>
+                            {periodLabels.map(p => {
+                              const v = facMap[fac]?.[p]
+                              return (
+                                <td key={p} className="py-2 px-2 text-center tabular-nums font-bold text-[10px]"
+                                  style={{ color: v ? pctColor(v) : '#cbd5e1', background: v ? `${pctColor(v)}08` : 'transparent' }}>
+                                  {v ? v.toFixed(1) : '—'}
+                                </td>
+                              )
+                            })}
+                            <td className="py-2 px-3 text-center">
+                              <span className="font-black text-[12px] tabular-nums" style={{ color: pctColor(avg) }}>{avg.toFixed(1)}</span>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {trend !== null ? (
+                                <span className="font-bold text-[10px]" style={{ color: trend >= 0 ? '#059669' : '#dc2626' }}>
+                                  {trend >= 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}
+                                </span>
+                              ) : <span className="text-slate-300">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         )
       })()}
 
