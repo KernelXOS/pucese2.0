@@ -1064,7 +1064,12 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         })).sort((a,b) => b.avg - a.avg)
 
         const TOP_N = 8
-        const top8 = avgByFac.slice(0, TOP_N)
+        // Mostrar en el gráfico las unidades con MÁS períodos de datos (líneas más completas)
+        // Empate: gana mayor promedio. Mínimo 2 períodos para aparecer en el gráfico.
+        const top8 = [...avgByFac]
+          .filter(f => f.n >= 2)
+          .sort((a, b) => b.n - a.n || b.avg - a.avg)
+          .slice(0, TOP_N)
 
         const FAC_COLORS = [
           '#0f5ca8','#059669','#d97706','#7c3aed','#dc2626',
