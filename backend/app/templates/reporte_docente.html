@@ -3,109 +3,208 @@
 <head>
 <meta charset="UTF-8"/>
 <style>
-  @page { size: A4; margin: 0; }
+  @page {
+    size: A4;
+    margin: 0;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1e293b; background: #fff; }
-
-  /* ══ HEADER BANDA ═══════════════════════════════════════════════════════════ */
-  .hdr-band {
-    background: linear-gradient(135deg, #04204a 0%, #0056b3 60%, #1a78d4 100%);
-    padding: 0;
-    display: flex;
-    align-items: stretch;
-    min-height: 78px;
-  }
-  .hdr-logo-cell {
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    color: #222;
     background: #fff;
-    width: 90px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    padding: 10px 12px;
   }
-  .hdr-logo-cell img { width: 68px; }
-  .hdr-divider { width: 4px; background: linear-gradient(180deg, #f59e0b, #fbbf24); flex-shrink: 0; }
-  .hdr-body { flex: 1; padding: 13px 16px; color: #fff; }
-  .hdr-inst {
-    font-size: 6pt; color: rgba(255,255,255,.55); text-transform: uppercase;
-    letter-spacing: .15em; font-weight: 700; margin-bottom: 3px;
+
+  /* ══ HEADER INSTITUCIONAL (igual al formato.pdf) ═══════════════════════ */
+  .page-header {
+    padding: 14px 22px 10px 22px;
+    border-bottom: 2px solid #0056b3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
-  .hdr-title { font-size: 15pt; font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -.3px; }
-  .hdr-sub { font-size: 7pt; color: rgba(255,255,255,.6); margin-top: 4px; }
-  .hdr-right {
-    padding: 13px 18px; text-align: center; border-left: 1px solid rgba(255,255,255,.12);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 115px;
+  .page-header img {
+    height: 52px;
   }
-  .hdr-per-lbl { font-size: 5.5pt; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .18em; font-weight: 800; }
-  .hdr-per-val { font-size: 14pt; font-weight: 900; color: #fff; line-height: 1; margin-top: 2px; }
-  .hdr-sys { margin-top: 5px; background: rgba(255,255,255,.15); color: #fff; font-size: 6.5pt; font-weight: 800; padding: 2px 9px; border-radius: 20px; }
-  .hdr-fecha { margin-top: 4px; font-size: 5.5pt; color: rgba(255,255,255,.4); }
-
-  /* ══ CONTENT WRAPPER ════════════════════════════════════════════════════════ */
-  .content { padding: 13px 16px 10px 16px; }
-
-  /* ══ SECTION TITLE ══════════════════════════════════════════════════════════ */
-  .sec { font-size: 6.5pt; font-weight: 900; text-transform: uppercase; letter-spacing: .16em; color: #0056b3; border-left: 3px solid #0056b3; padding-left: 7px; margin: 11px 0 6px 0; }
-
-  /* ══ DOCENTE BANNER ═════════════════════════════════════════════════════════ */
-  .doc-banner {
-    background: #f0f7ff; border: 1px solid #bfdbfe; border-left: 5px solid #0056b3;
-    border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin-bottom: 7px;
+  .header-right-text {
+    text-align: right;
+    font-size: 7.5pt;
+    color: #0056b3;
+    font-weight: 700;
   }
-  .doc-avatar {
-    width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#0056b3,#1a78d4);
-    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15pt; font-weight: 900; flex-shrink: 0;
+  .header-right-text .doc-title {
+    font-size: 11pt;
+    font-weight: 900;
+    color: #0056b3;
+    letter-spacing: 0.02em;
   }
-  .doc-name { font-size: 12pt; font-weight: 900; color: #0056b3; line-height: 1.1; }
-  .doc-ci { font-size: 8pt; color: #64748b; margin-top: 2px; font-weight: 600; }
-  .doc-carrera { font-size: 7.5pt; color: #475569; margin-top: 2px; }
-
-  /* ══ INFO GRID ══════════════════════════════════════════════════════════════ */
-  .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-  .info-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-  .ic { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 9px; }
-  .ic-lbl { font-size: 5.5pt; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 2px; }
-  .ic-val { font-size: 8.5pt; font-weight: 700; color: #1e293b; }
-  .ic-accent { border-top: 2px solid #0056b3; }
-
-  /* ══ SCORE HERO ═════════════════════════════════════════════════════════════ */
-  .score-hero { display: flex; gap: 8px; align-items: stretch; }
-  .score-main {
-    background: linear-gradient(160deg, #04204a 0%, #0056b3 100%);
-    color: #fff; border-radius: 7px; padding: 14px 16px; text-align: center;
-    min-width: 115px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  .header-right-text .doc-sub {
+    font-size: 7pt;
+    color: #64748b;
+    font-weight: 400;
+    margin-top: 2px;
   }
-  .score-num { font-size: 34pt; font-weight: 900; line-height: 1; letter-spacing: -1px; }
-  .score-base { font-size: 7pt; opacity: .5; margin-top: 1px; }
-  .score-lvl { margin-top: 7px; background: rgba(255,255,255,.18); font-size: 8pt; font-weight: 900; padding: 3px 10px; border-radius: 20px; }
-  .score-meta { margin-top: 5px; font-size: 6.5pt; opacity: .6; }
-  .score-stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-  .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 7px 8px; text-align: center; }
-  .stat-n { font-size: 11pt; font-weight: 900; color: #0056b3; line-height: 1.1; }
-  .stat-l { font-size: 5.5pt; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
 
-  /* META BAR */
-  .meta-strip { display: flex; gap: 6px; margin-top: 5px; }
-  .meta-chip { flex: 1; border-radius: 5px; padding: 6px 10px; text-align: center; border: 1px solid; }
-  .meta-chip .mc-val { font-size: 10pt; font-weight: 900; }
-  .meta-chip .mc-lbl { font-size: 6pt; font-weight: 700; text-transform: uppercase; color: #64748b; margin-top: 1px; }
-  .chip-ok   { background: #ecfdf5; border-color: #6ee7b7; }
-  .chip-warn { background: #fef3c7; border-color: #fde68a; }
-  .chip-bad  { background: #fef2f2; border-color: #fecaca; }
+  /* ══ BANDA PERIODO/SISTEMA ══════════════════════════════════════════════ */
+  .period-band {
+    background: #0056b3;
+    color: #fff;
+    padding: 5px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 7.5pt;
+    font-weight: 700;
+  }
+  .period-band .pb-item { display: flex; flex-direction: column; align-items: center; }
+  .period-band .pb-lbl { font-size: 5.5pt; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.12em; }
+  .period-band .pb-val { font-size: 10pt; font-weight: 900; }
 
-  /* ══ COMPONENTES ════════════════════════════════════════════════════════════ */
-  .comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* ══ BODY CONTENT ═══════════════════════════════════════════════════════ */
+  .body { padding: 14px 22px; }
+
+  /* ══ SECTION HEADERS ════════════════════════════════════════════════════ */
+  .sec {
+    font-size: 7pt;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #0056b3;
+    border-bottom: 1.5px solid #0056b3;
+    padding-bottom: 3px;
+    margin: 12px 0 7px 0;
+  }
+
+  /* ══ NOMBRE DOCENTE ═════════════════════════════════════════════════════ */
+  .doc-nombre {
+    font-size: 14pt;
+    font-weight: 900;
+    color: #0056b3;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+  }
+  .doc-ci {
+    font-size: 8pt;
+    color: #64748b;
+    margin-top: 3px;
+  }
+  .doc-carrera-line {
+    font-size: 8pt;
+    color: #374151;
+    margin-top: 3px;
+    font-weight: 600;
+  }
+
+  /* ══ GRILLA DATOS ════════════════════════════════════════════════════════ */
+  .data-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .data-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .dc {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 6px 9px;
+    background: #fafbfc;
+  }
+  .dc-lbl {
+    font-size: 5.5pt;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .dc-val {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  /* ══ SCORE HERO ════════════════════════════════════════════════════════ */
+  .score-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    margin-top: 4px;
+  }
+  .score-box {
+    border: 2px solid #0056b3;
+    border-radius: 6px;
+    padding: 12px 18px;
+    text-align: center;
+    min-width: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+  }
+  .score-num {
+    font-size: 30pt;
+    font-weight: 900;
+    color: #0056b3;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .score-base { font-size: 7pt; color: #94a3b8; margin-top: 2px; }
+  .score-nivel {
+    margin-top: 6px;
+    background: #0056b3;
+    color: #fff;
+    font-size: 7.5pt;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .stats-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+  .stat-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 7px 8px;
+    text-align: center;
+    background: #fafbfc;
+  }
+  .stat-num { font-size: 11pt; font-weight: 900; color: #0056b3; line-height: 1.1; }
+  .stat-lbl { font-size: 5.5pt; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
+
+  /* META */
+  .meta-row { display: flex; gap: 6px; margin-top: 6px; }
+  .meta-chip { flex: 1; border-radius: 4px; padding: 6px 10px; text-align: center; }
+  .meta-ok   { background: #ecfdf5; border: 1px solid #6ee7b7; }
+  .meta-warn { background: #fef3c7; border: 1px solid #fde68a; }
+  .meta-bad  { background: #fef2f2; border: 1px solid #fecaca; }
+  .meta-val  { font-size: 9pt; font-weight: 900; }
+  .meta-lbl  { font-size: 6pt; font-weight: 600; color: #64748b; margin-top: 1px; }
+
+  /* ══ COMPONENTES ════════════════════════════════════════════════════════ */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .comp-tbl { width: 100%; border-collapse: collapse; }
-  .comp-tbl th { background: #f1f5f9; font-size: 6pt; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: .08em; padding: 5px 7px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+  .comp-tbl th {
+    background: #f1f5f9; font-size: 6pt; font-weight: 800; color: #64748b;
+    text-transform: uppercase; letter-spacing: .07em; padding: 5px 7px;
+    text-align: left; border-bottom: 1.5px solid #e2e8f0;
+  }
   .comp-tbl td { padding: 5px 7px; border-bottom: 1px solid #f1f5f9; font-size: 8pt; vertical-align: middle; }
   .comp-tbl tr:last-child td { border-bottom: none; }
   .bar-bg { width: 100%; background: #f1f5f9; border-radius: 3px; height: 7px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; }
-  .bex { background: linear-gradient(90deg,#059669,#10b981); }
-  .bbu { background: linear-gradient(90deg,#0056b3,#1a78d4); }
-  .bre { background: linear-gradient(90deg,#d97706,#f59e0b); }
-  .bde { background: linear-gradient(90deg,#dc2626,#ef4444); }
+  .bex { background: #059669; } .bbu { background: #0056b3; }
+  .bre { background: #d97706; } .bde { background: #dc2626; }
 
-  /* ══ BADGES ═════════════════════════════════════════════════════════════════ */
+  /* badges */
   .b { display: inline-block; font-size: 6pt; font-weight: 800; padding: 2px 6px; border-radius: 3px; }
   .b-ex { background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; }
   .b-bu { background:#eff6ff; color:#0056b3; border:1px solid #bfdbfe; }
@@ -113,9 +212,9 @@
   .b-de { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
   .b-nd { background:#f8fafc; color:#94a3b8; border:1px solid #e2e8f0; }
 
-  /* ══ HISTÓRICO ══════════════════════════════════════════════════════════════ */
+  /* ══ HISTORICO ══════════════════════════════════════════════════════════ */
   .hist-tbl { width: 100%; border-collapse: collapse; }
-  .hist-tbl th { background:#f1f5f9; font-size:6pt; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.07em; padding:5px 6px; text-align:center; border-bottom:2px solid #e2e8f0; }
+  .hist-tbl th { background:#f1f5f9; font-size:6pt; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.07em; padding:5px 6px; text-align:center; border-bottom:1.5px solid #e2e8f0; }
   .hist-tbl th:first-child { text-align:left; }
   .hist-tbl td { padding:5px 6px; border-bottom:1px solid #f1f5f9; font-size:8pt; text-align:center; }
   .hist-tbl td:first-child { text-align:left; font-weight:700; }
@@ -123,171 +222,192 @@
   .cur { background:#eff6ff; font-weight:900; color:#0056b3; }
   .tup { color:#059669; font-weight:800; } .tdn { color:#dc2626; font-weight:800; } .tfl { color:#94a3b8; }
 
-  /* ══ RESUMEN BOX ════════════════════════════════════════════════════════════ */
-  .res-box { background: linear-gradient(135deg,#f0f9ff,#e0f2fe); border:1px solid #bae6fd; border-left:4px solid #0284c7; border-radius:6px; padding:9px 12px; }
-  .res-ttl { font-size:6pt; font-weight:900; color:#0284c7; text-transform:uppercase; letter-spacing:.12em; margin-bottom:4px; }
-  .res-txt { font-size:8pt; color:#1e293b; line-height:1.65; }
+  /* ══ RESUMEN ════════════════════════════════════════════════════════════ */
+  .res-box {
+    background: #f0f7ff;
+    border: 1px solid #bfdbfe;
+    border-left: 3px solid #0056b3;
+    border-radius: 4px;
+    padding: 9px 12px;
+  }
+  .res-ttl { font-size: 6pt; font-weight: 900; color: #0056b3; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 4px; }
+  .res-txt { font-size: 8pt; color: #1e293b; line-height: 1.65; }
 
-  /* ══ RECOMENDACIONES ════════════════════════════════════════════════════════ */
-  .rec-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:9px 12px; }
-  .rec-item { font-size:8pt; color:#374151; line-height:1.7; }
+  /* ══ RECOMENDACIONES ════════════════════════════════════════════════════ */
+  .rec-box { background:#fafbfc; border:1px solid #e2e8f0; border-radius:4px; padding:8px 12px; }
+  .rec-item { font-size: 8pt; color: #374151; line-height: 1.75; }
 
-  /* ══ SVG WRAP ═══════════════════════════════════════════════════════════════ */
+  /* ══ SVG ════════════════════════════════════════════════════════════════ */
   .svgw { width:100%; overflow:hidden; }
 
-  /* ══ FOOTER ═════════════════════════════════════════════════════════════════ */
-  .ftr { margin-top: 12px; border-top: 1px solid #e2e8f0; padding: 7px 16px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-  .ftr-l { font-size: 6pt; color: #94a3b8; }
-  .ftr-r { font-size: 6pt; color: #94a3b8; text-align: right; }
-  .conf { font-size: 5.5pt; font-weight: 900; color: #cbd5e1; text-transform: uppercase; letter-spacing: .2em; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* ══ FOOTER INSTITUCIONAL (igual al formato.pdf) ════════════════════════ */
+  .page-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-top: 1.5px solid #0056b3;
+    padding: 7px 22px 8px 22px;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .footer-left { font-size: 6pt; color: #64748b; line-height: 1.6; }
+  .footer-left strong { color: #0056b3; }
+  .footer-right { text-align: right; font-size: 6pt; color: #94a3b8; }
+  .footer-social { font-size: 6pt; color: #64748b; margin-top: 2px; }
+
+  /* margen para que el footer no tape el contenido */
+  .body { padding-bottom: 60px; }
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════ HEADER ══════════════════════════════════════════ -->
-<div class="hdr-band">
-  <div class="hdr-logo-cell"><img src="{{ logo_url }}" alt="PUCESE"/></div>
-  <div class="hdr-divider"></div>
-  <div class="hdr-body">
-    <div class="hdr-inst">Pontificia Universidad Católica del Ecuador · Sede Esmeraldas</div>
-    <div class="hdr-title">Informe de Evaluación Docente</div>
-    <div class="hdr-sub">Dirección de Calidad y Acreditación · Sistema Integrado de Evaluación del Desempeño Docente</div>
-  </div>
-  <div class="hdr-right">
-    <div class="hdr-per-lbl">Período</div>
-    <div class="hdr-per-val">{{ periodo_label }}</div>
-    <div class="hdr-sys">{{ sistema_upper }}</div>
-    <div class="hdr-fecha">{{ fecha_generacion }}</div>
+<!-- ══════════════════ HEADER INSTITUCIONAL ══════════════════════════════ -->
+<div class="page-header">
+  <img src="{{ logo_url }}" alt="PUCESE"/>
+  <div class="header-right-text">
+    <div class="doc-title">Informe de Evaluación Docente</div>
+    <div class="doc-sub">Dirección de Calidad y Acreditación · Sistema Integrado de Evaluación del Desempeño</div>
   </div>
 </div>
 
-<div class="content">
-
-<!-- ═══════════════════════ DATOS DEL DOCENTE ════════════════════════════════ -->
-<div class="sec">&#128100; Perfil del Docente</div>
-
-<div class="doc-banner">
-  <div class="doc-avatar">{{ nombre_completo[0] if nombre_completo else '?' }}</div>
-  <div style="flex:1; min-width:0;">
-    <div class="doc-name">{{ nombre_completo | upper }}</div>
-    <div class="doc-ci">Cédula de Identidad: {{ cedula }}</div>
-    {% if perfil.carrera and perfil.carrera != '—' %}
-    <div class="doc-carrera">&#127979; {{ perfil.carrera }}{% if perfil.facultad and perfil.facultad != perfil.carrera and perfil.facultad != '—' %} &nbsp;·&nbsp; {{ perfil.facultad }}{% endif %}</div>
-    {% elif perfil.facultad and perfil.facultad != '—' %}
-    <div class="doc-carrera">&#127979; {{ perfil.facultad }}</div>
-    {% endif %}
+<!-- Banda de período -->
+<div class="period-band">
+  <div class="pb-item">
+    <span class="pb-lbl">Período</span>
+    <span class="pb-val">{{ periodo_label }}</span>
   </div>
-  <div style="text-align:right; flex-shrink:0;">
-    <div style="font-size:7pt; color:#64748b; margin-bottom:3px;">Sistema de Evaluación</div>
-    <div style="font-size:9.5pt; font-weight:900; color:#0056b3;">{{ sistema_label }}</div>
-    <div style="font-size:7.5pt; color:#475569; margin-top:2px;">Modelo: {{ modelo_label }}</div>
+  <div class="pb-item">
+    <span class="pb-lbl">Sistema</span>
+    <span class="pb-val">{{ sistema_upper }}</span>
+  </div>
+  <div class="pb-item">
+    <span class="pb-lbl">Modelo</span>
+    <span class="pb-val">{{ modelo_label }}</span>
+  </div>
+  <div class="pb-item">
+    <span class="pb-lbl">Generado</span>
+    <span class="pb-val" style="font-size:8pt;">{{ fecha_generacion }}</span>
   </div>
 </div>
 
-<!-- Grilla de variables del docente -->
-<div class="info-grid">
-  <div class="ic ic-accent">
-    <div class="ic-lbl">Función</div>
-    <div class="ic-val">{{ perfil.funcion or '—' }}</div>
+<!-- ══════════════════ CONTENIDO ══════════════════════════════════════════ -->
+<div class="body">
+
+<!-- PERFIL DEL DOCENTE -->
+<div class="sec">Perfil del Docente</div>
+
+<div class="doc-nombre">{{ nombre_completo | upper }}</div>
+<div class="doc-ci">Cédula de Identidad: <strong>{{ cedula }}</strong></div>
+{% if perfil.carrera and perfil.carrera != '—' and perfil.carrera != '' %}
+<div class="doc-carrera-line">
+  &#127979; {{ perfil.carrera }}
+  {% if perfil.facultad and perfil.facultad != perfil.carrera and perfil.facultad != '—' and perfil.facultad != '' %}
+  &nbsp;·&nbsp; {{ perfil.facultad }}
+  {% endif %}
+</div>
+{% elif perfil.facultad and perfil.facultad != '—' and perfil.facultad != '' %}
+<div class="doc-carrera-line">&#127979; {{ perfil.facultad }}</div>
+{% endif %}
+
+<div class="data-grid">
+  <div class="dc">
+    <div class="dc-lbl">Función</div>
+    <div class="dc-val">{{ perfil.funcion or '—' }}</div>
   </div>
-  <div class="ic ic-accent">
-    <div class="ic-lbl">Tipo de Dedicación</div>
-    <div class="ic-val">{{ perfil.dedicacion or '—' }}</div>
+  <div class="dc">
+    <div class="dc-lbl">Tipo de Dedicación</div>
+    <div class="dc-val">{{ perfil.dedicacion or '—' }}</div>
   </div>
-  <div class="ic ic-accent">
-    <div class="ic-lbl">Género</div>
-    <div class="ic-val">{{ genero or '—' }}</div>
+  <div class="dc">
+    <div class="dc-lbl">Género</div>
+    <div class="dc-val">{{ genero or '—' }}</div>
   </div>
-  <div class="ic ic-accent">
-    <div class="ic-lbl">Antigüedad</div>
-    <div class="ic-val">{{ antiguedad_str }}</div>
+  <div class="dc">
+    <div class="dc-lbl">Antigüedad</div>
+    <div class="dc-val">{{ antiguedad_str }}</div>
   </div>
 </div>
-<div style="height:5px;"></div>
-<div class="info-grid">
-  <div class="ic" style="grid-column:span 2;">
-    <div class="ic-lbl">Nivel de Instrucción / Formación Académica</div>
-    <div class="ic-val">{{ perfil.nivel_instruccion or '—' }}</div>
+<div class="data-grid-3" style="margin-top:5px;">
+  <div class="dc" style="grid-column:span 2;">
+    <div class="dc-lbl">Nivel de Instrucción / Formación Académica</div>
+    <div class="dc-val">{{ perfil.nivel_instruccion or '—' }}</div>
   </div>
-  <div class="ic">
-    <div class="ic-lbl">N.° Evaluadores Período</div>
-    <div class="ic-val">{{ perfil.n_evaluadores }}</div>
-  </div>
-  <div class="ic">
-    <div class="ic-lbl">Período Evaluado</div>
-    <div class="ic-val">{{ periodo_label }}</div>
+  <div class="dc">
+    <div class="dc-lbl">N.° Evaluadores</div>
+    <div class="dc-val">{{ perfil.n_evaluadores }}</div>
   </div>
 </div>
 
-<!-- ═══════════════════════ RESULTADO DEL PERÍODO ═════════════════════════════ -->
-<div class="sec">&#127942; Resultado del Período {{ periodo_label }}</div>
+<!-- RESULTADO DEL PERÍODO -->
+<div class="sec">Resultado — Período {{ periodo_label }}</div>
 
-<div class="score-hero">
-  <div class="score-main">
-    <div style="font-size:6.5pt; opacity:.6; text-transform:uppercase; letter-spacing:.12em; margin-bottom:4px;">Puntaje Final</div>
+<div class="score-wrap">
+  <div class="score-box">
+    <div style="font-size:6.5pt; color:#94a3b8; text-transform:uppercase; letter-spacing:.1em; margin-bottom:3px;">Puntaje Final</div>
     <div class="score-num">{{ puntaje_actual.puntaje_fmt }}</div>
-    <div class="score-base">sobre 100 puntos</div>
-    <div class="score-lvl">{{ puntaje_actual.nivel_desempeno }}</div>
-    <div class="score-meta">{{ puntaje_actual.modelo_label }}</div>
+    <div class="score-base">/ 100 puntos</div>
+    <div class="score-nivel">{{ puntaje_actual.nivel_desempeno }}</div>
   </div>
-  <div class="score-stats">
-    <div class="stat">
-      <div class="stat-n" style="color:{{ ranking_color }};">{{ ranking_str }}</div>
-      <div class="stat-l">Ranking Inst.</div>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-num" style="color:{{ ranking_color }};">{{ ranking_str }}</div>
+      <div class="stat-lbl">Ranking Inst.</div>
     </div>
-    <div class="stat">
-      <div class="stat-n">{{ percentil_str }}</div>
-      <div class="stat-l">Percentil</div>
+    <div class="stat-box">
+      <div class="stat-num">{{ percentil_str }}</div>
+      <div class="stat-lbl">Percentil</div>
     </div>
-    <div class="stat">
-      <div class="stat-n" style="font-size:9pt;">{{ sistema_upper }}</div>
-      <div class="stat-l">Sistema</div>
+    <div class="stat-box">
+      <div class="stat-num" style="font-size:9pt;">{{ promedio_inst_str }}</div>
+      <div class="stat-lbl">Prom. Institución</div>
     </div>
-    <div class="stat">
-      <div class="stat-n" style="font-size:9.5pt;">{{ promedio_inst_str }}</div>
-      <div class="stat-l">Prom. Institución</div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:{{ diff_color }}; font-size:10pt;">{{ diff_str }}</div>
+      <div class="stat-lbl">vs Promedio</div>
     </div>
-    <div class="stat">
-      <div class="stat-n" style="color:{{ diff_color }}; font-size:10pt;">{{ diff_str }}</div>
-      <div class="stat-l">vs Promedio Inst.</div>
+    <div class="stat-box">
+      <div class="stat-num" style="font-size:9pt;">{{ perfil.n_evaluadores }}</div>
+      <div class="stat-lbl">Evaluadores</div>
     </div>
-    <div class="stat">
-      <div class="stat-n" style="font-size:9.5pt;">{{ perfil.n_evaluadores }}</div>
-      <div class="stat-l">N.° Evaluadores</div>
+    <div class="stat-box">
+      <div class="stat-num" style="font-size:8pt;">{{ sistema_upper }}</div>
+      <div class="stat-lbl">Sistema</div>
     </div>
   </div>
 </div>
 
-<!-- Indicador meta 90 -->
+<!-- Meta 90 -->
 {% set p = puntaje_actual.puntaje_fmt | float %}
-<div class="meta-strip">
+<div class="meta-row">
   {% if p >= 90 %}
-  <div class="meta-chip chip-ok" style="flex:3;">
-    <div class="mc-val" style="color:#059669;">&#10003; Supera la Meta Institucional</div>
-    <div class="mc-lbl">Puntaje ≥ 90/100 — Objetivo de calidad alcanzado</div>
+  <div class="meta-chip meta-ok" style="flex:3;">
+    <div class="meta-val" style="color:#059669;">&#10003; Supera la Meta Institucional</div>
+    <div class="meta-lbl">Puntaje ≥ 90/100 — Objetivo de calidad alcanzado</div>
   </div>
   {% elif p >= 75 %}
-  <div class="meta-chip chip-warn" style="flex:3;">
-    <div class="mc-val" style="color:#d97706;">&#8593; En Progreso — {{ (90 - p) | round(1) }} pts para la meta</div>
-    <div class="mc-lbl">Requiere mejora para alcanzar el estándar institucional de calidad (90/100)</div>
+  <div class="meta-chip meta-warn" style="flex:3;">
+    <div class="meta-val" style="color:#d97706;">&#8593; En Progreso — faltan {{ (90 - p) | round(1) }} puntos</div>
+    <div class="meta-lbl">Requiere mejora para alcanzar el estándar de calidad (90/100)</div>
   </div>
   {% else %}
-  <div class="meta-chip chip-bad" style="flex:3;">
-    <div class="mc-val" style="color:#dc2626;">&#9888; Requiere Plan de Mejora Inmediato</div>
-    <div class="mc-lbl">{{ (90 - p) | round(1) }} puntos por debajo de la meta — Intervención requerida</div>
+  <div class="meta-chip meta-bad" style="flex:3;">
+    <div class="meta-val" style="color:#dc2626;">&#9888; Requiere Plan de Mejora — {{ (90 - p) | round(1) }} puntos bajo la meta</div>
+    <div class="meta-lbl">Intervención pedagógica requerida — Meta institucional: 90/100</div>
   </div>
   {% endif %}
-  <div class="meta-chip" style="flex:1;">
-    <div class="mc-val" style="color:#0056b3;">90</div>
-    <div class="mc-lbl">Meta Institucional</div>
+  <div class="meta-chip" style="flex:1; border:1px solid #e2e8f0;">
+    <div class="meta-val" style="color:#0056b3;">90</div>
+    <div class="meta-lbl">Meta Institucional</div>
   </div>
 </div>
 
-<!-- ═══════════════════════ DESGLOSE COMPONENTES ═════════════════════════════ -->
+<!-- DESGLOSE COMPONENTES -->
 {% if componentes %}
-<div class="sec">&#128202; Desglose por Componente de Evaluación</div>
-<div class="comp-grid">
+<div class="sec">Desglose por Componente de Evaluación</div>
+<div class="two-col">
   <div>
     <table class="comp-tbl">
       <thead>
@@ -295,8 +415,8 @@
           <th style="width:38%">Componente</th>
           <th style="width:10%; text-align:center">Peso</th>
           <th style="width:14%; text-align:center">Puntaje</th>
-          <th style="width:22%">Progreso</th>
-          <th style="width:16%">Nivel</th>
+          <th style="width:23%">Progreso</th>
+          <th style="width:15%">Nivel</th>
         </tr>
       </thead>
       <tbody>
@@ -322,16 +442,16 @@
 </div>
 {% endif %}
 
-<!-- ═══════════════════════ RESUMEN EJECUTIVO ═════════════════════════════════ -->
-<div class="sec">&#128203; Resumen Ejecutivo</div>
+<!-- RESUMEN EJECUTIVO -->
+<div class="sec">Resumen Ejecutivo</div>
 <div class="res-box">
-  <div class="res-ttl">&#129302; Análisis Automatizado · Sistema de Evaluación Docente PUCESE</div>
+  <div class="res-ttl">Análisis Automatizado · Sistema de Evaluación Docente PUCESE</div>
   <div class="res-txt">{{ resumen | safe }}</div>
 </div>
 
-<!-- ═══════════════════════ EVOLUCIÓN HISTÓRICA ══════════════════════════════ -->
+<!-- EVOLUCIÓN HISTÓRICA -->
 {% if historico %}
-<div class="sec">&#128200; Evolución Histórica del Desempeño</div>
+<div class="sec">Evolución Histórica del Desempeño</div>
 {% if svg_historico %}<div class="svgw">{{ svg_historico | safe }}</div>{% endif %}
 <table class="hist-tbl" style="margin-top:6px;">
   <thead>
@@ -361,8 +481,8 @@
 </table>
 {% endif %}
 
-<!-- ═══════════════════════ RECOMENDACIONES ══════════════════════════════════ -->
-<div class="sec">&#127919; Recomendaciones</div>
+<!-- RECOMENDACIONES -->
+<div class="sec">Recomendaciones</div>
 <div class="rec-box">
   {% set p2 = puntaje_actual.puntaje_fmt | float %}
   {% if p2 >= 90 %}
@@ -370,32 +490,30 @@
   <div class="rec-item">&#10004;&nbsp; Compartir buenas prácticas con pares académicos en espacios de formación institucional.</div>
   <div class="rec-item">&#10004;&nbsp; Explorar oportunidades de investigación y vinculación que complementen la función docente.</div>
   {% elif p2 >= 75 %}
-  <div class="rec-item">&#9888;&nbsp; <strong>Buen desempeño con oportunidades de mejora.</strong> Se recomienda diseñar un plan de mejora focalizado.</div>
-  <div class="rec-item">&#8594;&nbsp; Revisar los componentes con menor puntaje e identificar estrategias pedagógicas específicas.</div>
+  <div class="rec-item">&#9888;&nbsp; <strong>Buen desempeño con oportunidades de mejora.</strong> Diseñar un plan de mejora focalizado en los componentes con menor puntaje.</div>
   <div class="rec-item">&#8594;&nbsp; Participar en los programas de capacitación docente de la Dirección de Calidad y Acreditación.</div>
-  <div class="rec-item">&#8594;&nbsp; Solicitar retroalimentación detallada de los resultados de cada componente de evaluación.</div>
+  <div class="rec-item">&#8594;&nbsp; Solicitar retroalimentación detallada de los resultados por componente.</div>
   {% else %}
-  <div class="rec-item">&#128276;&nbsp; <strong>Se requiere plan de mejora prioritario.</strong> Coordinar con la Dirección de Calidad.</div>
-  <div class="rec-item">&#8594;&nbsp; Establecer un proceso formal de acompañamiento pedagógico con el área académica correspondiente.</div>
-  <div class="rec-item">&#8594;&nbsp; Revisar en detalle los resultados por componente e identificar las áreas críticas de intervención.</div>
+  <div class="rec-item">&#128276;&nbsp; <strong>Se requiere plan de mejora prioritario.</strong> Coordinar con la Dirección de Calidad para establecer un acompañamiento pedagógico.</div>
+  <div class="rec-item">&#8594;&nbsp; Revisar en detalle los resultados por componente e identificar áreas críticas de intervención.</div>
   <div class="rec-item">&#8594;&nbsp; Inscribirse en los talleres de formación y actualización docente ofrecidos por la institución.</div>
   {% endif %}
 </div>
 
-</div><!-- /content -->
+</div><!-- /body -->
 
-<!-- ═══════════════════════ FOOTER ═══════════════════════════════════════════ -->
-<div class="ftr">
-  <div class="ftr-l">
-    <strong>PUCESE</strong> · Dirección de Calidad y Acreditación<br/>
-    Generado el {{ fecha_generacion }} · Sistema de Evaluación Docente IA
+<!-- ══════════════════ FOOTER INSTITUCIONAL ═══════════════════════════════ -->
+<div class="page-footer">
+  <div class="footer-left">
+    <strong>Dirección:</strong> Espejo y Subida a Santa Cruz<br/>
+    <strong>Código postal:</strong> 08-01-0065 &nbsp;|&nbsp; <strong>Teléfono:</strong> (593-6) 2721983 / 272 1595<br/>
+    Esmeraldas - Ecuador &nbsp;/&nbsp; www.pucese.edu.ec
+    <div class="footer-social">f &nbsp; &#x1D54F; &nbsp; &#9654; &nbsp; in &nbsp; &#9654;</div>
   </div>
-  <div style="text-align:center; flex:1;">
-    <div style="font-size:5.5pt; color:#cbd5e1; font-weight:800; text-transform:uppercase; letter-spacing:.15em;">Documento Confidencial · Uso Interno</div>
-  </div>
-  <div class="ftr-r">
+  <div class="footer-right">
     CI: {{ cedula }}<br/>
-    Período: {{ periodo_label }} · {{ sistema_label }}
+    Período: {{ periodo_label }} · {{ sistema_label }}<br/>
+    <span style="color:#cbd5e1; font-size:5.5pt; text-transform:uppercase; letter-spacing:.1em;">Documento Confidencial</span>
   </div>
 </div>
 
