@@ -67,35 +67,35 @@ export const api = {
   },
 
   // ── Legacy (compatibilidad con dashboard actual) ───────────────────────────
-  getKPIs: (modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/kpis/institucionales?${params({ modelo, anio, sistema })}`),
+  getKPIs: (modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/kpis/institucionales?${params({ modelo, anio, sistema, periodo })}`),
 
-  getRanking: (limit = 1000, modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/ranking?${params({ limit, modelo, anio, sistema })}`),
+  getRanking: (limit = 1000, modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/ranking?${params({ limit, modelo, anio, sistema, periodo })}`),
 
-  getCriticos: (threshold = 3.5, modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/criticos?${params({ threshold, modelo, anio, sistema })}`),
+  getCriticos: (threshold = 3.5, modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/criticos?${params({ threshold, modelo, anio, sistema, periodo })}`),
 
   getTendencias: (modelo?: string, sistema?: string) =>
     axios.get(`${EVAL}/tendencias?${params({ modelo, sistema })}`),
 
-  getVariables: (modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/variables?${params({ modelo, anio, sistema })}`),
+  getVariables: (modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/variables?${params({ modelo, anio, sistema, periodo })}`),
 
-  getDemograficos: (modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/demograficos?${params({ modelo, anio, sistema })}`),
+  getDemograficos: (modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/demograficos?${params({ modelo, anio, sistema, periodo })}`),
 
-  getAIAnalysis: (modelo?: string, anio?: number, sistema?: string) =>
-    axios.get(`${EVAL}/analisis-ia?${params({ modelo, anio, sistema })}`),
+  getAIAnalysis: (modelo?: string, anio?: number, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/analisis-ia?${params({ modelo, anio, sistema, periodo })}`),
 
-  getAnalytics: (sistema?: string, modelo?: string, anio?: number) =>
-    axios.get(`${EVAL}/analytics?${params({ sistema, modelo, anio })}`),
+  getAnalytics: (sistema?: string, modelo?: string, anio?: number, periodo?: string) =>
+    axios.get(`${EVAL}/analytics?${params({ sistema, modelo, anio, periodo })}`),
 
   getComparativo: (anio?: number) =>
     axios.get(`${EVAL}/comparativo?${params({ anio })}`),
 
-  getTodosDocentes: (anio?: number, modelo?: string, sistema?: string) =>
-    axios.get(`${EVAL}/todos-docentes?${params({ anio, modelo, sistema })}`),
+  getTodosDocentes: (anio?: number, modelo?: string, sistema?: string, periodo?: string) =>
+    axios.get(`${EVAL}/todos-docentes?${params({ anio, modelo, sistema, periodo })}`),
 
   processETL: () => axios.post(`${EVAL}/etl/process`),
   getETLStatus: () => axios.get(`${EVAL}/etl/status`),

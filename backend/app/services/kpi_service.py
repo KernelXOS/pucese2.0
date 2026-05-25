@@ -38,11 +38,14 @@ MEIPA_MODEL_CONFIG = {
 }
 
 
-def _base_q(db: Session, modelo: str = None, anio: int = None, sistema: str = None):
+def _base_q(db: Session, modelo: str = None, anio: int = None, sistema: str = None, periodo: str = None):
     q = db.query(Evaluacion)
     if modelo:
         q = q.filter(Evaluacion.modelo == modelo)
-    if anio:
+    if periodo:
+        q = q.filter(Evaluacion.periodo == periodo)
+    elif anio:
+        # Solo filtrar por año cuando no hay período específico
         q = q.filter(Evaluacion.anio == anio)
     if sistema:
         q = q.filter(Evaluacion.sistema == sistema)
@@ -57,8 +60,9 @@ class KPIService:
         modelo: str = None,
         anio: int = None,
         sistema: str = None,
+        periodo: str = None,
     ):
-        q = _base_q(db, modelo, anio, sistema)
+        q = _base_q(db, modelo, anio, sistema, periodo)
         total = q.count()
         if total == 0:
             return None
@@ -140,6 +144,7 @@ class KPIService:
         sistema: str = None,
         modelo: str = None,
         anio: int = None,
+        periodo: str = None,
     ) -> dict:
         """
         Return breakdowns:
@@ -148,7 +153,7 @@ class KPIService:
           por_antiguedad:{'0-3 años': avg, '4-10 años': avg, '11-20 años': avg, '20+ años': avg}
           por_funcion:   {'DOCENCIA': avg, 'COORDINACIÓN': avg, ...}
         """
-        q = _base_q(db, modelo, anio, sistema)
+        q = _base_q(db, modelo, anio, sistema, periodo)
 
         # ── Por género ────────────────────────────────────────────────────────
         rows_g = q.with_entities(Evaluacion.sexo, func.avg(Evaluacion.puntaje_100))\
@@ -747,8 +752,8 @@ class KPIService:
         return _result
 
     def get_ranking_docentes(self, db: Session, modelo: str = None, anio: int = None,
-                              limit: int = 1000, sistema: str = None):
-        q = _base_q(db, modelo, anio, sistema)
+                              limit: int = 1000, sistema: str = None, periodo: str = None):
+        q = _base_q(db, modelo, anio, sistema, periodo)
         ranking = q.with_entities(
             Evaluacion.docente_nombre,
             Evaluacion.facultad,
@@ -795,7 +800,7 @@ class KPIService:
             'sistema':         r[17] or '',
         } for r in ranking]
 
-    def get_todos_docentes(self, db: Session, anio: int = None) -> list:
+    def get_todos_docentes(self, db: Session, anio: int = None, modelo: str = None, sistema: str = None, periodo: str = None) -> list:
         """All teachers grouped by (cedula, sistema, modelo) with per-component normalized %."""
         _COMP_CFG: dict = {
             ('360', 'docencia'):     [('het_estudiantil',50),('eval_pares',20),('aula_virtual',10),('autoevaluacion',20)],
@@ -836,7 +841,13 @@ class KPIService:
             Evaluacion.puntaje_100.isnot(None),
             Evaluacion.puntaje_100 > 0,
         )
-        if anio:
+        if modelo:
+            q = q.filter(Evaluacion.modelo == modelo)
+        if sistema:
+            q = q.filter(Evaluacion.sistema == sistema)
+        if periodo:
+            q = q.filter(Evaluacion.periodo == periodo)
+        elif anio:
             q = q.filter(Evaluacion.anio == anio)
 
         from collections import defaultdict
@@ -887,8 +898,8 @@ class KPIService:
         return result
 
     def get_docentes_criticos(self, db: Session, modelo: str = None, anio: int = None,
-                               threshold: float = 3.5, sistema: str = None):
-        q = _base_q(db, modelo, anio, sistema)
+                               threshold: float = 3.5, sistema: str = None, periodo: str = None):
+        q = _base_q(db, modelo, anio, sistema, periodo)
         threshold_100 = threshold / 5 * 100
         criticos = q.with_entities(
             Evaluacion.docente_nombre,
@@ -935,8 +946,8 @@ class KPIService:
             ],
         }
 
-    def get_variables_kpis(self, db: Session, modelo: str = None, anio: int = None, sistema: str = None):
-        q = _base_q(db, modelo, anio, sistema)
+    def get_variables_kpis(self, db: Session, modelo: str = None, anio: int = None, sistema: str = None, periodo: str = None):
+        q = _base_q(db, modelo, anio, sistema, periodo)
         if sistema == 'meipa':
             cfg = MEIPA_MODEL_CONFIG.get(modelo or 'docencia', MEIPA_MODEL_CONFIG['docencia'])
         else:
@@ -956,8 +967,8 @@ class KPIService:
             'mas_alta':  sorted_r[-1] if sorted_r else None,
         }
 
-    def get_demograficos(self, db: Session, modelo: str = None, anio: int = None, sistema: str = None):
-        q = _base_q(db, modelo, anio, sistema)
+    def get_demograficos(self, db: Session, modelo: str = None, anio: int = None, sistema: str = None, periodo: str = None):
+        q = _base_q(db, modelo, anio, sistema, periodo)
         sexo_raw = q.with_entities(Evaluacion.sexo, func.count(Evaluacion.id)).group_by(Evaluacion.sexo).all()
         _GN = {'mujer':'Mujer','femenino':'Mujer','f':'Mujer','hombre':'Hombre','masculino':'Hombre','m':'Hombre'}
         _sex_merged: dict = {}

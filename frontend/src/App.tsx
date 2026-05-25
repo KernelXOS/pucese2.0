@@ -2769,13 +2769,16 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     }
   }
 
-  // Determine query params from state — activeAnio is the single source of truth for year filter
+  // Determine query params from state
+  // periodoActivo tiene prioridad sobre activeAnio (filtro exacto de período)
   const getQueryParams = useCallback(() => {
-    if (sistema === 'overview') return { modelo: undefined,  anio: activeAnio, sistemaParam: undefined }
-    if (sistema === 'meipa')    return { modelo: 'docencia', anio: activeAnio, sistemaParam: 'meipa'  }
-    if (sistema === 'salud')    return { modelo: saludSubTab, anio: activeAnio, sistemaParam: '360'    }
-    return { modelo: activeTab, anio: activeAnio, sistemaParam: '360' }
-  }, [sistema, activeTab, activeAnio, saludSubTab])
+    const periodoParam = periodoActivo || undefined
+    const anioParam   = periodoParam ? undefined : activeAnio  // si hay período, no pasar anio
+    if (sistema === 'overview') return { modelo: undefined,   anio: anioParam, sistemaParam: undefined,  periodoParam }
+    if (sistema === 'meipa')    return { modelo: 'docencia',  anio: anioParam, sistemaParam: 'meipa',    periodoParam }
+    if (sistema === 'salud')    return { modelo: saludSubTab, anio: anioParam, sistemaParam: '360',      periodoParam }
+    return { modelo: activeTab, anio: anioParam, sistemaParam: '360', periodoParam }
+  }, [sistema, activeTab, activeAnio, saludSubTab, periodoActivo])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -2783,13 +2786,13 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     setTendencias([]); setTendPorPeriodo([]); setAnalytics(null); setComparativo(null); setTodosDocentes([])
     setServiciosKpis(null)
     try {
-      const { modelo, anio, sistemaParam } = getQueryParams()
+      const { modelo, anio, sistemaParam, periodoParam } = getQueryParams()
 
       if (sistema === 'overview') {
         // Each call is individually resilient — one failure won't blank the whole dashboard
         const [compRes, todosRes, cpRes, dvRes] = await Promise.all([
           api.getComparativo(anio).catch(e => { console.error('[fetch] comparativo:', e); return { data: null } }),
-          api.getTodosDocentes(anio, undefined, undefined).catch(e => { console.error('[fetch] todos-docentes:', e); return { data: [] } }),
+          api.getTodosDocentes(anio, undefined, undefined, periodoParam).catch(e => { console.error('[fetch] todos-docentes:', e); return { data: [] } }),
           api.getCompetenciasPreguntas().catch(() => null),
           api.getDesempenoPorVariables(anio).catch(() => null),
         ])
@@ -2800,15 +2803,15 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
       } else {
         const noop = (label: string) => (e: any) => { console.error(`[fetch] ${label}:`, e); return null }
         const fetchList: Promise<any>[] = [
-          api.getKPIs(modelo, anio, sistemaParam).catch(noop('kpis')),
-          api.getRanking(1000, modelo, anio, sistemaParam).catch(noop('ranking')),
-          api.getDemograficos(modelo, anio, sistemaParam).catch(noop('demograficos')),
-          api.getTendencias(modelo, sistemaParam).catch(noop('tendencias')),
-          api.getAnalytics(sistemaParam, modelo, anio).catch(noop('analytics')),
-          api.getTodosDocentes(anio, modelo, sistemaParam).catch(noop('todos')),
+          api.getKPIs(modelo, anio, sistemaParam, periodoParam).catch(noop('kpis')),
+          api.getRanking(1000, modelo, anio, sistemaParam, periodoParam).catch(noop('ranking')),
+          api.getDemograficos(modelo, anio, sistemaParam, periodoParam).catch(noop('demograficos')),
+          api.getTendencias(modelo, sistemaParam).catch(noop('tendencias')),  // tendencias: siempre todos los períodos
+          api.getAnalytics(sistemaParam, modelo, anio, periodoParam).catch(noop('analytics')),
+          api.getTodosDocentes(anio, modelo, sistemaParam, periodoParam).catch(noop('todos')),
         ]
         if (sistema === 'salud' && modelo === 'abp') {
-          fetchList.push(api.getKPIs('servicios', anio, '360').catch(() => null))
+          fetchList.push(api.getKPIs('servicios', anio, '360', periodoParam).catch(() => null))
         }
         const [kpiRes, rankRes, demoRes, tendRes, analyticsRes, todosRes, svcRes] = await Promise.all(fetchList)
         if (kpiRes)      setKpis(kpiRes.data)

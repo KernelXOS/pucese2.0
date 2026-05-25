@@ -59,8 +59,9 @@ def get_kpis(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    kpis = kpi_service.get_institutional_kpis(db, modelo=modelo, anio=anio, sistema=sistema)
+    kpis = kpi_service.get_institutional_kpis(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
     if not kpis:
         raise HTTPException(status_code=404, detail="No hay datos disponibles")
     return kpis
@@ -73,8 +74,9 @@ def get_ranking(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    return kpi_service.get_ranking_docentes(db, modelo=modelo, anio=anio, limit=limit, sistema=sistema)
+    return kpi_service.get_ranking_docentes(db, modelo=modelo, anio=anio, limit=limit, sistema=sistema, periodo=periodo)
 
 
 @router.get("/criticos")
@@ -84,8 +86,9 @@ def get_criticos(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    return kpi_service.get_docentes_criticos(db, modelo=modelo, anio=anio, threshold=threshold, sistema=sistema)
+    return kpi_service.get_docentes_criticos(db, modelo=modelo, anio=anio, threshold=threshold, sistema=sistema, periodo=periodo)
 
 
 @router.get("/tendencias")
@@ -94,6 +97,7 @@ def get_tendencias(
     modelo: Optional[str] = None,
     sistema: Optional[str] = None,
 ):
+    # Las tendencias siempre muestran todos los períodos (para el gráfico de evolución)
     return kpi_service.get_tendencias(db, modelo=modelo, sistema=sistema)
 
 
@@ -103,8 +107,9 @@ def get_variables(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    return kpi_service.get_variables_kpis(db, modelo=modelo, anio=anio, sistema=sistema)
+    return kpi_service.get_variables_kpis(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
 
 
 @router.get("/demograficos")
@@ -113,8 +118,9 @@ def get_demograficos(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    return kpi_service.get_demograficos(db, modelo=modelo, anio=anio, sistema=sistema)
+    return kpi_service.get_demograficos(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
 
 
 @router.get("/analisis-ia")
@@ -123,11 +129,12 @@ def get_ai_analysis(
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
     sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
-    kpis = kpi_service.get_institutional_kpis(db, modelo=modelo, anio=anio, sistema=sistema)
+    kpis = kpi_service.get_institutional_kpis(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
     if not kpis:
         raise HTTPException(status_code=404, detail="No hay datos para analizar")
-    variables = kpi_service.get_variables_kpis(db, modelo=modelo, anio=anio, sistema=sistema)
+    variables = kpi_service.get_variables_kpis(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
     kpis['variables'] = {k: v['promedio'] for k, v in variables.get('componentes', {}).items()}
     analysis = gemini_service.generate_executive_analysis(kpis)
     return {"analysis": analysis}
@@ -139,9 +146,10 @@ def get_analytics(
     sistema: Optional[str] = None,
     modelo: Optional[str] = None,
     anio: Optional[int] = None,
+    periodo: Optional[str] = None,
 ):
     """Return gender/age/seniority/function breakdown for any filter combination."""
-    return kpi_service.get_analytics(db, sistema=sistema, modelo=modelo, anio=anio)
+    return kpi_service.get_analytics(db, sistema=sistema, modelo=modelo, anio=anio, periodo=periodo)
 
 
 @router.get("/comparativo")
@@ -157,9 +165,12 @@ def get_comparativo(
 def get_todos_docentes(
     db: Session = Depends(get_db),
     anio: Optional[int] = None,
+    modelo: Optional[str] = None,
+    sistema: Optional[str] = None,
+    periodo: Optional[str] = None,
 ):
     """All teachers with per-component breakdown."""
-    return kpi_service.get_todos_docentes(db, anio=anio)
+    return kpi_service.get_todos_docentes(db, anio=anio, modelo=modelo, sistema=sistema, periodo=periodo)
 
 
 @router.get("/desempeno-variables")
