@@ -67,15 +67,29 @@ async def auto_seed():
         print(f"[ETL] BD actual: {total_count} total | meipa={count_meipa} | 360={count_360} | servicios={count_servicios}")
         print(f"[ETL] Directorio de datos: {BASE} (existe={data_dir_ok})")
 
-        needs_etl = (total_count == 0 or count_meipa == 0 or count_360 == 0 or count_servicios == 0)
+        # Verificar cuántos períodos/modelos hay vs. lo esperado mínimo
+        from sqlalchemy import func as _func
+        count_2025   = db.query(Evaluacion).filter(Evaluacion.anio == 2025).count()
+        count_postgr = db.query(Evaluacion).filter(Evaluacion.modelo == 'posgrado').count()
+        count_tecn   = db.query(Evaluacion).filter(Evaluacion.modelo == 'tecnologado').count()
+
+        # Re-seed si: BD vacía, falta algún sistema, o tiene muy pocos registros (< 500)
+        needs_etl = (
+            total_count < 500
+            or count_meipa == 0
+            or count_360 == 0
+            or count_servicios == 0
+            or count_2025 == 0
+            or count_postgr == 0
+        )
         if needs_etl and data_dir_ok:
-            print("[ETL] Datos incompletos — procesando todos los archivos de data/...")
+            print("[ETL] Datos incompletos o insuficientes — procesando todos los archivos de data/...")
             total = etl_service.process_all_files(db)
             print(f"[ETL] Resultado: {total} registros.")
         elif needs_etl and not data_dir_ok:
-            print(f"[ETL] ⚠️  Datos incompletos PERO directorio {BASE} NO existe — omitiendo ETL para proteger la BD.")
+            print(f"[ETL] Datos incompletos PERO directorio {BASE} NO existe — omitiendo ETL para proteger la BD.")
         else:
-            print(f"[ETL] BD completa — omitiendo seed (para forzar recarga usa POST /api/v1/evaluacion/etl/process).")
+            print(f"[ETL] BD completa ({total_count} registros) — omitiendo seed (forzar: POST /api/v1/evaluacion/etl/process).")
 
         _seed_admin_user(db)
         db.close()
