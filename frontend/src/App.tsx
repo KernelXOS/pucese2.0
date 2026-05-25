@@ -3497,7 +3497,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       label="participantes"
                       icon={<Users size={21} className="text-violet-500" />}
                       iconBg="#f5f3ff"
-                      footer={`${kpis?.total_evaluaciones?.toLocaleString() ?? 0} registros totales`}
+                      footer=""
                       accent="#7c3aed"
                     />
                     <KPICard
