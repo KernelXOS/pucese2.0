@@ -1087,6 +1087,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         }]
 
         const barHeight = Math.max(400, barData.length * 22)
+        const TOP_N = 5
 
         return (
           <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
