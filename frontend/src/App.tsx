@@ -853,46 +853,62 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             gestion:'Gestión', investigacion:'Investigación',
           }
           const MC = ['#0f5ca8','#b91c1c','#047857','#b45309','#6d28d9','#0e7490','#7c2d12']
-          // Recopilar todos los períodos disponibles
-          const allPeriodos = Array.from(new Set(
-            MODELOS.flatMap(m => (porModeloPeriodo[m] || []).map((d:any) => d.periodo))
-          )).sort()
+          // Recopilar todos los períodos disponibles, normalizados y deduplicados
+          const allNormPeriodos = Array.from(new Set(
+            MODELOS.flatMap(m => (porModeloPeriodo[m] || []).map((d:any) => normPeriodo(d.periodo)))
+          )).sort((a,b) => {
+            // sort by year then suffix for proper chronological order
+            const ya = a.replace(/\D+/g,'').slice(0,4), yb = b.replace(/\D+/g,'').slice(0,4)
+            if (ya !== yb) return ya.localeCompare(yb)
+            return a.localeCompare(b)
+          })
 
-          if (allPeriodos.length > 0) {
-            // Una barra por modelo, agrupadas por período
+          if (allNormPeriodos.length > 0) {
+            // Agregar por período normalizado (avg cuando varios raw → mismo norm)
             const traces = MODELOS.map((m, i) => {
               const data = porModeloPeriodo[m] || []
+              // bucket: normLabel → {sum, cnt}
+              const bucket: Record<string,{sum:number,cnt:number}> = {}
+              data.forEach((d:any) => {
+                const lbl = normPeriodo(d.periodo)
+                if (!bucket[lbl]) bucket[lbl] = {sum:0, cnt:0}
+                bucket[lbl].sum += +(d.promedio ?? 0)
+                bucket[lbl].cnt += 1
+              })
+              const yVals = allNormPeriodos.map(lbl => bucket[lbl] ? +(bucket[lbl].sum / bucket[lbl].cnt).toFixed(1) : null)
               return {
                 type: 'bar' as const,
                 name: MODELO_LABELS[m],
-                x: data.map((d:any) => d.periodo),
-                y: data.map((d:any) => +(d.promedio ?? 0)),
+                x: allNormPeriodos,
+                y: yVals,
                 marker: { color: MC[i], opacity: 0.88 },
-                text: data.map((d:any) => d.promedio ? (+d.promedio).toFixed(1) : ''),
+                text: yVals.map(v => v != null ? v.toFixed(1) : ''),
                 textposition: 'outside' as const,
                 textfont: { family:'Inter', size:8, color: MC[i] },
                 hovertemplate: `<b>${MODELO_LABELS[m]}</b><br>%{x}<br>%{y:.1f}/100<extra></extra>`,
               }
             })
+            const manyPeriods = allNormPeriodos.length > 6
             const layout = {
               autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
               barmode: 'group' as const,
               font:{ family:'Inter', size:9, color:'#64748b' },
-              margin:{ t:28, b:70, l:46, r:16 },
+              margin:{ t:28, b: manyPeriods ? 110 : 70, l:46, r:16 },
               xaxis:{
                 type:'category' as const,
-                tickfont:{ family:'Inter', size:10, color:'#1e293b' },
+                tickangle: manyPeriods ? -35 : 0,
+                tickfont:{ family:'Inter', size: manyPeriods ? 9 : 10, color:'#1e293b' },
                 showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0',
               },
               yaxis:{ gridcolor:'#f0f4f8', range:[0,110], tickfont:{ family:'Inter', size:9, color:'#94a3b8' }, showgrid:true, zeroline:false, nticks:6 },
               showlegend:true,
-              legend:{ orientation:'h' as const, y:-0.25, font:{ size:8, family:'Inter' } },
+              legend:{ orientation:'h' as const, y: manyPeriods ? -0.38 : -0.25, font:{ size:8, family:'Inter' } },
               shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1.5, dash:'dot' } }],
               annotations:[{ x:1, y:90, xref:'paper', yref:'y', text:'Meta 90', showarrow:false, font:{ size:9, color:'#10b981', family:'Inter' }, xanchor:'right', yanchor:'bottom', yshift:4 }],
             }
             return (
               <ChartCard title="Puntaje por Modelo 360" sub="Por período — Modelos MECDI">
-                <Plot data={traces} layout={layout} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'300px'}} />
+                <Plot data={traces} layout={layout} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height: manyPeriods ? '380px' : '300px'}} />
               </ChartCard>
             )
           }
@@ -910,9 +926,19 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {(() => {
           const src = tendPeriodos360.length > 0 ? tendPeriodos360 : tend360.map((t:any)=>({...t, periodo: String(t.anio)}))
-          const sorted360 = [...src].sort((a:any,b:any)=>String(a.periodo).localeCompare(String(b.periodo)))
-          const vals = sorted360.map((t:any) => +(t.promedio ?? 0))
-          const labels = sorted360.map((t:any) => normPeriodo(t.periodo ?? String(t.anio)))
+          // Agregar por período normalizado para evitar duplicados
+          const bucket360: Record<string,{sum:number,cnt:number,raw:string}> = {}
+          src.forEach((t:any) => {
+            const lbl = normPeriodo(t.periodo ?? String(t.anio))
+            const raw = String(t.periodo ?? t.anio)
+            if (!bucket360[lbl]) bucket360[lbl] = {sum:0, cnt:0, raw}
+            bucket360[lbl].sum += +(t.promedio ?? 0)
+            bucket360[lbl].cnt += 1
+          })
+          const sorted360 = Object.entries(bucket360)
+            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
+          const vals = sorted360.map(([,v]) => +(v.sum/v.cnt).toFixed(2))
+          const labels = sorted360.map(([lbl]) => lbl)
           const yMin = Math.max(0, Math.floor(Math.min(...vals)) - 4)
           const yMax = Math.ceil(Math.max(...vals)) + 5
           return (
@@ -930,9 +956,10 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               }]} layout={{
                 autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
                 font:{ family:'Inter', size:9, color:'#64748b' },
-                margin:{ t:28, b:55, l:46, r:16 },
+                margin:{ t:28, b: labels.length > 6 ? 80 : 55, l:46, r:16 },
                 xaxis:{ type:'category' as const, categoryorder:'array' as const, categoryarray: labels,
-                  tickfont:{ family:'Inter', size:11, color:'#1e293b' }, showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0' },
+                  tickangle: labels.length > 6 ? -30 : 0,
+                  tickfont:{ family:'Inter', size: labels.length > 6 ? 9 : 11, color:'#1e293b' }, showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0' },
                 yaxis:{ gridcolor:'#f0f4f8', range:[yMin, yMax], tickfont:{ family:'Inter', size:9, color:'#94a3b8' }, showgrid:true, zeroline:false, nticks:6 },
                 showlegend:false,
                 shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1.5, dash:'dot' } }],
@@ -948,9 +975,19 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {(() => {
           const src = tendPeriodosMeipa.length > 0 ? tendPeriodosMeipa : tendMeipa.map((t:any)=>({...t, periodo: String(t.anio)}))
-          const sortedM = [...src].sort((a:any,b:any)=>String(a.periodo).localeCompare(String(b.periodo)))
-          const vals = sortedM.map((t:any) => +(t.promedio ?? 0))
-          const labels = sortedM.map((t:any) => normPeriodo(t.periodo ?? String(t.anio)))
+          // Agregar por período normalizado
+          const bucketM: Record<string,{sum:number,cnt:number,raw:string}> = {}
+          src.forEach((t:any) => {
+            const lbl = normPeriodo(t.periodo ?? String(t.anio))
+            const raw = String(t.periodo ?? t.anio)
+            if (!bucketM[lbl]) bucketM[lbl] = {sum:0, cnt:0, raw}
+            bucketM[lbl].sum += +(t.promedio ?? 0)
+            bucketM[lbl].cnt += 1
+          })
+          const sortedM = Object.entries(bucketM)
+            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
+          const vals = sortedM.map(([,v]) => +(v.sum/v.cnt).toFixed(2))
+          const labels = sortedM.map(([lbl]) => lbl)
           const yMin = Math.max(0, Math.floor(Math.min(...vals)) - 4)
           const yMax = Math.ceil(Math.max(...vals)) + 5
           return (
@@ -968,9 +1005,10 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               }]} layout={{
                 autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
                 font:{ family:'Inter', size:9, color:'#64748b' },
-                margin:{ t:28, b:55, l:46, r:16 },
+                margin:{ t:28, b: labels.length > 6 ? 80 : 55, l:46, r:16 },
                 xaxis:{ type:'category' as const, categoryorder:'array' as const, categoryarray: labels,
-                  tickfont:{ family:'Inter', size:11, color:'#1e293b' }, showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0' },
+                  tickangle: labels.length > 6 ? -30 : 0,
+                  tickfont:{ family:'Inter', size: labels.length > 6 ? 9 : 11, color:'#1e293b' }, showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0' },
                 yaxis:{ gridcolor:'#f0f4f8', range:[yMin, yMax], tickfont:{ family:'Inter', size:9, color:'#94a3b8' }, showgrid:true, zeroline:false, nticks:6 },
                 showlegend:false,
                 shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1.5, dash:'dot' } }],
