@@ -38,47 +38,112 @@ STAFF_REF_DATE = datetime(2025, 1, 1)
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 FACULTAD_MAP = {
-    'CONTABILIDAD':       'Ciencias Administrativas',
-    'ADMINISTRACION':     'Ciencias Administrativas',
-    'ADMINISTRACI':       'Ciencias Administrativas',
-    'TURISMO':            'Turismo y Hotelería',
-    'HOTELERIA':          'Turismo y Hotelería',
-    'MEDICINA':           'Medicina',
-    'LABORATORIO CLINICO':'Medicina',
-    'LABORATORIO CL':     'Medicina',
-    'ENFERMERIA':         'Salud',
-    'ENFERMERÍA':         'Salud',
-    'NUTRICION':          'Salud',
-    'NUTRICIÓN':          'Salud',
-    'PSICOLOGIA':         'Psicología',
-    'PSICOLOGÍA':         'Psicología',
-    'DERECHO':            'Derecho',
-    'INGENIERIA':         'Ingeniería',
-    'INGENIERÍA':         'Ingeniería',
-    'SISTEMAS':           'Ingeniería',
-    'COMPUTACION':        'Ingeniería',
-    'COMPUTACIÓN':        'Ingeniería',
-    'EDUCACION':          'Educación',
-    'EDUCACIÓN':          'Educación',
-    'AGRO':               'Agroindustria',
-    'PUCETEC':            'Tecnologado',
-    'TECNOLOGADO':        'Tecnologado',
-    'POSGRADO':           'Posgrado',
-    'MAESTRIA':           'Posgrado',
-    'MAESTRÍA':           'Posgrado',
-    'MENTOR':             'Sin clasificar',
-    'NO DEFINIDA':        'Sin clasificar',
+    # ── Ciencias Administrativas ──────────────────────────────────────────────
+    'CONTABILIDAD':            'Ciencias Administrativas',
+    'ADMINISTRACION':          'Ciencias Administrativas',
+    'ADMINISTRACI':            'Ciencias Administrativas',
+    'NEGOCIOS INTERNACIONALES':'Ciencias Administrativas',
+    'NEGOCIOS':                'Ciencias Administrativas',
+    'COMERCIO':                'Ciencias Administrativas',
+    'FINANZAS':                'Ciencias Administrativas',
+    'MARKETING':               'Ciencias Administrativas',
+    # ── Turismo y Hotelería ───────────────────────────────────────────────────
+    'TURISMO':                 'Turismo y Hotelería',
+    'HOTELERIA':               'Turismo y Hotelería',
+    'HOTELERÍA':               'Turismo y Hotelería',
+    'CULINARIA':               'Turismo y Hotelería',
+    'GASTRONOM':               'Turismo y Hotelería',
+    # ── Ciencias de la Salud ─────────────────────────────────────────────────
+    'MEDICINA':                'Ciencias de la Salud',
+    'LABORATORIO CLINICO':     'Ciencias de la Salud',
+    'LABORATORIO CL':          'Ciencias de la Salud',
+    'ENFERMERIA':              'Ciencias de la Salud',
+    'ENFERMERÍA':              'Ciencias de la Salud',
+    'NUTRICION':               'Ciencias de la Salud',
+    'NUTRICIÓN':               'Ciencias de la Salud',
+    'FISIOTERAPIA':            'Ciencias de la Salud',
+    'FISIO':                   'Ciencias de la Salud',
+    'TERAPIA':                 'Ciencias de la Salud',
+    'ODONTOLOG':               'Ciencias de la Salud',
+    'FARMACIA':                'Ciencias de la Salud',
+    'SALUD':                   'Ciencias de la Salud',
+    # ── Psicología ────────────────────────────────────────────────────────────
+    'PSICOLOGIA':              'Psicología',
+    'PSICOLOGÍA':              'Psicología',
+    # ── Derecho ───────────────────────────────────────────────────────────────
+    'DERECHO':                 'Derecho',
+    'JURIDIC':                 'Derecho',
+    # ── Ingeniería ────────────────────────────────────────────────────────────
+    'INGENIERIA':              'Ingeniería',
+    'INGENIERÍA':              'Ingeniería',
+    'SISTEMAS':                'Ingeniería',
+    'COMPUTACION':             'Ingeniería',
+    'COMPUTACIÓN':             'Ingeniería',
+    'INFORMATICA':             'Ingeniería',
+    'INFORMÁTICA':             'Ingeniería',
+    'SOFTWARE':                'Ingeniería',
+    'ELECTRONICA':             'Ingeniería',
+    'ELECTRÓNICA':             'Ingeniería',
+    'INDUSTRIAL':              'Ingeniería',
+    'CIVIL':                   'Ingeniería',
+    'AMBIENTAL':               'Ingeniería',
+    'RECURSOS NATURALES':      'Ingeniería',
+    'GESTION AMBIENTAL':       'Ingeniería',
+    'GESTIÓN AMBIENTAL':       'Ingeniería',
+    # ── Educación ────────────────────────────────────────────────────────────
+    'EDUCACION':               'Educación',
+    'EDUCACIÓN':               'Educación',
+    'PEDAGOG':                 'Educación',
+    'IDIOMAS':                 'Educación',
+    'IDIOMA':                  'Educación',
+    'LENGUAS':                 'Educación',
+    'INTEGRACION CURRICULAR':  'Educación',
+    'INTEGRACIÓN CURRICULAR':  'Educación',
+    'PASTORAL':                'Educación',
+    'DOCENCIA':                'Educación',
+    # ── Comunicación ─────────────────────────────────────────────────────────
+    'COMUNICACION':            'Comunicación',
+    'COMUNICACIÓN':            'Comunicación',
+    'DISEÑO':                  'Comunicación',
+    'DISENO':                  'Comunicación',
+    'PERIODISMO':              'Comunicación',
+    'PUBLICIDAD':              'Comunicación',
+    # ── Agroindustria ─────────────────────────────────────────────────────────
+    'AGRO':                    'Agroindustria',
+    'AGROINDUSTRIA':           'Agroindustria',
+    'AGRICULTURA':             'Agroindustria',
+    'PECUARIA':                'Agroindustria',
+    # ── Tecnologado ───────────────────────────────────────────────────────────
+    'PUCETEC':                 'Tecnologado',
+    'TECNOLOGADO':             'Tecnologado',
+    'TECNOLOG':                'Tecnologado',
+    # ── Posgrado ──────────────────────────────────────────────────────────────
+    'POSGRADO':                'Posgrado',
+    'POSTGRADO':               'Posgrado',
+    'MAESTRIA':                'Posgrado',
+    'MAESTRÍA':                'Posgrado',
+    'DOCTORADO':               'Posgrado',
+    # ── Sin clasificar ────────────────────────────────────────────────────────
+    'MENTOR':                  'Sin clasificar',
+    'NO DEFINIDA':             'Sin clasificar',
+    'NO DEFINIDO':             'Sin clasificar',
 }
 
 
 def _map_facultad(text: str) -> str:
-    if not text or pd.isna(text):
-        return 'Otras Ciencias'
+    """Mapea texto de carrera/departamento a nombre de facultad.
+    Si no encuentra coincidencia, devuelve el texto original (nunca 'Otras Ciencias').
+    """
+    if not text or (isinstance(text, float) and pd.isna(text)):
+        return ''
     t = str(text).upper().strip()
+    if not t or t in ('NAN', 'NONE', 'NO DEFINIDA', 'NO DEFINIDO', 'ND', 'N/A'):
+        return ''
     for k, v in FACULTAD_MAP.items():
         if k in t:
             return v
-    return 'Otras Ciencias'
+    # Fallback: devolver el texto original capitalizado, no "Otras Ciencias"
+    return str(text).strip().title()
 
 
 def _nivel_from_puntaje(p) -> str:
