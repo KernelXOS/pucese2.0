@@ -910,8 +910,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {(() => {
           const src = tendPeriodos360.length > 0 ? tendPeriodos360 : tend360.map((t:any)=>({...t, periodo: String(t.anio)}))
-          const vals = src.map((t:any) => +(t.promedio ?? 0))
-          const labels = src.map((t:any) => t.periodo ?? String(t.anio))
+          const sorted360 = [...src].sort((a:any,b:any)=>String(a.periodo).localeCompare(String(b.periodo)))
+          const vals = sorted360.map((t:any) => +(t.promedio ?? 0))
+          const labels = sorted360.map((t:any) => normPeriodo(t.periodo ?? String(t.anio)))
           const yMin = Math.max(0, Math.floor(Math.min(...vals)) - 4)
           const yMax = Math.ceil(Math.max(...vals)) + 5
           return (
@@ -947,8 +948,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {(() => {
           const src = tendPeriodosMeipa.length > 0 ? tendPeriodosMeipa : tendMeipa.map((t:any)=>({...t, periodo: String(t.anio)}))
-          const vals = src.map((t:any) => +(t.promedio ?? 0))
-          const labels = src.map((t:any) => t.periodo ?? String(t.anio))
+          const sortedM = [...src].sort((a:any,b:any)=>String(a.periodo).localeCompare(String(b.periodo)))
+          const vals = sortedM.map((t:any) => +(t.promedio ?? 0))
+          const labels = sortedM.map((t:any) => normPeriodo(t.periodo ?? String(t.anio)))
           const yMin = Math.max(0, Math.floor(Math.min(...vals)) - 4)
           const yMax = Math.ceil(Math.max(...vals)) + 5
           return (
@@ -2611,8 +2613,28 @@ function SidebarItem({ icon, label, active, collapsed, onClick, accentColor, bad
 }
 
 const PERIODO_TO_ANIO: Record<string, number> = {
-  '202301': 2023, '202302': 2023, '202401': 2024,
-  '202402': 2024, '202501': 2025, '202502': 2025,
+  '202301': 2023, '202302': 2023,
+  '202401': 2024, '202402': 2024, '202456': 2024, '202466': 2024,
+  '202501': 2025, '202502': 2025, '202556': 2025, '202566': 2025,
+}
+
+/** Convierte código de período crudo en etiqueta legible (202571 → Posg-I-2025) */
+function normPeriodo(p: string | number): string {
+  const s = String(p).trim()
+  if (s.length < 4) return s
+  const y = s.slice(0, 4)
+  const sufRaw = s.slice(4)
+  if (!sufRaw) return `I-${y}`
+  const suf = parseInt(sufRaw, 10)
+  if (isNaN(suf) || suf === 0 || suf === 1) return `I-${y}`
+  if (suf === 2)                return `II-${y}`
+  if (suf >= 10 && suf <= 20)  return `TEC-I-${y}`
+  if (suf >= 21 && suf <= 30)  return `TEC-II-${y}`
+  if (suf >= 51 && suf <= 57)  return `Posg-I-${y}`
+  if (suf >= 58 && suf <= 65)  return `Posg-II-${y}`
+  if (suf >= 56 && suf <= 68)  return `I-${y}`
+  if (suf >= 69 && suf <= 80)  return `II-${y}`
+  return `${y}-${sufRaw}`
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2640,7 +2662,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const [serviciosKpis, setServiciosKpis] = useState<any>(null)
   const [ranking, setRanking]         = useState<any[]>([])
   const [demograficos, setDemograficos] = useState<any>(null)
-  const [tendencias, setTendencias]   = useState<any[]>([])
+  const [tendencias, setTendencias]               = useState<any[]>([])
+  const [tendenciasPorPeriodo, setTendPorPeriodo] = useState<any[]>([])
   const [analytics, setAnalytics]     = useState<any>(null)
   const [comparativo, setComparativo]       = useState<any>(null)
   const [compPreguntas, setCompPreguntas]   = useState<any>(null)
@@ -2702,7 +2725,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     setKpis(null); setRanking([]); setDemograficos(null)
-    setTendencias([]); setAnalytics(null); setComparativo(null); setTodosDocentes([])
+    setTendencias([]); setTendPorPeriodo([]); setAnalytics(null); setComparativo(null); setTodosDocentes([])
     setServiciosKpis(null)
     try {
       const { modelo, anio, sistemaParam } = getQueryParams()
@@ -2736,7 +2759,16 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
         if (kpiRes)      setKpis(kpiRes.data)
         if (rankRes)     setRanking(rankRes.data)
         if (demoRes)     setDemograficos(demoRes.data)
-        if (tendRes)     setTendencias(tendRes.data)
+        if (tendRes) {
+          const d = tendRes.data
+          if (Array.isArray(d)) {
+            setTendencias(d)
+            setTendPorPeriodo([])
+          } else {
+            setTendencias(d.por_anio || [])
+            setTendPorPeriodo(d.por_periodo || [])
+          }
+        }
         if (analyticsRes) setAnalytics(analyticsRes.data)
         setTodosDocentes(Array.isArray(todosRes?.data) ? todosRes.data : [])
         if (svcRes) setServiciosKpis(svcRes.data)
@@ -3619,20 +3651,77 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     </div>
                   </div>
 
-                  {/* Tendencia anual */}
-                  {tendencias.length > 1 && (
-                    <div className="bg-white border border-slate-200 overflow-hidden mb-8" style={{ borderRadius: 6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-                      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Evolución ·</span>
-                        <h3 className="text-[13px] font-bold text-slate-700">Tendencia Anual — {currentTabCfg.label}</h3>
+                  {/* ── Tendencia por Período ── */}
+                  {(tendenciasPorPeriodo.length > 1 || tendencias.length > 1) && (() => {
+                    // Priorizar datos por período; fallback a por año
+                    const src = tendenciasPorPeriodo.length > 1
+                      ? tendenciasPorPeriodo
+                      : tendencias.map((t: any) => ({ ...t, periodo: String(t.anio) }))
+                    // Ordenar por periodo raw (es alfanumérico comparable)
+                    const sorted = [...src].sort((a: any, b: any) => String(a.periodo).localeCompare(String(b.periodo)))
+                    const labels = sorted.map((t: any) => normPeriodo(t.periodo ?? String(t.anio)))
+                    const yVals  = sorted.map((t: any) => +t.puntaje_100)
+                    const yMin   = Math.max(0, Math.floor(Math.min(...yVals)) - 5)
+                    const yMax   = Math.min(100, Math.ceil(Math.max(...yVals))  + 6)
+                    const color  = currentTabCfg.color
+                    return (
+                      <div className="bg-white border border-slate-200 overflow-hidden mb-8" style={{ borderRadius: 6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Evolución ·</span>
+                            <h3 className="text-[13px] font-bold text-slate-700">Tendencia por Período — {currentTabCfg.label}</h3>
+                          </div>
+                          <span className="text-[9px] font-bold px-2 py-1 rounded border"
+                            style={{ color, background:`${color}10`, borderColor:`${color}30`, borderRadius:4 }}>
+                            {sorted.length} período{sorted.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="p-5">
+                          <Plot
+                            data={[{
+                              type: 'scatter' as const,
+                              mode: 'lines+markers+text' as const,
+                              x: labels,
+                              y: yVals,
+                              line:  { color, width: 3, shape:'spline', smoothing: 0.5 },
+                              marker:{ size: 10, color:'white', symbol:'circle', line:{ color, width: 2.5 } },
+                              text:  yVals.map((v: number) => v.toFixed(1)),
+                              textposition: 'top center' as const,
+                              textfont:  { family:'Inter', size: 10, color },
+                              hovertemplate: `<b>${currentTabCfg.label}</b> · %{x}<br><b>%{y:.1f}/100</b><extra></extra>`,
+                              fill: 'tozeroy' as const,
+                              fillcolor: `${color}0d`,
+                            }]}
+                            layout={{
+                              autosize: true, paper_bgcolor:'white', plot_bgcolor:'white',
+                              font: { family:'Inter', size:9, color:'#64748b' },
+                              margin: { t:28, b:60, l:46, r:16 },
+                              xaxis: {
+                                type:'category' as const,
+                                categoryorder:'array' as const, categoryarray: labels,
+                                tickfont:{ family:'Inter', size:11, color:'#1e293b' },
+                                showgrid:false, zeroline:false, showline:true, linecolor:'#e2e8f0',
+                                tickangle: labels.length > 6 ? -30 : 0,
+                              },
+                              yaxis: {
+                                gridcolor:'#f0f4f8', range:[yMin, yMax],
+                                tickfont:{ family:'Inter', size:9, color:'#94a3b8' },
+                                showgrid:true, zeroline:false, nticks:6,
+                              },
+                              showlegend: false,
+                              shapes: [{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90,
+                                line:{ color:'#10b981', width:1.5, dash:'dot' } }],
+                              annotations: [{ x:1, y:90, xref:'paper', yref:'y', text:'Meta 90',
+                                showarrow:false, font:{ size:9, color:'#10b981', family:'Inter' },
+                                xanchor:'right', yanchor:'bottom', yshift:4 }],
+                            }}
+                            config={{ responsive:true, displayModeBar:false }}
+                            style={{ width:'100%', height:'260px' }}
+                          />
+                        </div>
                       </div>
-                      <div className="p-5">{(() => {
-                        const yVals = tendencias.map(t=>+t.puntaje_100)
-                        const ch = trendLine2D([{x:tendencias.map(t=>t.anio),y:yVals,color:currentTabCfg.color,name:currentTabCfg.label}],{minY:Math.min(...yVals)})
-                        return <Plot data={ch.data} layout={ch.layout} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'230px'}} />
-                      })()}</div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Analytics section */}
                   <AnalyticsSection analytics={analytics} color={currentTabCfg.color} />

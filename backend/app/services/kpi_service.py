@@ -906,12 +906,34 @@ class KPIService:
             q = q.filter(Evaluacion.modelo == modelo)
         if sistema:
             q = q.filter(Evaluacion.sistema == sistema)
-        tendencias = q.with_entities(Evaluacion.anio, func.avg(Evaluacion.puntaje_100))\
-            .filter(Evaluacion.anio != None)\
+
+        # Por período (granularidad fina: I-2023, II-2023, I-2024, …)
+        por_per = q.with_entities(
+            Evaluacion.periodo, Evaluacion.anio, func.avg(Evaluacion.puntaje_100)
+        ).filter(
+            Evaluacion.anio.isnot(None), Evaluacion.periodo.isnot(None)
+        ).group_by(Evaluacion.periodo, Evaluacion.anio)\
+         .order_by(Evaluacion.anio, Evaluacion.periodo).all()
+
+        # Por año (agregado, para backward-compat con código existente)
+        por_anio = q.with_entities(Evaluacion.anio, func.avg(Evaluacion.puntaje_100))\
+            .filter(Evaluacion.anio.isnot(None))\
             .group_by(Evaluacion.anio)\
             .order_by(Evaluacion.anio).all()
-        return [{'anio': t[0], 'puntaje_100': round(t[1], 2),
-                 'promedio': round(t[1] / 100 * 5, 2)} for t in tendencias]
+
+        return {
+            'por_periodo': [
+                {'periodo': t[0], 'anio': t[1],
+                 'puntaje_100': round(t[2], 2),
+                 'promedio': round(t[2] / 100 * 5, 2)}
+                for t in por_per
+            ],
+            'por_anio': [
+                {'anio': t[0], 'puntaje_100': round(t[1], 2),
+                 'promedio': round(t[1] / 100 * 5, 2)}
+                for t in por_anio
+            ],
+        }
 
     def get_variables_kpis(self, db: Session, modelo: str = None, anio: int = None, sistema: str = None):
         q = _base_q(db, modelo, anio, sistema)
