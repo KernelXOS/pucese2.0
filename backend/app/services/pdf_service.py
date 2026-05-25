@@ -3,7 +3,7 @@ Servicio de generación de PDF por docente.
 Usa Jinja2 para renderizar HTML y WeasyPrint / xhtml2pdf para convertir a PDF.
 Trabaja exclusivamente con la tabla `evaluaciones` (modelo Evaluacion).
 """
-import os
+import os, json as _json
 from datetime import datetime
 from typing import Optional, Tuple
 from collections import defaultdict
@@ -546,6 +546,14 @@ def _build_docente_ctx(cedula: str, db: Session, periodo_codigo: Optional[str] =
     # Número de evaluadores
     n_eval = ev.n_evaluadores
 
+    # Desglose materias+carreras (del campo materias_json almacenado en ETL)
+    materias: list = []
+    if getattr(ev, 'materias_json', None):
+        try:
+            materias = _json.loads(ev.materias_json)
+        except Exception:
+            materias = []
+
     return {
         "cedula":            cedula,
         "nombre_completo":   ev.docente_nombre or cedula,
@@ -573,6 +581,7 @@ def _build_docente_ctx(cedula: str, db: Session, periodo_codigo: Optional[str] =
         "componentes":       componentes,
         "historico":         periodos_lista,
         "historico_modelos": hist_mod,
+        "materias":          materias,
     }
 
 

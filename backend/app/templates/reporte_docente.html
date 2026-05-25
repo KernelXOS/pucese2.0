@@ -174,6 +174,24 @@
   .cur { background:#eff6ff; font-weight:900; color:#0056b3; }
   .tup{color:#059669;font-weight:800;} .tdn{color:#dc2626;font-weight:800;} .tfl{color:#94a3b8;}
 
+  /* ══ MATERIAS ══════════════════════════════════════════════════════════ */
+  .mat-tbl { width:100%; border-collapse:collapse; font-size:7.5pt; }
+  .mat-tbl thead th {
+    background:#f1f5f9; font-size:6pt; font-weight:800; color:#64748b;
+    text-transform:uppercase; letter-spacing:.07em;
+    padding:4pt 7pt; text-align:left; border-bottom:1.5pt solid #e2e8f0;
+  }
+  .mat-tbl td { padding:3.5pt 7pt; border-bottom:1pt solid #f1f5f9; vertical-align:middle; }
+  .mat-tbl tr:last-child td { border-bottom:none; }
+  .mat-name {
+    background:#eff6ff; font-weight:800; color:#0056b3;
+    font-size:7pt; padding:4pt 7pt; border-bottom:1pt solid #dbeafe;
+    border-top:1pt solid #dbeafe;
+  }
+  .mat-carr { color:#374151; }
+  .mat-n    { text-align:center; color:#64748b; font-size:7pt; }
+  .mat-p    { text-align:center; font-weight:800; color:#0056b3; }
+
   /* ══ RESUMEN ════════════════════════════════════════════════════════════ */
   .res { background:#f0f7ff; border:1pt solid #bfdbfe; border-left:3pt solid #0056b3; border-radius:3pt; padding:8pt 11pt; }
   .res-t { font-size:5.5pt; font-weight:900; color:#0056b3; text-transform:uppercase; letter-spacing:.12em; margin-bottom:4pt; }
@@ -293,6 +311,36 @@
   </table>
   <div class="svgw">{{ svg_componentes | safe }}</div>
 </div>
+{% endif %}
+
+<!-- MATERIAS Y CARRERAS EVALUADORAS -->
+{% if materias %}
+<div class="sec">Materias Impartidas y Carreras que Evaluaron</div>
+<table class="mat-tbl">
+  <thead>
+    <tr>
+      <th style="width:40%">Materia / Asignatura</th>
+      <th style="width:35%">Carrera Evaluadora</th>
+      <th style="width:12%;text-align:center">N° Est.</th>
+      <th style="width:13%;text-align:center">Puntaje</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for mat in materias %}
+    <tr>
+      <td class="mat-name" colspan="4">{{ mat.materia }}</td>
+    </tr>
+    {% for carr in mat.carreras %}
+    <tr>
+      <td></td>
+      <td class="mat-carr">{{ carr.nombre }}</td>
+      <td class="mat-n">{{ carr.n }}</td>
+      <td class="mat-p">{% if carr.puntaje > 0 %}{{ carr.puntaje }}/100{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+  </tbody>
+</table>
 {% endif %}
 
 <!-- RESUMEN EJECUTIVO -->

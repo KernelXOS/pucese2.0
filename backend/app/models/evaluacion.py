@@ -56,5 +56,9 @@ class Evaluacion(Base):
     funcion_docente = Column(String)               # 'DOCENCIA', 'COORDINACIÓN', 'OPERATIVO', etc.
     n_evaluadores   = Column(Integer)              # Nº de estudiantes/evaluadores que respondieron
 
+    # ── Desglose materias + carreras evaluadoras ──────────────────────────────
+    # JSON: [{"materia": "...", "carreras": [{"nombre": "...", "puntaje": 87.5, "n": 23}]}]
+    materias_json   = Column(String)
+
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

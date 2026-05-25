@@ -3,13 +3,14 @@ ETL service — wraps the multi-model processing logic so the /etl/process
 endpoint always rebuilds the DB from the real data sources.
 Mirrors construir_multi_modelo.py logic with sistema='meipa'|'360' field support.
 """
-import os, re, sys, warnings
+import os, re, sys, warnings, json as _json
 from datetime import datetime
 warnings.filterwarnings('ignore')
 
 import pandas as pd
 import numpy as np
 from sqlalchemy.orm import Session
+from sqlalchemy import text as _sa_text
 from app.models.evaluacion import Evaluacion
 
 # Ruta de datos: busca en múltiples ubicaciones posibles
@@ -339,7 +340,86 @@ class ETLService:
             return _clean_nombre(fallback)
         return f'CED-{ced}' if ced else 'Sin nombre'
 
+    # ── Materias+carreras cache ────────────────────────────────────────────────
+
+    def _fill_materias_cache(self) -> tuple:
+        """
+        Lee archivos Banner (XLSX y CSV de heteroevaluación) y construye el desglose
+        materia+carrera por docente.
+        Retorna (by_period, by_ced):
+          by_period: {(cedula, periodo): list}
+          by_ced:    {cedula: list}  (último disponible)
+        """
+        by_period: dict = {}
+        by_ced: dict = {}
+
+        if not os.path.isdir(BASE):
+            return by_period, by_ced
+
+        # 1. HETEROEVALUACION XLSX files
+        for fname in os.listdir(BASE):
+            fl = fname.lower()
+            if ('heteroevaluacion' in fl or 'resultados de evaluacion' in fl) and fl.endswith('.xlsx'):
+                m = re.search(r'(20\d{4})', fname)
+                periodo = m.group(1) if m else None
+                fpath = os.path.join(BASE, fname)
+                try:
+                    xl = pd.ExcelFile(fpath, engine='openpyxl')
+                    sheet = next(
+                        (s for s in xl.sheet_names
+                         if any(k in s.lower() for k in ('hetero', 'resultado', 'data', 'datos'))),
+                        xl.sheet_names[0]
+                    )
+                    df = pd.read_excel(xl, sheet_name=sheet, dtype=str)
+                    df.columns = [str(c).strip() for c in df.columns]
+                    data = _extract_materias_banner_df(df)
+                    for ced, mats in data.items():
+                        by_ced[ced] = mats
+                        if periodo:
+                            by_period[(ced, periodo)] = mats
+                    print(f"[ETL] Materias XLSX {fname}: {len(data)} docentes")
+                except Exception as e:
+                    print(f"[ETL] Materias XLSX {fname}: {e}")
+
+        # 2. CSV hetero files (202566, 202556, …)
+        csv_files = [f for f in os.listdir(BASE) if f.endswith('.csv')]
+        for fname in csv_files:
+            m_per = re.search(r'(20\d{4})', fname)
+            periodo = m_per.group(1) if m_per else None
+            fpath = os.path.join(BASE, fname)
+            df = None
+            for enc in ('utf-8-sig', 'latin1'):
+                try:
+                    df = pd.read_csv(fpath, sep=';', encoding=enc, decimal=',', on_bad_lines='skip')
+                    break
+                except Exception:
+                    pass
+            if df is None:
+                continue
+            # Solo Banner format (tiene NUM_DOCU y SCBCRSE_TITLE)
+            cols_l = [c.lower() for c in df.columns]
+            if 'num_docu' not in cols_l or not any('scbcrse' in c for c in cols_l):
+                continue
+            data = _extract_materias_banner_df(df)
+            for ced, mats in data.items():
+                by_ced[ced] = mats
+                if periodo:
+                    by_period[(ced, periodo)] = mats
+            print(f"[ETL] Materias CSV {fname}: {len(data)} docentes")
+
+        print(f"[ETL] Materias cache: {len(by_ced)} docentes únicos, {len(by_period)} entradas por período")
+        return by_period, by_ced
+
     def process_all_files(self, db: Session) -> int:
+        # ── Asegurar columna materias_json en la BD ─────────────────────────
+        try:
+            db.execute(_sa_text(
+                "ALTER TABLE evaluaciones ADD COLUMN IF NOT EXISTS materias_json TEXT"
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+
         staff = _load_staff_lookup()
         records = []
 
@@ -391,6 +471,15 @@ class ETLService:
                 rec['nivel_estudio'] = s.get('nivel_instruccion', '')
             if not rec.get('sexo') and s.get('genero'):
                 rec['sexo'] = s.get('genero', '')
+
+        # ── Inyectar desglose materia+carrera ──────────────────────────────
+        by_period, by_ced = self._fill_materias_cache()
+        for rec in records:
+            ced = str(rec.get('cedula', '')).strip()
+            per = str(rec.get('periodo', '')).strip()
+            mats = by_period.get((ced, per)) or by_ced.get(ced)
+            if mats:
+                rec['materias_json'] = _json.dumps(mats, ensure_ascii=False)
 
         # Safety: never wipe if no records were loaded (protects against missing data dir)
         if not records:
@@ -1945,6 +2034,81 @@ class ETLService:
         print(f"[ETL] MEIPA PUCESE DATA: {len(recs)} registros completos "
               f"({len(het_scores)} het, {len(comp_scores)} comp).")
         return recs
+
+
+
+# ── Helper global: extrae desglose materia+carrera de un DataFrame Banner ──────
+
+def _extract_materias_banner_df(df: pd.DataFrame) -> dict:
+    """
+    A partir de un DataFrame en formato Banner, construye {cedula: [{materia, carreras:[...]}]}.
+    Columnas esperadas: NUM_DOCU (o similar), SCBCRSE_TITLE, STVDEPT_DESC, PUNTAJE.
+    """
+    def _fc(keywords):
+        kl = [k.lower() for k in keywords]
+        for c in df.columns:
+            cl = c.lower()
+            if any(k in cl for k in kl):
+                return c
+        return None
+
+    col_doc = _fc(['num_docu'])
+    col_mat = _fc(['scbcrse_title', 'title'])
+    col_dep = _fc(['stvdept_desc'])
+    col_pun = _fc(['puntaje'])
+
+    if not (col_doc and col_mat):
+        return {}
+
+    df2 = df[[c for c in [col_doc, col_mat, col_dep, col_pun] if c]].copy()
+    df2.columns = ['ced', 'mat'] + (['dep'] if col_dep else []) + (['pun'] if col_pun else [])
+
+    df2['ced'] = df2['ced'].astype(str).str.strip().str.lstrip('0')
+    df2['mat'] = df2['mat'].astype(str).str.strip()
+    if 'dep' not in df2.columns:
+        df2['dep'] = 'Sin especificar'
+    else:
+        df2['dep'] = df2['dep'].astype(str).str.strip()
+    if 'pun' not in df2.columns:
+        df2['pun'] = np.nan
+    else:
+        df2['pun'] = pd.to_numeric(df2['pun'], errors='coerce')
+
+    # Filtrar inválidos
+    df2 = df2[df2['ced'].notna() & ~df2['ced'].isin(['', 'nan', 'NaN'])]
+    df2 = df2[df2['mat'].notna() & ~df2['mat'].isin(['', 'nan', 'NaN', 'None'])]
+
+    agg = df2.groupby(['ced', 'mat', 'dep']).agg(
+        puntaje=('pun', 'mean'),
+        n=('pun', 'count'),
+    ).reset_index()
+
+    raw = {}  # ced → mat → dep → {puntaje, n}
+    for _, row in agg.iterrows():
+        ced = str(row['ced']).strip()
+        mat = str(row['mat']).strip()
+        dep = str(row['dep']).strip()
+        if not ced or not mat or mat in ('Nan', 'None'):
+            continue
+        puntaje = float(row['puntaje']) if not pd.isna(row['puntaje']) else 0.0
+        n = int(row['n'])
+        raw.setdefault(ced, {}).setdefault(mat, {})[dep] = {'puntaje': puntaje, 'n': n}
+
+    final = {}
+    for ced, mat_data in raw.items():
+        materias = []
+        for mat in sorted(mat_data.keys()):
+            carrs = mat_data[mat]
+            carreras_list = [
+                {'nombre': dep[:60], 'puntaje': round(v['puntaje'], 1), 'n': v['n']}
+                for dep, v in sorted(carrs.items(), key=lambda x: x[1]['n'], reverse=True)
+                if dep not in ('Nan', 'None', '', 'Sin especificar') or len(carrs) == 1
+            ]
+            if carreras_list:
+                materias.append({'materia': mat[:80], 'carreras': carreras_list})
+        if materias:
+            final[ced] = materias
+    return final
 
 
 etl_service = ETLService()
