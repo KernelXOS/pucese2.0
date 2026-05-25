@@ -1063,34 +1063,39 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           first: facMap[f][periodLabels[0]] ?? null,
         })).sort((a,b) => b.avg - a.avg)
 
-        const TOP_N = 8
-        // Mostrar en el gráfico las unidades con MÁS períodos de datos (líneas más completas)
-        // Empate: gana mayor promedio. Mínimo 2 períodos para aparecer en el gráfico.
-        const top8 = [...avgByFac]
-          .filter(f => f.n >= 2)
-          .sort((a, b) => b.n - a.n || b.avg - a.avg)
-          .slice(0, TOP_N)
-
-        const FAC_COLORS = [
-          '#0f5ca8','#059669','#d97706','#7c3aed','#dc2626',
-          '#0891b2','#15803d','#c2410c','#9333ea','#be123c',
-        ]
         const pctColor = (v: number) => v >= 90 ? '#059669' : v >= 80 ? '#0056b3' : v >= 70 ? '#d97706' : '#dc2626'
 
-        const traces = top8.map(({ fac }, i) => ({
-          type: 'scatter' as const,
-          mode: 'lines+markers' as const,
-          name: fac.length > 28 ? fac.slice(0,26)+'…' : fac,
+        // ── Heatmap: todas las unidades × todos los períodos ──────────────
+        // Y = unidades ordenadas por promedio (de mayor a menor)
+        const yLabels = avgByFac.map(f => f.fac.length > 35 ? f.fac.slice(0,33)+'…' : f.fac)
+        const zValues = avgByFac.map(({ fac }) =>
+          periodLabels.map(p => facMap[fac]?.[p] ?? null)
+        )
+        const heatmapTrace = [{
+          type: 'heatmap' as const,
           x: periodLabels,
-          y: periodLabels.map(p => facMap[fac][p] ?? null),
-          line: { color: FAC_COLORS[i], width: 2.5 },
-          marker: { color: FAC_COLORS[i], size: 8, symbol: 'circle' },
-          connectgaps: false,
-          hovertemplate: `<b>${fac}</b><br>%{x}<br><b>%{y:.1f}</b>/100<extra></extra>`,
-        }))
+          y: yLabels,
+          z: zValues,
+          colorscale: [
+            [0,    '#dc2626'],
+            [0.55, '#f59e0b'],
+            [0.75, '#3b82f6'],
+            [0.88, '#10b981'],
+            [1,    '#065f46'],
+          ] as any,
+          zmin: 60, zmax: 100,
+          showscale: true,
+          colorbar: {
+            title: { text:'Puntaje', side:'right' as const, font:{size:9} },
+            thickness: 12, len: 0.8,
+            tickfont:{ size:8 }, tickvals:[60,70,80,90,100],
+            ticktext:['60','70','80','90','100'],
+          },
+          hovertemplate: '<b>%{y}</b><br>%{x}<br><b>%{z:.1f}</b>/100<extra></extra>',
+          xgap: 2, ygap: 1,
+        }]
 
-        const allVals = facultadPorPeriodo.map((r:any) => r.promedio).filter(Boolean)
-        const yMin = allVals.length ? Math.max(55, Math.floor(Math.min(...allVals)) - 3) : 60
+        const hmHeight = Math.max(420, avgByFac.length * 16)
 
         return (
           <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -1098,44 +1103,31 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
               <TrendingUp size={14} style={{ color:'#0f5ca8', opacity:0.8 }} />
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Análisis Temporal ·</span>
-              <h3 className="text-[13px] font-bold text-slate-700">Evolución por Período — Escuelas / Unidades</h3>
+              <h3 className="text-[13px] font-bold text-slate-700">Desempeño por Período — Escuelas / Unidades</h3>
               <span className="ml-auto text-[9px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">{avgByFac.length} unidades · {periodLabels.length} períodos</span>
             </div>
 
             <div className="p-5 space-y-5">
-              {/* Líneas top 8 */}
+              {/* Heatmap todas las unidades */}
               <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-2">Top {TOP_N} unidades — Tendencia por período</p>
-                <Plot data={traces} layout={{
-                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'#fafbfc',
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-1">
+                  Mapa de calor — Todas las unidades por período <span className="text-slate-300 font-normal ml-2">🟩 ≥90 · 🟦 ≥80 · 🟧 ≥70 · 🟥 &lt;70</span>
+                </p>
+                <Plot data={heatmapTrace} layout={{
+                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'white',
                   font: { family:'Inter', size:9 },
-                  margin: { t:8, b:40, l:42, r:12 },
+                  margin: { t:8, b:50, l:220, r:70 },
                   xaxis: {
                     type:'category' as const,
-                    tickfont:{ size:10, color:'#334155', family:'Inter' },
-                    showgrid:false, zeroline:false,
-                    tickangle: -30,
+                    tickfont:{ size:10, color:'#334155' },
+                    side:'bottom' as const,
+                    tickangle:-30,
                   },
                   yaxis: {
-                    gridcolor:'#e8edf2', range:[yMin, 102],
-                    tickfont:{ size:9, color:'#94a3b8' },
-                    showgrid:true, zeroline:false,
-                    ticksuffix:'%',
+                    tickfont:{ size:9, color:'#334155' },
+                    autorange:'reversed' as const,
                   },
-                  legend: { orientation:'h' as const, y:-0.28, font:{ size:9, family:'Inter' }, traceorder:'normal', bgcolor:'transparent' },
-                  showlegend: true,
-                  shapes:[
-                    { type:'rect', x0:0, x1:1, xref:'paper', y0:90, y1:102,
-                      fillcolor:'#d1fae5', opacity:0.18, line:{width:0} },
-                    { type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90,
-                      line:{ color:'#10b981', width:1.5, dash:'dot' } },
-                  ],
-                  annotations:[{
-                    x:1, xref:'paper', y:90, yref:'y', text:'Meta 90%',
-                    showarrow:false, xanchor:'right', font:{size:8,color:'#10b981',family:'Inter'},
-                    bgcolor:'white', bordercolor:'#10b981', borderwidth:1, borderpad:2,
-                  }],
-                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'340px'}} />
+                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:`${hmHeight}px`}} />
               </div>
 
               {/* Ranking table */}
