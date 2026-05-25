@@ -27,6 +27,8 @@ _DATA_CANDIDATES = [
 
 BASE = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
 EVAL_DIR      = os.path.join(BASE, 'eval_detalladas_2025_02')
+EVAL_DIR_202501 = os.path.join(BASE, 'eval_detalladas_202501')
+EVAL_DIR_202402 = os.path.join(BASE, 'eval_det_202402')
 POSGRADO_DIR  = os.path.join(BASE, 'posgrado')
 
 print(f"[ETL] BASE resuelto a: {BASE} (existe={os.path.isdir(BASE)})")
@@ -130,6 +132,20 @@ def _safe_float(v):
         return None
 
 
+def _map_tiempo_servicio(td: str) -> str:
+    """Convierte código de dedicación (TC/MT/TP) a etiqueta legible."""
+    if not td:
+        return ''
+    td = str(td).upper().strip()
+    if td in ('TC',) or 'COMPLETO' in td:
+        return 'Tiempo Completo'
+    if td in ('TP',) or 'PARCIAL' in td:
+        return 'Tiempo Parcial'
+    if td in ('MT',) or 'MEDIO' in td:
+        return 'Medio Tiempo'
+    return ''
+
+
 def _parse_antiguedad(s) -> float:
     if not s or pd.isna(s):
         return None
@@ -175,6 +191,9 @@ def _load_staff_lookup() -> dict:
         col_uni = fc(['unidad organizativa'])
         col_fec = fc(['fecha antig', 'primer ingreso', 'antiguedad'])
         col_fun = fc(['funcion', 'función'])
+        col_ded = fc(['tiempo de dedicacion', 'dedicacion', 'dedicación'])
+        col_niv = fc(['nivel de instruccion', 'instruccion', 'instrucción'])
+        col_grd = fc(['grado de instruccion', 'grado de'])
 
         for _, row in df.iterrows():
             ced = _clean_cedula(row.get(col_ced, '')) if col_ced else ''
@@ -196,12 +215,25 @@ def _load_staff_lookup() -> dict:
                 except:
                     pass
 
+            ded_raw = _clean_nombre(row.get(col_ded)) if col_ded else ''
+            niv_raw = _clean_nombre(row.get(col_niv)) if col_niv else ''
+            grd_raw = _clean_nombre(row.get(col_grd)) if col_grd else ''
+            # Combinar nivel + grado → nivel_instruccion legible
+            if grd_raw and grd_raw not in ('Grado', 'nan', ''):
+                nivel_inst = grd_raw        # p.ej. 'Maestría profesional'
+            elif niv_raw:
+                nivel_inst = niv_raw        # p.ej. 'Tercer Nivel', 'Cuarto Nivel'
+            else:
+                nivel_inst = ''
+
             staff[ced] = {
-                'nombre_completo': nombre,
-                'antiguedad_anos': antig,
-                'funcion':         (_clean_nombre(row.get(col_fun)) or '').upper() if col_fun else '',
-                'unidad_org':      _clean_nombre(row.get(col_uni)) if col_uni else '',
-                'genero':          _clean_nombre(row.get(col_gen)) if col_gen else '',
+                'nombre_completo':  nombre,
+                'antiguedad_anos':  antig,
+                'funcion':          (_clean_nombre(row.get(col_fun)) or '').upper() if col_fun else '',
+                'unidad_org':       _clean_nombre(row.get(col_uni)) if col_uni else '',
+                'genero':           _clean_nombre(row.get(col_gen)) if col_gen else '',
+                'tiempo_dedicacion': ded_raw,
+                'nivel_instruccion': nivel_inst,
             }
     except Exception as e:
         pass
@@ -257,6 +289,22 @@ class ETLService:
         self._reclassify_by_programa(model_scores)
         records += self._build_360_records_2025(model_scores, staff)
         records += self._source_posgrado_historico(staff)
+        records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202501, '202501', 2025)
+        # eval_det_202402 no se procesa — ya está cubierto por _source_360_mecdi_2024
+        records += self._source_pucetec_hetero(staff)
+
+        # ── Post-procesamiento demográfico ──────────────────────────────────
+        # Para todos los registros: rellenar tiempo_servicio / nivel_estudio / sexo
+        # desde el lookup de personal si el campo está vacío.
+        for rec in records:
+            ced = rec.get('cedula', '')
+            s   = staff.get(ced, {})
+            if not rec.get('tiempo_servicio'):
+                rec['tiempo_servicio'] = _map_tiempo_servicio(s.get('tiempo_dedicacion', ''))
+            if not rec.get('nivel_estudio'):
+                rec['nivel_estudio'] = s.get('nivel_instruccion', '')
+            if not rec.get('sexo') and s.get('genero'):
+                rec['sexo'] = s.get('genero', '')
 
         # Safety: never wipe if no records were loaded (protects against missing data dir)
         if not records:
@@ -1319,6 +1367,300 @@ class ETLService:
             })
 
         print(f"[ETL] Posgrado histórico: {len(recs)} registros ({len(hetero)} hetero, {len(auto)} auto).")
+        return recs
+
+    # ── Eval detalladas por período (202401, 202402, 202501, …) ──────────────
+    def _source_eval_detalladas_periodo(
+        self, staff: dict, dir_path: str, periodo: str, anio: int
+    ) -> list:
+        """
+        Procesa archivos XLSX de evaluaciones detalladas desde un directorio dado.
+        Usa el mismo INSTR_MAP que el pipeline 202502 pero sin CSV hetero ni
+        reclasificación por programa. Genera registros sistema='360'.
+        Nunca sobreescribirá período 202502 (usa dir_path separado).
+        """
+        if not os.path.isdir(dir_path):
+            return []
+
+        MAX_CAL = {3: 4, 10: 4, 11: 4, 12: 4, 13: 4}
+        INSTR_MAP = {
+            1:  ('docencia',     'auto',       20),
+            2:  ('docencia',     'pares',      20),
+            3:  ('docencia',     'aula',       10),
+            4:  ('docencia',     'hetero_est', 50),
+            5:  ('abp',          'auto',       20),
+            6:  ('abp',          'hetero_est', 50),
+            7:  ('tecnologado',  'hetero_est', 50),
+            8:  ('posgrado',     'auto',       30),
+            9:  ('posgrado',     'hetero_est', 60),
+            10: ('investigacion','auto',       20),
+            11: ('investigacion','hetero_dir', 50),
+            12: ('investigacion','pares',      15),
+            13: ('investigacion','hetero_dec', 15),
+            14: ('vinculacion',  'auto',       20),
+            15: ('vinculacion',  'hetero_dir', 15),
+            16: ('vinculacion',  'hetero_est', 50),
+            17: ('vinculacion',  'hetero_inv', 15),
+            18: ('gestion',      'auto',       20),
+            19: ('gestion',      'hetero_dir', 50),
+            20: ('gestion',      'hetero_est', 30),
+            170:('vinculacion',  'hetero_inv', 15),
+        }
+        MODEL_WEIGHTS = {
+            'docencia':      {'hetero_est':50,'pares':20,'aula':10,'auto':20},
+            'abp':           {'hetero_est':50,'pares':20,'aula':10,'auto':20},
+            'tecnologado':   {'hetero_est':50,'pares':20,'aula':10,'auto':20},
+            'servicios':     {'hetero_est':100},
+            'posgrado':      {'hetero_est':60,'auto':30,'aula':10},
+            'investigacion': {'hetero_dir':50,'auto':20,'pares':15,'hetero_dec':15},
+            'vinculacion':   {'hetero_est':50,'auto':20,'hetero_dir':15,'hetero_inv':15},
+            'gestion':       {'hetero_dir':50,'hetero_est':30,'auto':20},
+        }
+
+        try:
+            xlsx_files = [f for f in os.listdir(dir_path) if f.endswith('.xlsx')]
+            if not xlsx_files:
+                return []
+            frames = []
+            for f in xlsx_files:
+                try:
+                    frames.append(pd.read_excel(os.path.join(dir_path, f), engine='openpyxl'))
+                except Exception:
+                    pass
+            if not frames:
+                return []
+            df = pd.concat(frames, ignore_index=True)
+        except Exception as e:
+            print(f"[ETL] Error leyendo {dir_path}: {e}")
+            return []
+
+        # Normalizar columnas requeridas
+        req = ['usuario_evaluado', 'cod_instrumento', 'calificacion', 'peso']
+        for col in req:
+            if col not in df.columns:
+                print(f"[ETL] {dir_path}: falta columna {col} — omitiendo.")
+                return []
+
+        df['cal_norm'] = pd.to_numeric(df['calificacion'], errors='coerce').fillna(0)
+        df['peso_num'] = pd.to_numeric(df['peso'], errors='coerce').fillna(0)
+        df['max_cal']  = df['cod_instrumento'].apply(
+            lambda c: MAX_CAL.get(int(c) if str(c).strip().isdigit() else 0, 3))
+        df['contrib']  = (df['cal_norm'] / df['max_cal'].replace(0, 1)) * df['peso_num']
+        df['_ced']     = df['usuario_evaluado'].astype(str).str.strip().str.lstrip('0')
+
+        # Columnas opcionales para nombre
+        col_ap = 'apellidos_evaluado' if 'apellidos_evaluado' in df.columns else None
+        col_nm = 'nombres_evaluado'   if 'nombres_evaluado'   in df.columns else None
+        col_pr = 'programa'           if 'programa'           in df.columns else None
+
+        # Score por (cedula, instrumento)
+        group_cols = ['_ced', 'cod_instrumento']
+        if col_ap: group_cols += ['apellidos_evaluado']
+        if col_nm: group_cols += ['nombres_evaluado']
+        if col_pr: group_cols += ['programa']
+
+        agg_cols = ['_ced', 'cod_instrumento']
+        by_instr = df.groupby(agg_cols).agg(
+            score=('contrib', 'sum'),
+            max_score=('peso_num', 'sum'),
+        ).reset_index()
+        by_instr['puntaje_100'] = (
+            by_instr['score'] / by_instr['max_score'].replace(0, 1) * 100
+        ).round(2)
+
+        # Nombres y programa (primer valor por cedula)
+        extras: dict = {}
+        for _, row in df.iterrows():
+            ced = str(row['_ced']).strip()
+            if ced not in extras:
+                ap = _clean_nombre(row.get(col_ap, '')) if col_ap else ''
+                nm = _clean_nombre(row.get(col_nm, '')) if col_nm else ''
+                pr = _clean_nombre(row.get(col_pr, '')) if col_pr else ''
+                extras[ced] = {'nombre': f"{ap} {nm}".strip(), 'programa': pr}
+
+        # Acumular scores por (ced, modelo)
+        model_scores: dict = {}
+        for _, row in by_instr.iterrows():
+            ced = str(row['_ced']).strip()
+            try:
+                cod = int(float(row['cod_instrumento']))
+            except Exception:
+                continue
+            if cod not in INSTR_MAP:
+                continue
+            modelo, comp, peso = INSTR_MAP[cod]
+            key = (ced, modelo)
+            if key not in model_scores:
+                info = extras.get(ced, {})
+                model_scores[key] = {
+                    'nombre':   self._build_nombre(ced, staff, info.get('nombre', '')),
+                    'programa': info.get('programa', ''),
+                    'scores':   {},
+                }
+            puntaje_100 = float(row['puntaje_100']) if not pd.isna(row['puntaje_100']) else 0.0
+            model_scores[key]['scores'][comp] = {'puntaje': puntaje_100, 'peso': peso}
+
+        _MODELO_FACULTAD = {'tecnologado': 'Tecnologado', 'posgrado': 'Posgrado'}
+        recs = []
+        for (ced, modelo), info in model_scores.items():
+            scores  = info['scores']
+            weights = MODEL_WEIGHTS.get(modelo, {})
+            if not scores:
+                continue
+            total_peso, total_score = 0, 0.0
+            comp_vals: dict = {}
+            for comp, w in weights.items():
+                if comp in scores:
+                    total_score += scores[comp]['puntaje'] * w / 100
+                    total_peso  += w
+                    comp_vals[comp] = scores[comp]['puntaje']
+            if total_peso == 0:
+                continue
+            puntaje = round(total_score / total_peso * 100, 2)
+            s = staff.get(ced, {})
+            programa = info.get('programa', '')
+            rec = {
+                'docente_nombre':  info['nombre'] or self._build_nombre(ced, staff),
+                'facultad':        _MODELO_FACULTAD.get(modelo) or _map_facultad(programa),
+                'carrera':         programa,
+                'periodo':         periodo,
+                'anio':            anio,
+                'modelo':          modelo,
+                'sistema':         '360',
+                'cedula':          ced,
+                'puntaje_100':     puntaje,
+                'promedio':        round(puntaje / 100 * 5, 2),
+                'nivel_desempeno': _nivel_from_puntaje(puntaje),
+                'comp_auto':       round(comp_vals.get('auto', 0), 2),
+                'comp_pares':      round(comp_vals.get('pares', 0), 2),
+                'comp_hetero_dir': round(comp_vals.get('hetero_dir', 0), 2),
+                'comp_hetero_est': round(comp_vals.get('hetero_est', comp_vals.get('hetero_dec', 0)), 2),
+                'sexo':            s.get('genero', ''),
+                'antiguedad_anos': s.get('antiguedad_anos'),
+                'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
+                'tiempo_servicio': _map_tiempo_servicio(s.get('tiempo_dedicacion', '')),
+                'nivel_estudio':   s.get('nivel_instruccion', ''),
+                'archivo_fuente':  f'eval_detalladas_{periodo}',
+            }
+            if modelo in ('docencia', 'abp', 'tecnologado'):
+                h = comp_vals.get('hetero_est', 0)
+                rec['het_estudiantil'] = round(h / 100 * 50, 2)
+                rec['eval_pares']      = round(comp_vals.get('pares', 0) / 100 * 20, 2)
+                rec['aula_virtual']    = round(comp_vals.get('aula', 0) / 100 * 10, 2)
+                rec['autoevaluacion']  = round(comp_vals.get('auto', 0) / 100 * 20, 2)
+            elif modelo == 'posgrado':
+                h = comp_vals.get('hetero_est', 0)
+                rec['het_estudiantil'] = round(h / 100 * 60, 2)
+                rec['aula_virtual']    = round(comp_vals.get('aula', 0) / 100 * 10, 2)
+                rec['autoevaluacion']  = round(comp_vals.get('auto', 0) / 100 * 30, 2)
+            elif modelo == 'servicios':
+                rec['het_estudiantil'] = round(comp_vals.get('hetero_est', 0), 2)
+            recs.append(rec)
+
+        print(f"[ETL] eval_detalladas {periodo}: {len(recs)} registros desde {dir_path}")
+        return recs
+
+    # ── PUCETEC hetero histórico (CSV) ────────────────────────────────────────
+    def _source_pucetec_hetero(self, staff: dict) -> list:
+        """
+        Lee el CSV de heteroevaluación PUCETEC histórica (2023–2025).
+        Mismo formato que los CSV de posgrado hetero:
+        NUM_DOCU, SVRTSR3_TERM_CODE, PUNTAJE, PESO, COD_PREGUNTA, STVDEPT_DESC.
+        Genera registros sistema='360', modelo='tecnologado'.
+        """
+        # Buscar el CSV de PUCETEC en el directorio base
+        pucetec_csv = None
+        for fname in (os.listdir(BASE) if os.path.isdir(BASE) else []):
+            if 'pucetec' in fname.lower() and fname.lower().endswith('.csv'):
+                pucetec_csv = os.path.join(BASE, fname)
+                break
+        if not pucetec_csv:
+            return []
+
+        print(f"[ETL] PUCETEC hetero: procesando {pucetec_csv} ...")
+        try:
+            df_p = pd.read_csv(pucetec_csv, encoding='latin1', sep=';', on_bad_lines='skip')
+        except Exception:
+            try:
+                df_p = pd.read_csv(pucetec_csv, encoding='utf-8-sig', sep=';', on_bad_lines='skip')
+            except Exception as e:
+                print(f"[ETL] PUCETEC CSV error: {e}")
+                return []
+
+        col_doc  = next((c for c in df_p.columns if 'num_docu'     in c.lower()), None)
+        col_term = next((c for c in df_p.columns if 'term_code'    in c.lower()), None)
+        col_punt = next((c for c in df_p.columns if c.lower() == 'puntaje'), None)
+        col_peso = next((c for c in df_p.columns if c.lower() == 'peso' and 'total' not in c.lower()), None)
+        col_preg = next((c for c in df_p.columns if 'cod_pregunta' in c.lower()), None)
+        col_last = next((c for c in df_p.columns if 'last_name'    in c.lower()), None)
+        col_frst = next((c for c in df_p.columns if 'first_name'   in c.lower()), None)
+        col_dept = next((c for c in df_p.columns if 'stvdept_desc' in c.lower()), None)
+
+        if not (col_doc and col_term and col_punt):
+            print("[ETL] PUCETEC CSV: columnas insuficientes — omitiendo.")
+            return []
+
+        df_p['_ced']  = df_p[col_doc].astype(str).str.strip().str.lstrip('0')
+        df_p['_per']  = df_p[col_term].astype(str).str.strip()
+        df_p['_anio'] = df_p['_per'].apply(
+            lambda p: int(str(p)[:4]) if len(str(p)) >= 4 and str(p)[:4].isdigit() else 2023)
+        df_p['_punt'] = pd.to_numeric(
+            df_p[col_punt].astype(str).str.replace(',', '.', regex=False), errors='coerce')
+        df_p['_peso'] = pd.to_numeric(df_p[col_peso], errors='coerce').fillna(1) if col_peso else 1.0
+        df_p['_nom']  = (
+            df_p[col_last].astype(str).str.strip() + ' ' +
+            df_p[col_frst].astype(str).str.strip()
+        ).str.strip() if (col_last and col_frst) else ''
+        df_p['_dept'] = df_p[col_dept].astype(str).str.strip() if col_dept else ''
+        df_p['_preg'] = df_p[col_preg].astype(str) if col_preg else '__'
+
+        df_valid = df_p.dropna(subset=['_punt'])
+        # Dedup por (ced, periodo, pregunta)
+        df_dd = df_valid.groupby(['_ced', '_per', '_preg']).agg(
+            punt_q=('_punt',  'mean'),
+            peso  =('_peso',  'first'),
+            anio  =('_anio',  'first'),
+            nombre=('_nom',   'first'),
+            dept  =('_dept',  'first'),
+        ).reset_index()
+
+        recs = []
+        for (ced, per), grp in df_dd.groupby(['_ced', '_per']):
+            if not ced or ced in ('nan', ''):
+                continue
+            peso_sum = grp['peso'].sum()
+            if peso_sum == 0:
+                continue
+            puntaje = float((grp['punt_q'] * grp['peso']).sum() / peso_sum)
+            puntaje = min(round(puntaje, 2), 100.0)
+            anio    = int(grp['anio'].iloc[0])
+            dept    = str(grp['dept'].iloc[0]).strip()
+            nombre_raw = str(grp['nombre'].iloc[0]).strip()
+            s = staff.get(ced, {})
+
+            recs.append({
+                'docente_nombre':  self._build_nombre(ced, staff, nombre_raw),
+                'facultad':        'Tecnologado',
+                'carrera':         dept,
+                'periodo':         str(per),
+                'anio':            anio,
+                'modelo':          'tecnologado',
+                'sistema':         '360',
+                'cedula':          ced,
+                'puntaje_100':     puntaje,
+                'promedio':        round(puntaje / 100 * 5, 2),
+                'nivel_desempeno': _nivel_from_puntaje(puntaje),
+                'het_estudiantil': round(puntaje / 100 * 50, 2),
+                'comp_hetero_est': round(puntaje, 2),
+                'sexo':            s.get('genero', ''),
+                'antiguedad_anos': s.get('antiguedad_anos'),
+                'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
+                'tiempo_servicio': _map_tiempo_servicio(s.get('tiempo_dedicacion', '')),
+                'nivel_estudio':   s.get('nivel_instruccion', ''),
+                'archivo_fuente':  os.path.basename(pucetec_csv),
+            })
+
+        print(f"[ETL] PUCETEC hetero: {len(recs)} registros.")
         return recs
 
 
