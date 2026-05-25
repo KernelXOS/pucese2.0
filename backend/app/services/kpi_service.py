@@ -1124,8 +1124,9 @@ class KPIService:
         anio: int = None, sistema: str = None, modelo: str = None
     ) -> dict:
         """
-        Agrupa el puntaje_100 por tiempo_servicio, sexo, funcion_docente,
-        nivel_estudio y devuelve promedios + mejores docentes TC y TP.
+        Agrupa el puntaje_100 por tiempo_servicio, sexo, nivel_estudio,
+        antigüedad y devuelve promedios, mejores docentes TC/TP,
+        top evaluados y comparativa TC vs TP.
         """
         from collections import defaultdict
 
@@ -1151,8 +1152,36 @@ class KPIService:
                 key=lambda x: x['promedio'], reverse=True
             )
 
-        # Mejor docente por tipo de contrato (TC / TP)
-        ced_info: dict = defaultdict(lambda: {'puntajes': [], 'nombre': '', 'ts': '', 'facultad': ''})
+        # ── Agrupación por antigüedad ─────────────────────────────────────
+        def _antig_label(anos) -> str:
+            if anos is None:
+                return ''
+            try:
+                a = float(anos)
+            except Exception:
+                return ''
+            if a < 1:   return '< 1 año'
+            if a <= 5:  return '1-5 años'
+            if a <= 10: return '6-10 años'
+            if a <= 20: return '11-20 años'
+            return '21+ años'
+
+        ANTIG_ORDER = ['< 1 año', '1-5 años', '6-10 años', '11-20 años', '21+ años']
+        antig_groups: dict = defaultdict(list)
+        for r in recs:
+            k = _antig_label(r.antiguedad_anos)
+            if k:
+                antig_groups[k].append(r.puntaje_100)
+        por_antiguedad = [
+            {'categoria': k, 'promedio': round(sum(v)/len(v), 1), 'n': len(v)}
+            for k, v in sorted(antig_groups.items(), key=lambda x: ANTIG_ORDER.index(x[0]) if x[0] in ANTIG_ORDER else 99)
+        ]
+
+        # ── Info por cédula para TC/TP y evaluadores ─────────────────────
+        ced_info: dict = defaultdict(lambda: {
+            'puntajes': [], 'nombre': '', 'ts': '', 'facultad': '',
+            'n_evals': [], 'periodos': set(),
+        })
         for r in recs:
             k = r.cedula or r.docente_nombre or ''
             ced_info[k]['puntajes'].append(r.puntaje_100)
@@ -1162,33 +1191,80 @@ class KPIService:
                 ced_info[k]['ts'] = r.tiempo_servicio
             if r.facultad:
                 ced_info[k]['facultad'] = r.facultad
+            if r.n_evaluadores and r.n_evaluadores > 0:
+                ced_info[k]['n_evals'].append(r.n_evaluadores)
+            if r.periodo:
+                ced_info[k]['periodos'].add(r.periodo)
 
+        # ── Mejor TC / TP + TC vs TP summary ─────────────────────────────
         mejor_tc = mejor_tp = None
+        tc_puntajes: list = []
+        tp_puntajes: list = []
+
         for ced, info in ced_info.items():
             if not info['puntajes']:
                 continue
             avg = round(sum(info['puntajes']) / len(info['puntajes']), 1)
             ts  = (info.get('ts') or '').lower()
+            n_ev_avg = round(sum(info['n_evals']) / len(info['n_evals'])) if info['n_evals'] else None
             entry = {
-                'nombre':   info['nombre'] or ced,
-                'cedula':   ced,
-                'facultad': info['facultad'],
-                'puntaje':  avg,
+                'nombre':      info['nombre'] or ced,
+                'cedula':      ced,
+                'facultad':    info['facultad'],
+                'puntaje':     avg,
+                'n_evaluadores': n_ev_avg,
+                'periodos':    len(info['periodos']),
             }
             if 'completo' in ts:
+                tc_puntajes.append(avg)
                 if not mejor_tc or avg > mejor_tc['puntaje']:
                     mejor_tc = entry
-            elif 'parcial' in ts:
+            elif 'parcial' in ts or 'medio' in ts:
+                tp_puntajes.append(avg)
                 if not mejor_tp or avg > mejor_tp['puntaje']:
                     mejor_tp = entry
 
+        tc_vs_tp = {
+            'tc': {
+                'promedio': round(sum(tc_puntajes)/len(tc_puntajes), 1) if tc_puntajes else None,
+                'n': len(tc_puntajes),
+                'label': 'Tiempo Completo',
+            },
+            'tp': {
+                'promedio': round(sum(tp_puntajes)/len(tp_puntajes), 1) if tp_puntajes else None,
+                'n': len(tp_puntajes),
+                'label': 'Tiempo Parcial / Medio',
+            },
+        }
+
+        # ── Top 10 docentes por cantidad de evaluadores ───────────────────
+        top_evaluados = []
+        for ced, info in ced_info.items():
+            if not info['n_evals']:
+                continue
+            top_evaluados.append({
+                'nombre':        info['nombre'] or ced,
+                'facultad':      info['facultad'],
+                'n_evaluadores': sum(info['n_evals']),
+                'puntaje':       round(sum(info['puntajes']) / len(info['puntajes']), 1),
+                'ts':            info.get('ts', ''),
+            })
+        top_evaluados = sorted(top_evaluados, key=lambda x: x['n_evaluadores'], reverse=True)[:10]
+
+        # ── Promedio general de evaluadores ──────────────────────────────
+        all_n_evals = [r.n_evaluadores for r in recs if r.n_evaluadores and r.n_evaluadores > 0]
+        n_evaluadores_promedio = round(sum(all_n_evals) / len(all_n_evals)) if all_n_evals else None
+
         return {
-            'tiempo_servicio': _group(lambda r: r.tiempo_servicio),
-            'sexo':            _group(lambda r: r.sexo),
-            'funcion':         _group(lambda r: r.funcion_docente),
-            'nivel_estudio':   _group(lambda r: r.nivel_estudio),
-            'mejor_tc':        mejor_tc,
-            'mejor_tp':        mejor_tp,
+            'tiempo_servicio':      _group(lambda r: r.tiempo_servicio),
+            'sexo':                 _group(lambda r: r.sexo),
+            'nivel_estudio':        _group(lambda r: r.nivel_estudio),
+            'antiguedad':           por_antiguedad,
+            'mejor_tc':             mejor_tc,
+            'mejor_tp':             mejor_tp,
+            'tc_vs_tp':             tc_vs_tp,
+            'top_evaluados':        top_evaluados,
+            'n_evaluadores_promedio': n_evaluadores_promedio,
         }
 
     # ── get_todos_docentes actualizado con funcion_docente + tiempo_servicio ──
