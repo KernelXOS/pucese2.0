@@ -15,6 +15,206 @@ from sqlalchemy import func
 from app.models.evaluacion import Evaluacion
 
 
+# ── SVG Chart Generators ───────────────────────────────────────────────────────
+
+def _svg_components_chart(componentes: list) -> str:
+    """Genera SVG de barras horizontales para los componentes de evaluación."""
+    if not componentes:
+        return ""
+    row_h = 32
+    pad_l = 160
+    pad_r = 70
+    pad_t = 10
+    w = 520
+    h = pad_t + len(componentes) * row_h + 10
+
+    COLOR_MAP = {
+        "excelente":  "#059669",
+        "bueno":      "#0056b3",
+        "regular":    "#d97706",
+        "deficiente": "#dc2626",
+    }
+    MAX_VAL = 100.0
+    bar_w = w - pad_l - pad_r
+
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" style="font-family:Helvetica,Arial,sans-serif;">']
+
+    # guías verticales
+    for tick in [25, 50, 75, 100]:
+        x = pad_l + bar_w * tick / MAX_VAL
+        lines.append(f'<line x1="{x:.1f}" y1="{pad_t}" x2="{x:.1f}" y2="{h-5}" stroke="#e2e8f0" stroke-width="1"/>')
+        lines.append(f'<text x="{x:.1f}" y="{h}" text-anchor="middle" font-size="7" fill="#cbd5e1">{tick}</text>')
+
+    for i, comp in enumerate(componentes):
+        y = pad_t + i * row_h
+        val = min(float(comp.get("pct", 0)), 100.0)
+        color = COLOR_MAP.get(comp.get("nivel_css", "bueno"), "#0056b3")
+        fill_w = bar_w * val / MAX_VAL
+
+        # etiqueta izquierda
+        label = comp.get("label", "")[:24]
+        lines.append(f'<text x="{pad_l-6}" y="{y+18}" text-anchor="end" font-size="8" fill="#374151" font-weight="600">{label}</text>')
+
+        # fondo barra
+        lines.append(f'<rect x="{pad_l}" y="{y+8}" width="{bar_w}" height="14" rx="3" fill="#f1f5f9"/>')
+        # barra coloreada
+        if fill_w > 0:
+            lines.append(f'<rect x="{pad_l}" y="{y+8}" width="{fill_w:.1f}" height="14" rx="3" fill="{color}"/>')
+        # valor
+        lines.append(f'<text x="{pad_l+bar_w+6}" y="{y+19}" font-size="8.5" font-weight="800" fill="{color}">{comp.get("valor_fmt","—")}</text>')
+
+        # peso
+        peso = comp.get("peso", "")
+        lines.append(f'<text x="{pad_l+bar_w+42}" y="{y+19}" font-size="7" fill="#94a3b8">{peso}%</text>')
+
+    lines.append('</svg>')
+    return "\n".join(lines)
+
+
+def _svg_historico_chart(periodos_lista: list, hist_modelos: list) -> str:
+    """Genera SVG de barras agrupadas para el histórico de puntajes."""
+    if not periodos_lista or not hist_modelos:
+        return ""
+
+    # Tomar máx 8 períodos para que quepa bien
+    periodos = periodos_lista[-8:]
+    n_p = len(periodos)
+    n_m = len(hist_modelos)
+
+    w = 520
+    h = 180
+    pad_l = 35
+    pad_r = 10
+    pad_t = 15
+    pad_b = 45
+    chart_w = w - pad_l - pad_r
+    chart_h = h - pad_t - pad_b
+
+    COLORS = ["#0056b3", "#059669", "#d97706", "#7c3aed", "#dc2626"]
+    group_w = chart_w / n_p
+    bar_w = min(group_w / (n_m + 1), 22)
+
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" style="font-family:Helvetica,Arial,sans-serif;">']
+
+    # guías horizontales
+    for tick in [60, 70, 80, 90, 100]:
+        y = pad_t + chart_h - chart_h * (tick - 50) / 55
+        lines.append(f'<line x1="{pad_l}" y1="{y:.1f}" x2="{w-pad_r}" y2="{y:.1f}" stroke="#f1f5f9" stroke-width="1"/>')
+        lines.append(f'<text x="{pad_l-3}" y="{y+3:.1f}" text-anchor="end" font-size="7" fill="#cbd5e1">{tick}</text>')
+
+    # línea meta 90
+    y90 = pad_t + chart_h - chart_h * (90 - 50) / 55
+    lines.append(f'<line x1="{pad_l}" y1="{y90:.1f}" x2="{w-pad_r}" y2="{y90:.1f}" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3"/>')
+    lines.append(f'<text x="{w-pad_r+2}" y="{y90+3:.1f}" font-size="6.5" fill="#10b981">90</text>')
+
+    for pi, pinfo in enumerate(periodos):
+        p_label = pinfo.get("label", pinfo.get("periodo", ""))[-6:]
+        cx = pad_l + (pi + 0.5) * group_w
+
+        # barras por modelo
+        total_bar_w = bar_w * n_m
+        x_start = cx - total_bar_w / 2
+
+        for mi, mod in enumerate(hist_modelos):
+            # Buscar índice real en periodos_lista
+            real_idx = next((k for k, p in enumerate(periodos_lista) if p.get("periodo") == pinfo.get("periodo")), None)
+            if real_idx is None or real_idx >= len(mod["celdas"]):
+                continue
+            celda = mod["celdas"][real_idx]
+            val = celda.get("valor")
+            if val is None:
+                continue
+            val = max(float(val), 50.0)
+            bar_h_px = chart_h * (val - 50) / 55
+            bx = x_start + mi * bar_w
+            by = pad_t + chart_h - bar_h_px
+            color = COLORS[mi % len(COLORS)]
+            lines.append(f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bar_w-1:.1f}" height="{bar_h_px:.1f}" rx="2" fill="{color}" opacity="0.85"/>')
+            # valor encima si hay espacio
+            if bar_h_px > 18:
+                lines.append(f'<text x="{bx+bar_w/2-0.5:.1f}" y="{by+10:.1f}" text-anchor="middle" font-size="6" fill="white" font-weight="800">{float(celda["valor"]):.0f}</text>')
+
+        # etiqueta período
+        lines.append(f'<text x="{cx:.1f}" y="{h-pad_b+12}" text-anchor="middle" font-size="7" fill="#64748b">{p_label}</text>')
+
+    # leyenda
+    lex = pad_l
+    for mi, mod in enumerate(hist_modelos[:4]):
+        color = COLORS[mi % len(COLORS)]
+        lines.append(f'<rect x="{lex}" y="{h-14}" width="8" height="8" rx="2" fill="{color}"/>')
+        lbl = mod.get("label", "")[:16]
+        lines.append(f'<text x="{lex+10}" y="{h-7}" font-size="7" fill="#374151">{lbl}</text>')
+        lex += len(lbl) * 5 + 20
+
+    lines.append('</svg>')
+    return "\n".join(lines)
+
+
+def _build_resumen(ctx: dict) -> str:
+    """Genera un párrafo de resumen automático del desempeño docente."""
+    nombre    = ctx.get("nombre_completo", "El/la docente")
+    puntaje   = ctx.get("puntaje_fmt", "—")
+    nivel     = ctx.get("nivel_desempeno", "—")
+    ranking   = ctx.get("ranking_str", "—")
+    percentil = ctx.get("percentil_str", "—")
+    periodo   = ctx.get("periodo_label", "—")
+    facultad  = ctx.get("facultad", "—")
+    modelo    = ctx.get("modelo_label", "—")
+    sistema   = ctx.get("sistema_label", "—")
+    diff_str  = ctx.get("diff_str", "0")
+    prom_inst = ctx.get("promedio_inst_str", "—")
+    componentes = ctx.get("componentes", [])
+    hist_mod    = ctx.get("historico_modelos", [])
+
+    # Tendencia histórica
+    tendencia_txt = ""
+    for mod in hist_mod:
+        t = mod.get("tendencia", 0)
+        if t > 0:
+            tendencia_txt = f"muestra una tendencia positiva de +{abs(t):.1f} puntos respecto al período anterior"
+        elif t < 0:
+            tendencia_txt = f"registra una variación de {t:.1f} puntos respecto al período anterior"
+        break
+
+    # Mejor y peor componente
+    mejor_comp  = max(componentes, key=lambda c: c.get("pct", 0), default=None)
+    peor_comp   = min(componentes, key=lambda c: c.get("pct", 0), default=None)
+
+    # Diferencia vs institución
+    try:
+        diff_val = float(diff_str.replace("+", ""))
+        if diff_val > 0:
+            vs_inst = f"supera el promedio institucional ({prom_inst}/100) por {diff_val:.1f} puntos"
+        elif diff_val < 0:
+            vs_inst = f"se ubica {abs(diff_val):.1f} puntos por debajo del promedio institucional ({prom_inst}/100)"
+        else:
+            vs_inst = f"iguala el promedio institucional ({prom_inst}/100)"
+    except Exception:
+        vs_inst = f"el promedio institucional es {prom_inst}/100"
+
+    partes = [
+        f"En el período {periodo}, {nombre.title()} obtuvo una calificación de {puntaje}/100 "
+        f"en el sistema {sistema} — modelo {modelo}, lo que corresponde al nivel <strong>{nivel}</strong>. "
+        f"Su desempeño {vs_inst}, ocupando la posición {ranking} (percentil {percentil}) a nivel institucional."
+    ]
+
+    if tendencia_txt:
+        partes.append(f"Históricamente, {tendencia_txt}.")
+
+    if mejor_comp and peor_comp and mejor_comp["label"] != peor_comp["label"]:
+        partes.append(
+            f"Entre los componentes evaluados, destaca <strong>{mejor_comp['label']}</strong> "
+            f"con {mejor_comp['valor_fmt']}/100 ({mejor_comp['nivel']}), mientras que "
+            f"<strong>{peor_comp['label']}</strong> ({peor_comp['valor_fmt']}/100) "
+            f"representa el área con mayor oportunidad de mejora."
+        )
+
+    if facultad and facultad != "—":
+        partes.append(f"El/la docente pertenece a la unidad académica: <strong>{facultad}</strong>.")
+
+    return " ".join(partes)
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def nivel_from_puntaje(p) -> str:
@@ -331,6 +531,9 @@ def generar_pdf_docente(cedula: str, db: Session, periodo_codigo: Optional[str] 
     ctx["logo_url"]          = LOGO_URL
     ctx["fecha_generacion"]  = datetime.now().strftime("%d/%m/%Y %H:%M")
     ctx["ia_comentario"]     = None
+    ctx["resumen"]           = _build_resumen(ctx)
+    ctx["svg_componentes"]   = _svg_components_chart(ctx.get("componentes", []))
+    ctx["svg_historico"]     = _svg_historico_chart(ctx.get("historico", []), ctx.get("historico_modelos", []))
 
     # El template espera "docente" y "perfil" como objetos/dicts
     ctx["docente"] = {
