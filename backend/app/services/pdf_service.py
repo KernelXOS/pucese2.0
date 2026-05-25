@@ -152,17 +152,20 @@ def _svg_historico_chart(periodos_lista: list, hist_modelos: list) -> str:
 
 def _build_resumen(ctx: dict) -> str:
     """Genera un párrafo de resumen automático del desempeño docente."""
-    nombre    = ctx.get("nombre_completo", "El/la docente")
-    puntaje   = ctx.get("puntaje_fmt", "—")
-    nivel     = ctx.get("nivel_desempeno", "—")
-    ranking   = ctx.get("ranking_str", "—")
-    percentil = ctx.get("percentil_str", "—")
-    periodo   = ctx.get("periodo_label", "—")
-    facultad  = ctx.get("facultad", "—")
-    modelo    = ctx.get("modelo_label", "—")
-    sistema   = ctx.get("sistema_label", "—")
-    diff_str  = ctx.get("diff_str", "0")
-    prom_inst = ctx.get("promedio_inst_str", "—")
+    nombre     = ctx.get("nombre_completo", "El/la docente")
+    puntaje    = ctx.get("puntaje_fmt", "—")
+    nivel      = ctx.get("nivel_desempeno", "—")
+    ranking    = ctx.get("ranking_str", "—")
+    percentil  = ctx.get("percentil_str", "—")
+    periodo    = ctx.get("periodo_label", "—")
+    facultad   = ctx.get("facultad", "—")
+    carrera    = ctx.get("carrera", "—")
+    modelo     = ctx.get("modelo_label", "—")
+    sistema    = ctx.get("sistema_label", "—")
+    dedicacion = ctx.get("dedicacion", "—")
+    n_eval     = ctx.get("n_evaluadores", "—")
+    diff_str   = ctx.get("diff_str", "0")
+    prom_inst  = ctx.get("promedio_inst_str", "—")
     componentes = ctx.get("componentes", [])
     hist_mod    = ctx.get("historico_modelos", [])
 
@@ -209,8 +212,19 @@ def _build_resumen(ctx: dict) -> str:
             f"representa el área con mayor oportunidad de mejora."
         )
 
-    if facultad and facultad != "—":
+    if carrera and carrera != "—" and carrera != facultad:
+        partes.append(f"Pertenece a la carrera/programa: <strong>{carrera}</strong>" +
+                      (f", unidad académica {facultad}." if facultad and facultad != "—" else "."))
+    elif facultad and facultad != "—":
         partes.append(f"El/la docente pertenece a la unidad académica: <strong>{facultad}</strong>.")
+
+    extras = []
+    if dedicacion and dedicacion != "—":
+        extras.append(f"dedicación <strong>{dedicacion}</strong>")
+    if n_eval and n_eval != "—":
+        extras.append(f"<strong>{n_eval}</strong> evaluadores participaron en este período")
+    if extras:
+        partes.append("Datos adicionales: " + " · ".join(extras) + ".")
 
     return " ".join(partes)
 
@@ -293,6 +307,30 @@ def _antiguedad_str(anos) -> str:
     if m == 0:
         return f"{a} años"
     return f"{a} años {m} meses"
+
+
+def _norm_periodo(p: str) -> str:
+    """Convierte código de período crudo (ej. 202571) en etiqueta legible (Posg-I-2025)."""
+    if not p or p == "—":
+        return p
+    s = str(p).strip()
+    if len(s) < 4:
+        return s
+    y = s[:4]
+    try:
+        suf = int(s[4:]) if len(s) > 4 else 0
+    except ValueError:
+        return s
+    if suf == 0 or suf == 1:   return f"I-{y}"
+    if suf == 2:                return f"II-{y}"
+    if 10 <= suf <= 20:         return f"TEC-I-{y}"
+    if 21 <= suf <= 30:         return f"TEC-II-{y}"
+    if 51 <= suf <= 57:         return f"Posg-I-{y}"
+    if 58 <= suf <= 65:         return f"Posg-II-{y}"
+    if 60 <= suf <= 68:         return f"I-{y}"
+    if 69 <= suf <= 80:         return f"II-{y}"
+    if 70 <= suf <= 79:         return f"Posg-I-{y}"
+    return f"{y}-{suf}"
 
 
 # ── Core builders ──────────────────────────────────────────────────────────────
@@ -475,13 +513,18 @@ def _build_docente_ctx(cedula: str, db: Session, periodo_codigo: Optional[str] =
     if not ev:
         ev = evs_p[0]
 
-    periodo_str = ev.periodo or "—"
-    sistema     = ev.sistema or "meipa"
-    nivel       = ev.nivel_desempeno or nivel_from_puntaje(ev.puntaje_100)
+    periodo_str  = ev.periodo or "—"
+    periodo_norm = _norm_periodo(periodo_str)
+    sistema      = ev.sistema or "meipa"
+    nivel        = ev.nivel_desempeno or nivel_from_puntaje(ev.puntaje_100)
 
     componentes                = _build_componentes(ev)
     rank_data                  = _build_ranking(cedula, periodo_str, ev.modelo or "docencia", float(ev.puntaje_100 or 0), db)
     periodos_lista, hist_mod   = _build_historico(cedula, db)
+
+    # Normalizar etiquetas de período en el histórico
+    for pinfo in periodos_lista:
+        pinfo["label"] = _norm_periodo(pinfo.get("periodo", ""))
 
     for row in hist_mod:
         for i, p in enumerate(periodos_lista):
@@ -490,16 +533,32 @@ def _build_docente_ctx(cedula: str, db: Session, periodo_codigo: Optional[str] =
 
     ranking_colors = {"Excelente": "#059669", "Bueno": "#0056b3", "Regular": "#d97706", "Deficiente": "#dc2626"}
 
+    # Tipo dedicación: tiempo_servicio → etiqueta legible
+    ded_raw = ev.tiempo_servicio or ""
+    ded_map = {"TC": "Tiempo Completo", "TP": "Tiempo Parcial", "MT": "Medio Tiempo",
+               "Tiempo Completo": "Tiempo Completo", "Tiempo Parcial": "Tiempo Parcial", "Medio Tiempo": "Medio Tiempo"}
+    dedicacion = ded_map.get(ded_raw.strip().upper(), ded_raw) if ded_raw else "—"
+
+    # Carrera: usar campo carrera primero, luego facultad
+    carrera  = ev.carrera or ev.facultad or "—"
+    facultad = ev.facultad or ev.carrera or "—"
+
+    # Número de evaluadores
+    n_eval = ev.n_evaluadores
+
     return {
         "cedula":            cedula,
         "nombre_completo":   ev.docente_nombre or cedula,
         "genero":            ev.sexo or "—",
-        "facultad":          ev.facultad or "—",
+        "facultad":          facultad,
+        "carrera":           carrera,
         "funcion":           ev.funcion_docente or "—",
-        "dedicacion":        "—",
+        "dedicacion":        dedicacion,
         "antiguedad_str":    _antiguedad_str(ev.antiguedad_anos),
-        "nivel_instruccion": ev.nivel_estudio or "—",
-        "periodo_label":     periodo_str,
+        "nivel_instruccion": ev.nivel_estudio or ev.grado or "—",
+        "n_evaluadores":     n_eval if n_eval else "—",
+        "periodo_label":     periodo_norm,
+        "periodo_raw":       periodo_str,
         "sistema_label":     "Sistema MEIPA" if sistema == "meipa" else "Sistema 360°",
         "sistema_upper":     sistema.upper(),
         "puntaje_fmt":       _fmt(ev.puntaje_100),
@@ -546,10 +605,12 @@ def generar_pdf_docente(cedula: str, db: Session, periodo_codigo: Optional[str] 
         pass
     p = _Perfil()
     p.facultad          = ctx["facultad"]
+    p.carrera           = ctx["carrera"]
     p.funcion           = ctx["funcion"]
     p.dedicacion        = ctx["dedicacion"]
     p.antiguedad_str    = ctx["antiguedad_str"]
     p.nivel_instruccion = ctx["nivel_instruccion"]
+    p.n_evaluadores     = ctx["n_evaluadores"]
     ctx["perfil"] = p
 
     ctx["puntaje_actual"] = {
