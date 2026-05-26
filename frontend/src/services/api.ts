@@ -148,6 +148,10 @@ export const api = {
   getDesempenoPorVariables: (anio?: number, sistema?: string, modelo?: string) =>
     axios.get(`${EVAL}/desempeno-variables?${params({ anio, sistema, modelo })}`),
 
+  // ── Mejor / peor competencia por carrera ─────────────────────────────────────
+  getCompetenciasPorCarrera: (anio?: number, sistema?: string, modelo?: string, periodo?: string) =>
+    axios.get(`${EVAL}/competencias-por-carrera?${params({ anio, sistema, modelo, periodo })}`),
+
   /** Descarga el PDF del informe general (todo, o filtrado por sistema/modelo/periodo). */
   descargarInformeGeneral: async (opts: {
     sistema?: string; modelo?: string; periodo?: string; filename?: string

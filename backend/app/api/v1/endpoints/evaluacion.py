@@ -184,6 +184,21 @@ def get_desempeno_variables(
     return kpi_service.get_desempeno_por_variables(db, anio=anio, sistema=sistema, modelo=modelo)
 
 
+@router.get("/competencias-por-carrera")
+def get_competencias_por_carrera(
+    db: Session = Depends(get_db),
+    anio: Optional[int] = None,
+    sistema: Optional[str] = None,
+    modelo: Optional[str] = None,
+    periodo: Optional[str] = None,
+):
+    """Best and worst component for each official carrera."""
+    data = kpi_service.get_competencias_por_carrera(db, anio=anio, sistema=sistema, modelo=modelo, periodo=periodo)
+    if not data:
+        raise HTTPException(status_code=404, detail="No hay datos de competencias por carrera")
+    return data
+
+
 @router.get("/competencias-preguntas")
 def get_competencias_preguntas():
     """Ranking de competencias y preguntas (mejor/peor) por periodo, leído de eval_detalladas."""

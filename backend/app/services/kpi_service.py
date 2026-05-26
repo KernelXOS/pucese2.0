@@ -1304,4 +1304,71 @@ class KPIService:
     # (ya existe arriba — solo agregamos campos al resultado)
 
 
+    def get_competencias_por_carrera(
+        self,
+        db: Session,
+        anio: int = None,
+        sistema: str = None,
+        modelo: str = None,
+        periodo: str = None,
+    ):
+        """Avg of each component column grouped by facultad, returns best/worst per carrera."""
+        COMP_LABELS = {
+            'het_estudiantil':  'Heteroevaluación Estudiantil',
+            'autoevaluacion':   'Autoevaluación',
+            'eval_pares':       'Evaluación de Pares',
+            'comp_hetero_dir':  'Coevaluación Directiva',
+            'aula_virtual':     'Entorno Virtual (CEV)',
+            'comp_hetero_est':  'Heteroevaluación Estudiantil (MEIPA)',
+            'comp_auto':        'Autoevaluación (MEIPA)',
+            'comp_pares':       'Eval. Pares (MEIPA)',
+        }
+        COMP_COLS = list(COMP_LABELS.keys())
+
+        q = _base_q(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
+        recs = q.filter(Evaluacion.facultad != None, Evaluacion.facultad != '').all()
+
+        # Accumulate component values per carrera
+        buckets: dict = {}  # facultad -> {col -> [vals]}
+        for r in recs:
+            fac = r.facultad or ''
+            if not fac:
+                continue
+            if fac not in buckets:
+                buckets[fac] = {col: [] for col in COMP_COLS}
+                buckets[fac]['_n'] = 0
+            buckets[fac]['_n'] += 1
+            for col in COMP_COLS:
+                val = getattr(r, col, None)
+                if val is not None and val > 0:
+                    buckets[fac][col].append(float(val))
+
+        result = []
+        for fac, data in sorted(buckets.items()):
+            avgs = {}
+            for col in COMP_COLS:
+                vals = data[col]
+                if vals:
+                    avgs[col] = round(sum(vals) / len(vals), 2)
+
+            if not avgs:
+                continue
+
+            best_col = max(avgs, key=lambda c: avgs[c])
+            worst_col = min(avgs, key=lambda c: avgs[c])
+
+            result.append({
+                'carrera':          fac,
+                'n':                data['_n'],
+                'mejor_comp':       COMP_LABELS[best_col],
+                'mejor_puntaje':    avgs[best_col],
+                'peor_comp':        COMP_LABELS[worst_col],
+                'peor_puntaje':     avgs[worst_col],
+                'componentes':      {COMP_LABELS[c]: v for c, v in avgs.items()},
+            })
+
+        result.sort(key=lambda x: x['carrera'])
+        return result
+
+
 kpi_service = KPIService()
