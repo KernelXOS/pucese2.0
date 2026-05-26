@@ -3416,6 +3416,22 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors relative">
                   <Bell size={16} />
                 </button>
+
+                {/* ── Informe General PDF (topbar) ── */}
+                <button
+                  onClick={() => handleDescargarInforme(
+                    sistema === 'overview' ? undefined : sistema === 'meipa' ? 'meipa' : '360',
+                    sistema === 'overview' ? undefined : sistema === 'meipa' ? 'docencia' : sistema === 'salud' ? saludSubTab : activeTab
+                  )}
+                  disabled={exportingInforme}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60 active:scale-95"
+                  style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)', boxShadow:'0 2px 8px rgba(0,86,179,0.3)' }}
+                  title="Descargar Informe General PDF"
+                >
+                  {exportingInforme ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                  <span>{exportingInforme ? 'Generando…' : 'Informe PDF'}</span>
+                </button>
+
                 <button
                   onClick={sistema === 'overview' ? exportComparativoPDF2 : exportVistaPDF}
                   disabled={sistema === 'overview' ? exportingComp : exportingVista}
