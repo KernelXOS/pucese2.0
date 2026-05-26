@@ -1107,8 +1107,17 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         const pctBg    = (v: number) => v >= 90 ? '#ecfdf5' : v >= 80 ? '#eff6ff' : v >= 70 ? '#fef3c7' : '#fef2f2'
         const pctLabel = (v: number) => v >= 90 ? 'Excelente' : v >= 80 ? 'Bueno' : v >= 70 ? 'Regular' : 'Crítico'
 
-        // Excluir vacíos y ordenar
-        const rankedCarreras = avgByFac.filter(d => d.fac && d.fac.trim() !== '')
+        // Carreras oficiales PUCESE — solo estas aparecen en el ranking
+        const CARRERAS_OFICIALES = new Set([
+          'Administración de Empresas', 'Agroindustria', 'Contabilidad y Auditoría',
+          'Derecho', 'Diseño Gráfico', 'Edu. Básica Semi - Quinindé', 'Educación Básica',
+          'Enfermería', 'Enfermería – Quinindé', 'Enfermería – San Lorenzo',
+          'Fisioterapia', 'Ing. Recursos Naturales Renova', 'Laboratorio Clínico',
+          'Medicina', 'Negocios Internacionales', 'Pedagogía Idiomas Nac. Ext.',
+          'Psicología', 'TC Enfermería', 'Tecnologías de la Información',
+          'TG Desarrollo de Software', 'TG Gestión Culinaria',
+        ])
+        const rankedCarreras = avgByFac.filter(d => d.fac && CARRERAS_OFICIALES.has(d.fac))
 
         // Vista controlada: top 25 para la gráfica, tabla completa paginada
         const TOP_CHART = 25
