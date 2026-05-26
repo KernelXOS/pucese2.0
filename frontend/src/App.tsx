@@ -1292,10 +1292,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
       {/* ── Row 4: Género | Edad | Antigüedad por período ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* ── Helper: normaliza y agrupa por período (máx 6, sin Posg-) ───────
-            Toma un array de filas {periodo, ...brackets} y devuelve filas
-            agrupadas por normPeriodo, promediando los valores numéricos.     */}
         {generoPorPeriodo.length > 0 && (() => {
+          // 6 períodos académicos principales: 3 MEIPA + 3 360 (sin TEC-I ni Posg-)
+          const PERIODOS_PRINCIPALES = ['I-2023','II-2023','I-2024','II-2024','I-2025','II-2025']
           // Agrupa por normPeriodo y promedia
           const bucket: Record<string,{raw:string,[k:string]:any}> = {}
           generoPorPeriodo.forEach((d:any) => {
@@ -1306,9 +1305,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             if (d['Mujer']  != null) bucket[lbl]['Mujer'].push(+d['Mujer'])
             if (d['Hombre'] != null) bucket[lbl]['Hombre'].push(+d['Hombre'])
           })
-          const sorted = Object.entries(bucket)
-            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
-            .slice(-6)
+          const sorted = PERIODOS_PRINCIPALES
+            .filter(lbl => bucket[lbl])
+            .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
           const periodos = sorted.map(([lbl]) => lbl)
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const generos = ['Mujer','Hombre']
@@ -1354,6 +1353,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {/* Edad por período */}
         {edadPorPeriodo.length > 0 && (() => {
+          const PERIODOS_PRINCIPALES = ['I-2023','II-2023','I-2024','II-2024','I-2025','II-2025']
           const EDAD_COLORS = ['#0f5ca8','#b45309','#047857','#6d28d9']
           const bucket: Record<string,{raw:string, vals:Record<string,number[]>}> = {}
           edadPorPeriodo.forEach((d:any) => {
@@ -1363,7 +1363,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             if (!bucket[lbl]) { bucket[lbl] = {raw, vals:{}}; AGE_BRACKETS.forEach(b => bucket[lbl].vals[b] = []) }
             AGE_BRACKETS.forEach(b => { if (d[b] != null) bucket[lbl].vals[b].push(+d[b]) })
           })
-          const sorted = Object.entries(bucket).sort(([,a],[,b]) => a.raw.localeCompare(b.raw)).slice(-6)
+          const sorted = PERIODOS_PRINCIPALES
+            .filter(lbl => bucket[lbl])
+            .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
           const periodos = sorted.map(([lbl]) => lbl)
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const traces = AGE_BRACKETS.map((b, i) => {
@@ -1400,6 +1402,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         {/* Antigüedad por período */}
         {antiguedadPorPeriodo.length > 0 && (() => {
+          const PERIODOS_PRINCIPALES = ['I-2023','II-2023','I-2024','II-2024','I-2025','II-2025']
           const ANT_COLORS = ['#0e7490','#b91c1c','#7c3aed','#047857']
           const bucket: Record<string,{raw:string, vals:Record<string,number[]>}> = {}
           antiguedadPorPeriodo.forEach((d:any) => {
@@ -1409,7 +1412,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             if (!bucket[lbl]) { bucket[lbl] = {raw, vals:{}}; ANTIG_BRACKETS.forEach(b => bucket[lbl].vals[b] = []) }
             ANTIG_BRACKETS.forEach(b => { if (d[b] != null) bucket[lbl].vals[b].push(+d[b]) })
           })
-          const sorted = Object.entries(bucket).sort(([,a],[,b]) => a.raw.localeCompare(b.raw)).slice(-6)
+          const sorted = PERIODOS_PRINCIPALES
+            .filter(lbl => bucket[lbl])
+            .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
           const periodos = sorted.map(([lbl]) => lbl)
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const traces = ANTIG_BRACKETS.map((b, i) => {
