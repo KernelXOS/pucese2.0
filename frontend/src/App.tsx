@@ -4102,8 +4102,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   {/* ── Ranking por Carrera + Competencias (calculado desde todosDocentes) ── */}
                   {todosDocentes.length > 0 && (() => {
                     const SALUD_CARRERAS = new Set([
+                      'Medicina','Laboratorio Clínico','Psicología',
                       'Enfermería','Enfermería – Quinindé','Enfermería – San Lorenzo',
-                      'Fisioterapia','Laboratorio Clínico','Medicina','TC Enfermería',
+                      'Fisioterapia','TC Enfermería',
                     ])
                     const TODAS_CARRERAS = new Set([
                       'Administración de Empresas','Agroindustria','Contabilidad y Auditoría',
