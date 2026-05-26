@@ -61,8 +61,8 @@ def _base_q(db: Session, modelo: str = None, anio: int = None, sistema: str = No
     if modelo:
         q = q.filter(Evaluacion.modelo == modelo)
     if periodo:
-        # Normalizar: acepta '202402' del frontend o '2024-II' de la DB
-        q = q.filter(Evaluacion.periodo == _norm_periodo(periodo))
+        # La BD guarda periodos como '202301', '202402', etc. — usar directo
+        q = q.filter(Evaluacion.periodo == str(periodo))
     elif anio:
         # Solo filtrar por año cuando no hay período específico
         q = q.filter(Evaluacion.anio == anio)
