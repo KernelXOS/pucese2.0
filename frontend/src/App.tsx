@@ -1452,17 +1452,21 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
       {/* ── Row 5: Género × Edad/Antigüedad — selector de período ─────────── */}
       {(generoEdadPorPeriodo.length > 0 || generoAntiguedadPorPeriodo.length > 0) && (() => {
-        // períodos únicos ordenados
-        const periodosUnicos: string[] = []
+        // Solo los 6 períodos principales (3 MEIPA + 3 360), sin TEC-I ni Posg-
+        const PERIODOS_PRINCIPALES = ['I-2023','II-2023','I-2024','II-2024','I-2025','II-2025']
+        // Calcular qué períodos normalizados tienen datos reales
+        const conDatos = new Set<string>()
         for (const row of [...generoEdadPorPeriodo, ...generoAntiguedadPorPeriodo]) {
-          if (!periodosUnicos.includes(row.periodo)) periodosUnicos.push(row.periodo)
+          conDatos.add(normPeriodo(String(row.periodo)))
         }
+        const periodosUnicos = PERIODOS_PRINCIPALES.filter(p => conDatos.has(p))
 
         // helper: pivot rows filtrados → { Mujer: { bracket: val }, Hombre: { bracket: val } }
+        // Compara por normPeriodo para agrupar todos los códigos crudos del mismo período
         function pivotCross(rows: any[], brackets: string[], periodo: string) {
           const acc: Record<string, Record<string, number[]>> = { Mujer: {}, Hombre: {} }
           for (const r of rows) {
-            if (periodo !== '__todos__' && r.periodo !== periodo) continue
+            if (periodo !== '__todos__' && normPeriodo(String(r.periodo)) !== periodo) continue
             if (!acc[r.genero]) acc[r.genero] = {}
             if (!acc[r.genero][r.bracket]) acc[r.genero][r.bracket] = []
             if (r.promedio != null) acc[r.genero][r.bracket].push(r.promedio)
