@@ -2917,14 +2917,10 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
-  // Cargar períodos al montar
+  // Cargar períodos al montar (solo para saber cuáles tienen datos, no auto-navegar)
   useEffect(() => {
     api.getPeriodos().then(res => {
-      const cargados = res.data.filter((p: any) => p.cargado)
       setPeriodos(res.data)
-      if (cargados.length > 0) {
-        setPeriodoActivo(cargados[cargados.length - 1].codigo) // último período cargado
-      }
     }).catch(() => {})
   }, [])
 
