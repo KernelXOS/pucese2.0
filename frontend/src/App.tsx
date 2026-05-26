@@ -1292,25 +1292,42 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
       {/* ── Row 4: Género | Edad | Antigüedad por período ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* Género por período */}
+        {/* ── Helper: normaliza y agrupa por período (máx 6, sin Posg-) ───────
+            Toma un array de filas {periodo, ...brackets} y devuelve filas
+            agrupadas por normPeriodo, promediando los valores numéricos.     */}
         {generoPorPeriodo.length > 0 && (() => {
-          const periodos = generoPorPeriodo.map((d:any) => d.periodo)
+          // Agrupa por normPeriodo y promedia
+          const bucket: Record<string,{raw:string,[k:string]:any}> = {}
+          generoPorPeriodo.forEach((d:any) => {
+            const lbl = normPeriodo(String(d.periodo))
+            if (lbl.startsWith('Posg-')) return          // excluir posgrado
+            const raw = String(d.periodo)
+            if (!bucket[lbl]) bucket[lbl] = {raw, Mujer:[], Hombre:[]}
+            if (d['Mujer']  != null) bucket[lbl]['Mujer'].push(+d['Mujer'])
+            if (d['Hombre'] != null) bucket[lbl]['Hombre'].push(+d['Hombre'])
+          })
+          const sorted = Object.entries(bucket)
+            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
+            .slice(-6)
+          const periodos = sorted.map(([lbl]) => lbl)
+          const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const generos = ['Mujer','Hombre']
-          const traces = generos.map(g => ({
-            type: 'bar' as const,
-            name: g,
-            x: periodos,
-            y: generoPorPeriodo.map((d:any) => d[g] ?? null),
-            marker: { color: GENDER_COLORS[g] || '#94a3b8', opacity: 0.88 },
-            text: generoPorPeriodo.map((d:any) => d[g] ? (+d[g]).toFixed(1) : ''),
-            textposition: 'outside' as const,
-            textfont: { family:'Inter', size:8 },
-            hovertemplate: `<b>${g}</b><br>%{x}<br>%{y:.1f}/100<extra></extra>`,
-          }))
-          const yVals = generoPorPeriodo.flatMap((d:any) => generos.map(g => d[g] ?? 0)).filter(Boolean)
-          const yMin = Math.max(0, Math.floor(Math.min(...yVals)) - 5)
+          const traces = generos.map(g => {
+            const yVals = sorted.map(([,v]) => avg(v[g]))
+            return {
+              type:'bar' as const, name:g,
+              x: periodos, y: yVals,
+              marker:{ color: GENDER_COLORS[g]||'#94a3b8', opacity:0.88 },
+              text: yVals.map(v => v != null ? String(v) : ''),
+              textposition:'outside' as const,
+              textfont:{ family:'Inter', size:9 },
+              hovertemplate:`<b>${g}</b> · %{x}<br>%{y:.1f}/100<extra></extra>`,
+            }
+          })
+          const allV = sorted.flatMap(([,v]) => [...v['Mujer'], ...v['Hombre']])
+          const yMin = allV.length ? Math.max(0, Math.floor(Math.min(...allV)) - 5) : 70
           return (
-            <ChartCard title="Desempeño por Género" sub="Por período">
+            <ChartCard title="Desempeño por Género" sub="Por período — máx. 6 períodos principales">
               <div className="flex justify-center gap-6 mb-2">
                 {gKeys.map(k=>(
                   <div key={k} className="text-center">
@@ -1324,83 +1341,105 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                 autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
                 barmode:'group' as const,
                 font:{ family:'Inter', size:9 },
-                margin:{ t:10, b:55, l:40, r:10 },
-                xaxis:{ type:'category' as const, tickfont:{ size:9, color:'#1e293b' }, showgrid:false, zeroline:false },
+                margin:{ t:10, b:50, l:40, r:10 },
+                xaxis:{ type:'category' as const, categoryorder:'array' as const, categoryarray:periodos, tickfont:{ size:10, color:'#1e293b' }, showgrid:false, zeroline:false },
                 yaxis:{ gridcolor:'#f0f4f8', range:[yMin, 105], tickfont:{ size:8, color:'#94a3b8' }, showgrid:true, zeroline:false },
-                legend:{ orientation:'h' as const, y:-0.22, font:{ size:8 } },
+                legend:{ orientation:'h' as const, y:-0.2, font:{ size:9 } },
                 showlegend:true,
                 shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1, dash:'dot' } }],
-              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'230px'}} />
+              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'250px'}} />
             </ChartCard>
           )
         })()}
 
         {/* Edad por período */}
         {edadPorPeriodo.length > 0 && (() => {
-          const periodos = edadPorPeriodo.map((d:any) => d.periodo)
           const EDAD_COLORS = ['#0f5ca8','#b45309','#047857','#6d28d9']
-          const traces = AGE_BRACKETS.map((b, i) => ({
-            type: 'bar' as const,
-            name: b,
-            x: periodos,
-            y: edadPorPeriodo.map((d:any) => d[b] ?? null),
-            marker: { color: EDAD_COLORS[i], opacity: 0.85 },
-            text: edadPorPeriodo.map((d:any) => d[b] ? (+d[b]).toFixed(1) : ''),
-            textposition: 'outside' as const,
-            textfont: { family:'Inter', size:7 },
-            hovertemplate: `<b>${b}</b><br>%{x}<br>%{y:.1f}/100<extra></extra>`,
-          }))
-          const yVals = edadPorPeriodo.flatMap((d:any) => AGE_BRACKETS.map(b => d[b] ?? 0)).filter(Boolean)
-          const yMin = Math.max(0, Math.floor(Math.min(...yVals)) - 5)
+          const bucket: Record<string,{raw:string, vals:Record<string,number[]>}> = {}
+          edadPorPeriodo.forEach((d:any) => {
+            const lbl = normPeriodo(String(d.periodo))
+            if (lbl.startsWith('Posg-')) return
+            const raw = String(d.periodo)
+            if (!bucket[lbl]) { bucket[lbl] = {raw, vals:{}}; AGE_BRACKETS.forEach(b => bucket[lbl].vals[b] = []) }
+            AGE_BRACKETS.forEach(b => { if (d[b] != null) bucket[lbl].vals[b].push(+d[b]) })
+          })
+          const sorted = Object.entries(bucket).sort(([,a],[,b]) => a.raw.localeCompare(b.raw)).slice(-6)
+          const periodos = sorted.map(([lbl]) => lbl)
+          const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
+          const traces = AGE_BRACKETS.map((b, i) => {
+            const yVals = sorted.map(([,v]) => avg(v.vals[b]))
+            return {
+              type:'bar' as const, name:b,
+              x:periodos, y:yVals,
+              marker:{ color:EDAD_COLORS[i], opacity:0.85 },
+              text: yVals.map(v => v != null ? String(v) : ''),
+              textposition:'outside' as const,
+              textfont:{ family:'Inter', size:8 },
+              hovertemplate:`<b>${b}</b> · %{x}<br>%{y:.1f}/100<extra></extra>`,
+            }
+          })
+          const allV = sorted.flatMap(([,v]) => AGE_BRACKETS.flatMap(b => v.vals[b]))
+          const yMin = allV.length ? Math.max(0, Math.floor(Math.min(...allV)) - 5) : 70
           return (
-            <ChartCard title="Desempeño por Rango de Edad" sub="Por período">
+            <ChartCard title="Desempeño por Rango de Edad" sub="Por período — máx. 6 períodos principales">
               {bestEdad&&<p className="text-[8px] font-black mb-1 px-1" style={{color:'#b45309'}}>Mejor: <span className="text-slate-700">{bestEdad}</span> · {porEdad[bestEdad]}/100</p>}
               <Plot data={traces} layout={{
                 autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
                 barmode:'group' as const,
                 font:{ family:'Inter', size:9 },
-                margin:{ t:10, b:65, l:40, r:10 },
-                xaxis:{ type:'category' as const, tickfont:{ size:9, color:'#1e293b' }, showgrid:false, zeroline:false },
+                margin:{ t:10, b:55, l:40, r:10 },
+                xaxis:{ type:'category' as const, categoryorder:'array' as const, categoryarray:periodos, tickfont:{ size:10, color:'#1e293b' }, showgrid:false, zeroline:false },
                 yaxis:{ gridcolor:'#f0f4f8', range:[yMin, 105], tickfont:{ size:8, color:'#94a3b8' }, showgrid:true, zeroline:false },
-                legend:{ orientation:'h' as const, y:-0.28, font:{ size:7 } },
+                legend:{ orientation:'h' as const, y:-0.26, font:{ size:7 } },
                 showlegend:true,
                 shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1, dash:'dot' } }],
-              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'250px'}} />
+              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'260px'}} />
             </ChartCard>
           )
         })()}
 
         {/* Antigüedad por período */}
         {antiguedadPorPeriodo.length > 0 && (() => {
-          const periodos = antiguedadPorPeriodo.map((d:any) => d.periodo)
           const ANT_COLORS = ['#0e7490','#b91c1c','#7c3aed','#047857']
-          const traces = ANTIG_BRACKETS.map((b, i) => ({
-            type: 'bar' as const,
-            name: b,
-            x: periodos,
-            y: antiguedadPorPeriodo.map((d:any) => d[b] ?? null),
-            marker: { color: ANT_COLORS[i], opacity: 0.85 },
-            text: antiguedadPorPeriodo.map((d:any) => d[b] ? (+d[b]).toFixed(1) : ''),
-            textposition: 'outside' as const,
-            textfont: { family:'Inter', size:7 },
-            hovertemplate: `<b>${b}</b><br>%{x}<br>%{y:.1f}/100<extra></extra>`,
-          }))
-          const yVals = antiguedadPorPeriodo.flatMap((d:any) => ANTIG_BRACKETS.map(b => d[b] ?? 0)).filter(Boolean)
-          const yMin = Math.max(0, Math.floor(Math.min(...yVals)) - 5)
+          const bucket: Record<string,{raw:string, vals:Record<string,number[]>}> = {}
+          antiguedadPorPeriodo.forEach((d:any) => {
+            const lbl = normPeriodo(String(d.periodo))
+            if (lbl.startsWith('Posg-')) return
+            const raw = String(d.periodo)
+            if (!bucket[lbl]) { bucket[lbl] = {raw, vals:{}}; ANTIG_BRACKETS.forEach(b => bucket[lbl].vals[b] = []) }
+            ANTIG_BRACKETS.forEach(b => { if (d[b] != null) bucket[lbl].vals[b].push(+d[b]) })
+          })
+          const sorted = Object.entries(bucket).sort(([,a],[,b]) => a.raw.localeCompare(b.raw)).slice(-6)
+          const periodos = sorted.map(([lbl]) => lbl)
+          const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
+          const traces = ANTIG_BRACKETS.map((b, i) => {
+            const yVals = sorted.map(([,v]) => avg(v.vals[b]))
+            return {
+              type:'bar' as const, name:b,
+              x:periodos, y:yVals,
+              marker:{ color:ANT_COLORS[i], opacity:0.85 },
+              text: yVals.map(v => v != null ? String(v) : ''),
+              textposition:'outside' as const,
+              textfont:{ family:'Inter', size:8 },
+              hovertemplate:`<b>${b}</b> · %{x}<br>%{y:.1f}/100<extra></extra>`,
+            }
+          })
+          const allV = sorted.flatMap(([,v]) => ANTIG_BRACKETS.flatMap(b => v.vals[b]))
+          const yMin = allV.length ? Math.max(0, Math.floor(Math.min(...allV)) - 5) : 70
           return (
-            <ChartCard title="Desempeño por Antigüedad" sub="Por período">
+            <ChartCard title="Desempeño por Antigüedad" sub="Por período — máx. 6 períodos principales">
               {bestAnt&&<p className="text-[8px] font-black mb-1 px-1" style={{color:'#047857'}}>Mejor: <span className="text-slate-700">{bestAnt}</span> · {porAnt[bestAnt]}/100</p>}
               <Plot data={traces} layout={{
                 autosize:true, paper_bgcolor:'white', plot_bgcolor:'white',
                 barmode:'group' as const,
                 font:{ family:'Inter', size:9 },
-                margin:{ t:10, b:65, l:40, r:10 },
-                xaxis:{ type:'category' as const, tickfont:{ size:9, color:'#1e293b' }, showgrid:false, zeroline:false },
+                margin:{ t:10, b:55, l:40, r:10 },
+                xaxis:{ type:'category' as const, categoryorder:'array' as const, categoryarray:periodos, tickfont:{ size:10, color:'#1e293b' }, showgrid:false, zeroline:false },
                 yaxis:{ gridcolor:'#f0f4f8', range:[yMin, 105], tickfont:{ size:8, color:'#94a3b8' }, showgrid:true, zeroline:false },
-                legend:{ orientation:'h' as const, y:-0.28, font:{ size:7 } },
+                legend:{ orientation:'h' as const, y:-0.26, font:{ size:7 } },
                 showlegend:true,
                 shapes:[{ type:'line', x0:0, x1:1, xref:'paper', y0:90, y1:90, line:{ color:'#10b981', width:1, dash:'dot' } }],
-              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'250px'}} />
+              }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'260px'}} />
             </ChartCard>
           )
         })()}
