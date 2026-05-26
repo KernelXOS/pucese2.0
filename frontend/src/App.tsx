@@ -3314,7 +3314,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   const active = sistema === 'meipa' && periodoActivo === p.codigo
                   return (
                     <button key={p.codigo}
-                      onClick={() => { handleSistemaChange('meipa'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('meipa'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
                       className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
                       style={{
                         padding:'6px 10px',
@@ -3387,7 +3387,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   const active = sistema === '360' && periodoActivo === p.codigo
                   return (
                     <button key={p.codigo}
-                      onClick={() => { handleSistemaChange('360'); setActiveTab('docencia'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('360'); setActiveTab('docencia'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
                       className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
                       style={{
                         padding:'6px 10px',
@@ -3482,7 +3482,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   const active = sistema === 'salud' && periodoActivo === p.codigo
                   return (
                     <button key={p.codigo}
-                      onClick={() => { handleSistemaChange('salud'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('salud'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
                       className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
                       style={{
                         padding:'6px 10px',
