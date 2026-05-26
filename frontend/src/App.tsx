@@ -2078,8 +2078,7 @@ function DesempenoPorVariables({ data }: { data: any }) {
       {/* Mini tables: 4 variables (sin función) */}
       <div>
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Promedio por otras variables</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MiniTable title="Tipo de contrato"   icon="⏱️" rows={data.tiempo_servicio || []} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <MiniTable title="Género"             icon="👥" rows={data.sexo || []} />
           <MiniTable title="Nivel de estudio"   icon="📚" rows={data.nivel_estudio || []} />
           <MiniTable title="Antigüedad"         icon="📅" rows={data.antiguedad || []} />
