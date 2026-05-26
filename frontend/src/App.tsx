@@ -801,7 +801,6 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             <span className="font-black text-slate-900" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{meipa.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-3 pt-3 border-t border-slate-100">{meipa.n} registros</p>
         </div>
 
         <div className="bg-white border border-slate-200 col-span-1"
@@ -811,7 +810,6 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             <span className="font-black text-[#1e40af]" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-3 pt-3 border-t border-slate-100">{tres60.n} registros</p>
         </div>
 
         {/* Best gender insight */}
