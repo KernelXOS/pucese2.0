@@ -2762,8 +2762,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
         modelo:  modeloOpt,
         periodo: periodoActivo || undefined,
       })
-    } catch {
-      alert('Error al generar el informe general. Intenta de nuevo.')
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || 'Error desconocido'
+      alert(`Error al generar el informe general:\n${detail}`)
     } finally {
       setExportingInforme(false)
     }

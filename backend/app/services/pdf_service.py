@@ -462,19 +462,27 @@ def _render_pdf(template_name: str, ctx: dict) -> bytes:
     try:
         from weasyprint import HTML as WP_HTML
         return WP_HTML(string=html_str, base_url=TEMPLATE_DIR).write_pdf()
-    except Exception:
-        pass  # WeasyPrint no disponible → intentar xhtml2pdf
+    except Exception as _wp_err:
+        print(f"[pdf] WeasyPrint no disponible o falló: {_wp_err}")
 
     try:
         import io as _io
         from xhtml2pdf import pisa
         buf    = _io.BytesIO()
-        status = pisa.CreatePDF(html_str, dest=buf)
-        if status.err:
-            raise RuntimeError("xhtml2pdf falló al generar el PDF")
-        return buf.getvalue()
+        result = pisa.CreatePDF(html_str, dest=buf)
+        if result.err:
+            err_detail = getattr(result, 'log', str(result.err))
+            raise RuntimeError(f"xhtml2pdf error {result.err}: {err_detail}")
+        pdf = buf.getvalue()
+        if not pdf:
+            raise RuntimeError("xhtml2pdf produjo un PDF vacío")
+        return pdf
     except ImportError:
         raise RuntimeError("No se pudo generar el PDF. Instala weasyprint o xhtml2pdf.")
+    except RuntimeError:
+        raise
+    except Exception as _xpdf_err:
+        raise RuntimeError(f"xhtml2pdf excepción inesperada: {_xpdf_err}")
 
 
 # ── Contexto de un docente (reutilizable para bulk) ────────────────────────────

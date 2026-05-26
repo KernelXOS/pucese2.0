@@ -207,12 +207,14 @@ def reporte_general_pdf(
     """
     from app.services.pdf_service import generar_pdf_reporte_general
     from datetime import datetime as _dt
+    import traceback as _tb
     try:
         pdf_bytes = generar_pdf_reporte_general(db, sistema=sistema, modelo=modelo, periodo=periodo)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"No se pudo generar el reporte: {e}")
+        _tb.print_exc()
+        raise HTTPException(status_code=500, detail=f"No se pudo generar el reporte: {type(e).__name__}: {e}")
 
     parts = [p for p in [sistema, modelo, periodo] if p]
     tag   = "_".join(parts) if parts else "institucional"

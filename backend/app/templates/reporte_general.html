@@ -18,50 +18,31 @@
     background: #fff;
   }
 
-  /* ══ HEADER FIJO ═══════════════════════════════════════════════════════ */
-  .page-header {
-    position: fixed;
-    top: -68pt;
-    left: -44pt;
-    right: -44pt;
-    height: 68pt;
-    padding: 12pt 44pt 8pt 44pt;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  /* ══ HEADER / FOOTER para xhtml2pdf ════════════════════════════════════ */
+  @frame header_frame {
+    -pdf-frame-content: hdr_content;
+    top: 0pt; left: 0pt; right: 0pt; height: 40pt;
+  }
+  @frame footer_frame {
+    -pdf-frame-content: ftr_content;
+    bottom: 0pt; left: 0pt; right: 0pt; height: 28pt;
+  }
+  #hdr_content {
     border-bottom: 1.5pt solid #0056b3;
+    padding: 6pt 0 4pt 0;
   }
-  .page-header img.logo { height: 40pt; }
-  .hdr-right { text-align: right; }
-  .hdr-right .rpt-name {
-    font-size: 10pt; font-weight: 700; color: #0056b3; letter-spacing: 0.02em;
-  }
-  .hdr-right .rpt-sub {
-    font-size: 6pt; color: #94a3b8; margin-top: 2pt;
-  }
-
-  /* ══ FOOTER FIJO ═══════════════════════════════════════════════════════ */
-  .page-footer {
-    position: fixed;
-    bottom: -72pt;
-    left: -44pt;
-    right: -44pt;
-    height: 70pt;
-    padding: 6pt 44pt 0 44pt;
-    background: #fff;
+  #hdr_content table { width: 100%; }
+  #hdr_content .logo { height: 28pt; }
+  #hdr_content .rpt-name { font-size: 9pt; font-weight: 700; color: #0056b3; }
+  #hdr_content .rpt-sub  { font-size: 5.5pt; color: #94a3b8; margin-top: 1pt; }
+  #ftr_content {
     border-top: 1pt solid #cbd5e1;
+    padding: 4pt 0 0 0;
+    font-size: 5.5pt; color: #94a3b8;
   }
-  .footer-inner {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-  .footer-addr {
-    font-size: 5.5pt; color: #4d4d4c; font-weight: 700; line-height: 1.7;
-  }
-  .footer-right { text-align: right; font-size: 5.5pt; color: #94a3b8; line-height: 1.6; }
-  .footer-cross { width: 20pt; height: 20pt; margin-top: 2pt; margin-left: auto; }
+  #ftr_content table { width: 100%; }
+  .page-header { display: none; }
+  .page-footer { display: none; }
 
   /* ══ PORTADA ══════════════════════════════════════════════════════════ */
   .cover {
@@ -117,15 +98,13 @@
   .sec:first-of-type { margin-top: 0; }
 
   /* ══ KPI CARDS ════════════════════════════════════════════════════════ */
-  .kpi-grid {
-    display: flex; gap: 8pt; margin-bottom: 14pt;
-  }
+  .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 6pt; margin-bottom: 14pt; }
   .kpi-card {
-    flex: 1;
     border: 1pt solid #e2e8f0;
     border-top: 3pt solid #0056b3;
-    border-radius: 5pt;
     padding: 10pt 10pt 8pt 10pt;
+    vertical-align: top;
+    width: 20%;
   }
   .kpi-card.green  { border-top-color: #059669; }
   .kpi-card.purple { border-top-color: #7c3aed; }
@@ -143,12 +122,11 @@
   }
 
   /* ══ DISTRIBUCIÓN ═════════════════════════════════════════════════════ */
-  .dist-grid {
-    display: flex; gap: 8pt; margin-bottom: 14pt;
-  }
+  .dist-grid { width: 100%; border-collapse: separate; border-spacing: 6pt; margin-bottom: 14pt; }
   .dist-card {
-    flex: 1; border: 1pt solid #e2e8f0; border-radius: 5pt;
-    padding: 8pt 10pt; text-align: center;
+    border: 1pt solid #e2e8f0;
+    padding: 8pt 10pt; text-align: center; vertical-align: top;
+    width: 25%;
   }
   .dist-n { font-size: 16pt; font-weight: 900; line-height: 1; }
   .dist-label { font-size: 6.5pt; font-weight: 700; margin-top: 3pt; }
@@ -172,10 +150,10 @@
 
   /* ══ BARRA DE PROGRESO INLINE ══════════════════════════════════════════ */
   .bar-wrap {
-    background: #f1f5f9; border-radius: 2pt; height: 6pt;
-    width: 80pt; display: inline-block; vertical-align: middle;
+    background: #f1f5f9; height: 6pt;
+    width: 80pt; display: block;
   }
-  .bar-fill { height: 6pt; border-radius: 2pt; }
+  .bar-fill { height: 6pt; display: block; }
 
   /* ══ TABLA PRINCIPAL DE DOCENTES ══════════════════════════════════════ */
   .doc-table {
@@ -244,29 +222,22 @@
 </head>
 <body>
 
-<!-- ═══ HEADER Y FOOTER FIJOS ════════════════════════════════════════════ -->
-<div class="page-header">
-  <img class="logo" src="{{ logo_url }}" alt="PUCESE"/>
-  <div class="hdr-right">
-    <div class="rpt-name">Informe General · Evaluación Docente</div>
-    <div class="rpt-sub">Dirección de Calidad y Acreditación · PUCE Esmeraldas · {{ fecha_generacion }}</div>
-  </div>
+<!-- ═══ HEADER y FOOTER para xhtml2pdf (@frame) ═══════════════════════ -->
+<div id="hdr_content">
+  <table><tr>
+    <td><img class="logo" src="{{ logo_url }}" alt="PUCESE"/></td>
+    <td style="text-align:right">
+      <div class="rpt-name">Informe General · Evaluación Docente</div>
+      <div class="rpt-sub">Dirección de Calidad y Acreditación · PUCE Esmeraldas · {{ fecha_generacion }}</div>
+    </td>
+  </tr></table>
 </div>
 
-<div class="page-footer">
-  <div class="footer-inner">
-    <div class="footer-addr">
-      Pontificia Universidad Católica del Ecuador, Sede Esmeraldas<br/>
-      Av. Kennedy s/n y Av. Del Ejército · Esmeraldas, Ecuador<br/>
-      <a href="mailto:calidad@pucese.edu.ec">calidad@pucese.edu.ec</a>
-      · Dirección de Calidad y Acreditación
-    </div>
-    <div class="footer-right">
-      Generado el {{ fecha_generacion }}<br/>
-      Documento confidencial — uso interno<br/>
-      Sistema SIGA · PUCESE
-    </div>
-  </div>
+<div id="ftr_content">
+  <table><tr>
+    <td>Pontificia Universidad Católica del Ecuador, Sede Esmeraldas · calidad@pucese.edu.ec</td>
+    <td style="text-align:right">Sistema SIGA · Generado: {{ fecha_generacion }} · Confidencial</td>
+  </tr></table>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════
@@ -311,72 +282,72 @@
 
 <div class="sec">Resumen Ejecutivo</div>
 
-<!-- KPI Cards -->
-<div class="kpi-grid">
-  <div class="kpi-card">
-    <div class="kpi-label">Total Evaluados</div>
-    <div class="kpi-value">{{ total }}</div>
-    <div class="kpi-sub">Registros de evaluación</div>
-  </div>
-  <div class="kpi-card {% if promedio_float >= 90 %}green{% elif promedio_float >= 75 %}{% else %}amber{% endif %}">
-    <div class="kpi-label">Promedio General</div>
-    <div class="kpi-value">{{ promedio }}</div>
-    <div class="kpi-sub">/ 100 puntos · {{ nivel_gral }}</div>
-  </div>
-  <div class="kpi-card green">
-    <div class="kpi-label">Máximo</div>
-    <div class="kpi-value">{{ max_puntaje }}</div>
-    <div class="kpi-sub">Puntaje más alto</div>
-  </div>
-  <div class="kpi-card red">
-    <div class="kpi-label">Mínimo</div>
-    <div class="kpi-value">{{ min_puntaje }}</div>
-    <div class="kpi-sub">Puntaje más bajo</div>
-  </div>
-  <div class="kpi-card purple">
-    <div class="kpi-label">Mediana</div>
-    <div class="kpi-value">{{ mediana }}</div>
-    <div class="kpi-sub">Valor central</div>
-  </div>
-</div>
+<!-- KPI Cards (tabla para xhtml2pdf) -->
+<table class="kpi-grid">
+  <tr>
+    <td class="kpi-card">
+      <div class="kpi-label">Total Evaluados</div>
+      <div class="kpi-value">{{ total }}</div>
+      <div class="kpi-sub">Registros de evaluación</div>
+    </td>
+    <td class="kpi-card {% if promedio_float >= 90 %}green{% elif promedio_float >= 75 %}{% else %}amber{% endif %}">
+      <div class="kpi-label">Promedio General</div>
+      <div class="kpi-value">{{ promedio }}</div>
+      <div class="kpi-sub">/ 100 puntos · {{ nivel_gral }}</div>
+    </td>
+    <td class="kpi-card green">
+      <div class="kpi-label">Máximo</div>
+      <div class="kpi-value">{{ max_puntaje }}</div>
+      <div class="kpi-sub">Puntaje más alto</div>
+    </td>
+    <td class="kpi-card red">
+      <div class="kpi-label">Mínimo</div>
+      <div class="kpi-value">{{ min_puntaje }}</div>
+      <div class="kpi-sub">Puntaje más bajo</div>
+    </td>
+    <td class="kpi-card purple">
+      <div class="kpi-label">Mediana</div>
+      <div class="kpi-value">{{ mediana }}</div>
+      <div class="kpi-sub">Valor central</div>
+    </td>
+  </tr>
+</table>
 
-<!-- Distribución por nivel -->
+<!-- Distribución por nivel (tabla para xhtml2pdf) -->
 <div class="sec">Distribución por Nivel de Desempeño</div>
-<div class="dist-grid">
-  <div class="dist-card">
-    <div class="dist-n" style="color:#059669">{{ n_excelente }}</div>
-    <div class="dist-label" style="color:#059669">Excelente</div>
-    <div class="dist-pct">≥ 90 puntos</div>
-    <div class="dist-pct">{{ pct_excelente }}%</div>
-    <div class="dist-bar" style="background:#059669;width:{{ pct_excelente }}%"></div>
-  </div>
-  <div class="dist-card">
-    <div class="dist-n" style="color:#0056b3">{{ n_bueno }}</div>
-    <div class="dist-label" style="color:#0056b3">Bueno</div>
-    <div class="dist-pct">75 – 89 puntos</div>
-    <div class="dist-pct">{{ pct_bueno }}%</div>
-    <div class="dist-bar" style="background:#0056b3;width:{{ pct_bueno }}%"></div>
-  </div>
-  <div class="dist-card">
-    <div class="dist-n" style="color:#d97706">{{ n_regular }}</div>
-    <div class="dist-label" style="color:#d97706">Regular</div>
-    <div class="dist-pct">60 – 74 puntos</div>
-    <div class="dist-pct">{{ pct_regular }}%</div>
-    <div class="dist-bar" style="background:#d97706;width:{{ pct_regular }}%"></div>
-  </div>
-  <div class="dist-card">
-    <div class="dist-n" style="color:#dc2626">{{ n_deficiente }}</div>
-    <div class="dist-label" style="color:#dc2626">Deficiente</div>
-    <div class="dist-pct">&lt; 60 puntos</div>
-    <div class="dist-pct">{{ pct_deficiente }}%</div>
-    <div class="dist-bar" style="background:#dc2626;width:{{ pct_deficiente }}%"></div>
-  </div>
-</div>
+<table class="dist-grid">
+  <tr>
+    <td class="dist-card">
+      <div class="dist-n" style="color:#059669">{{ n_excelente }}</div>
+      <div class="dist-label" style="color:#059669">Excelente</div>
+      <div class="dist-pct">≥ 90 puntos · {{ pct_excelente }}%</div>
+      <div class="dist-bar" style="background:#059669;width:{{ pct_excelente }}%"></div>
+    </td>
+    <td class="dist-card">
+      <div class="dist-n" style="color:#0056b3">{{ n_bueno }}</div>
+      <div class="dist-label" style="color:#0056b3">Bueno</div>
+      <div class="dist-pct">75–89 pts · {{ pct_bueno }}%</div>
+      <div class="dist-bar" style="background:#0056b3;width:{{ pct_bueno }}%"></div>
+    </td>
+    <td class="dist-card">
+      <div class="dist-n" style="color:#d97706">{{ n_regular }}</div>
+      <div class="dist-label" style="color:#d97706">Regular</div>
+      <div class="dist-pct">60–74 pts · {{ pct_regular }}%</div>
+      <div class="dist-bar" style="background:#d97706;width:{{ pct_regular }}%"></div>
+    </td>
+    <td class="dist-card">
+      <div class="dist-n" style="color:#dc2626">{{ n_deficiente }}</div>
+      <div class="dist-label" style="color:#dc2626">Deficiente</div>
+      <div class="dist-pct">&lt; 60 pts · {{ pct_deficiente }}%</div>
+      <div class="dist-bar" style="background:#dc2626;width:{{ pct_deficiente }}%"></div>
+    </td>
+  </tr>
+</table>
 
 <!-- Tendencias por período -->
 {% if tendencias %}
 <div class="sec">Tendencia por Período Académico</div>
-<div class="chart-wrap">{{ svg_tendencia }}</div>
+<div class="chart-wrap">{{ svg_tendencia | safe }}</div>
 
 <table class="mini-table">
   <thead>
