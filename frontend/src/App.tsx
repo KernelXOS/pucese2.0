@@ -953,11 +953,16 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             if (!bucketM[lbl]) bucketM[lbl] = {sum:0, cnt:0, raw}
             bucketM[lbl].sum += +(t.promedio ?? 0); bucketM[lbl].cnt += 1
           })
-          const sortedM = Object.entries(bucketM).sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
+          // Solo períodos principales: I-XXXX y II-XXXX (sin Posg- ni TEC-)
+          const isMainPeriod = (lbl: string) => /^(I|II)-\d{4}$/.test(lbl)
+
+          const sortedM = Object.entries(bucketM)
+            .filter(([lbl]) => isMainPeriod(lbl))
+            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
           const meipaLbls = sortedM.map(([lbl]) => lbl)
           const meipaVals = sortedM.map(([,v]) => +(v.sum/v.cnt).toFixed(2))
 
-          // 360: II-2024, I-2025, TEC-I-2025
+          // 360: II-2024, I-2025, II-2025
           const src360 = tendPeriodos360.length > 0 ? tendPeriodos360 : tend360.map((t:any)=>({...t, periodo: String(t.anio)}))
           const bucket360: Record<string,{sum:number,cnt:number,raw:string}> = {}
           src360.forEach((t:any) => {
@@ -966,7 +971,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             if (!bucket360[lbl]) bucket360[lbl] = {sum:0, cnt:0, raw}
             bucket360[lbl].sum += +(t.promedio ?? 0); bucket360[lbl].cnt += 1
           })
-          const sorted360 = Object.entries(bucket360).sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
+          const sorted360 = Object.entries(bucket360)
+            .filter(([lbl]) => isMainPeriod(lbl))
+            .sort(([,a],[,b]) => a.raw.localeCompare(b.raw))
           const lbsl360 = sorted360.map(([lbl]) => lbl)
           const vals360 = sorted360.map(([,v]) => +(v.sum/v.cnt).toFixed(2))
 
