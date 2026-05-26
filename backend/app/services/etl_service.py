@@ -1191,7 +1191,7 @@ class ETLService:
     def _source_eval_detalladas_2025(self, staff: dict) -> dict:
         if not os.path.exists(EVAL_DIR):
             return {}
-        MAX_CAL = {3: 4, 10: 4, 11: 4, 12: 4, 13: 4}
+        MAX_CAL = {3: 4, 5: 5, 10: 4, 11: 4, 12: 4, 13: 4}  # instr 5 (ABP auto) usa escala 0-5
         # Instrument codes → (modelo, componente, peso)
         # Based on MECDI evaluation framework table:
         # Docencia: #01 Auto(20) + #02 Pares(20) + #03 CEV(10) + #04 Het.Est(50)
@@ -1253,7 +1253,7 @@ class ETLService:
 
         by_instr = df.groupby(['_ced','apellidos_evaluado','nombres_evaluado','programa','cod_instrumento'])\
                      .agg(score=('contrib','sum'), max_score=('peso_num','sum')).reset_index()
-        by_instr['puntaje_100'] = (by_instr['score'] / by_instr['max_score'].replace(0,1) * 100).round(2)
+        by_instr['puntaje_100'] = (by_instr['score'] / by_instr['max_score'].replace(0,1) * 100).clip(0, 100).round(2)
 
         # Pre-scan all rows to find the most specific programa for each (ced, modelo) key
         _SPEC = ('TG ', 'MAESTR', 'POSGRADO', 'DOCTORADO', 'ESPECIALID', 'PUCETEC', 'TECNOLOG', 'MP_')
@@ -1732,7 +1732,7 @@ class ETLService:
         if not os.path.isdir(dir_path):
             return []
 
-        MAX_CAL = {3: 4, 10: 4, 11: 4, 12: 4, 13: 4}
+        MAX_CAL = {3: 4, 5: 5, 10: 4, 11: 4, 12: 4, 13: 4}  # instr 5 (ABP auto) usa escala 0-5
         INSTR_MAP = {
             1:  ('docencia',     'auto',       20),
             2:  ('docencia',     'pares',      20),
@@ -1816,7 +1816,7 @@ class ETLService:
         ).reset_index()
         by_instr['puntaje_100'] = (
             by_instr['score'] / by_instr['max_score'].replace(0, 1) * 100
-        ).round(2)
+        ).clip(0, 100).round(2)
 
         # Nombres y programa (primer valor por cedula)
         extras: dict = {}
