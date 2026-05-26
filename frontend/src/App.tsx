@@ -860,6 +860,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             .filter(([lbl]) => MEIPA_PERIODS.has(lbl))
             .sort(([, a], [, b]) => a.raw.localeCompare(b.raw))
           const xLbls = sorted.map(([lbl]) => lbl)
+          const xDisplay = xLbls.map(displayPeriodo)
           const yVals = sorted.map(([, v]) => +(v.sum / v.cnt).toFixed(2))
 
           if (xLbls.length === 0) return (
@@ -879,7 +880,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                   type: 'scatter' as const,
                   mode: 'lines+markers+text' as const,
                   name: 'MEIPA',
-                  x: xLbls,
+                  x: xDisplay,
                   y: yVals,
                   connectgaps: false,
                   line: { color: '#6d28d9', width: 3, shape: 'spline' as const, smoothing: 0.4 },
@@ -898,7 +899,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                   xaxis: {
                     type: 'category' as const,
                     categoryorder: 'array' as const,
-                    categoryarray: xLbls,
+                    categoryarray: xDisplay,
                     tickfont: { family: 'Inter', size: 12, color: '#1e293b' },
                     showgrid: false, zeroline: false, showline: true, linecolor: '#e2e8f0',
                   },
@@ -948,6 +949,8 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             </ChartCard>
           )
 
+          const allPeriods360Display = allPeriods360.map(displayPeriodo)
+
           const traces = MODELOS.map((m, i) => {
             const data = porModeloPeriodo[m] || []
             const bucket: Record<string, { sum: number; cnt: number }> = {}
@@ -966,7 +969,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               type: 'scatter' as const,
               mode: 'lines+markers' as const,
               name: MODELO_LABELS[m],
-              x: allPeriods360,
+              x: allPeriods360Display,
               y: yVals,
               connectgaps: false,
               line: { color: MC[i], width: 2.5, shape: 'spline' as const, smoothing: 0.4 },
@@ -993,7 +996,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                   xaxis: {
                     type: 'category' as const,
                     categoryorder: 'array' as const,
-                    categoryarray: allPeriods360,
+                    categoryarray: allPeriods360Display,
                     tickangle: manyPeriods ? -30 : 0,
                     tickfont: { family: 'Inter', size: manyPeriods ? 9 : 12, color: '#1e293b' },
                     showgrid: false, zeroline: false, showline: true, linecolor: '#e2e8f0',
@@ -1090,7 +1093,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           if (!labelAcc[lbl][row.facultad]) labelAcc[lbl][row.facultad] = []
           labelAcc[lbl][row.facultad].push(row.promedio)
         }
-        // Ordered unique labels (I-2023 < II-2023 < TEC-I < Posg-I …)
+        // Ordered unique labels — internos en formato norm, display usa displayPeriodo
         const labelOrder = ['I-2023','TEC-I-2023','Posg-I-2023','II-2023','I-2024','TEC-I-2024','Posg-I-2024','II-2024','I-2025','TEC-I-2025','Posg-I-2025','II-2025']
         const periodLabels = labelOrder.filter(l => labelAcc[l])
 
@@ -1303,7 +1306,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                       {periodLabels.map(lbl => (
                         <th key={lbl} className="text-center py-2.5 px-2 font-black text-[8.5px] uppercase tracking-[0.08em] border-b border-slate-200 w-20"
                           style={{ color: lbl.startsWith('TEC-') ? '#7c3aed' : lbl.startsWith('Posg-') ? '#0891b2' : '#0056b3' }}>
-                          {lbl}
+                          {displayPeriodo(lbl)}
                         </th>
                       ))}
                     </tr>
@@ -1365,7 +1368,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const sorted = PERIODOS_PRINCIPALES
             .filter(lbl => bucket[lbl])
             .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
-          const periodos = sorted.map(([lbl]) => lbl)
+          const periodos = sorted.map(([lbl]) => displayPeriodo(lbl))
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const generos = ['Mujer','Hombre']
           const traces = generos.map(g => {
@@ -1423,7 +1426,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const sorted = PERIODOS_PRINCIPALES
             .filter(lbl => bucket[lbl])
             .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
-          const periodos = sorted.map(([lbl]) => lbl)
+          const periodos = sorted.map(([lbl]) => displayPeriodo(lbl))
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const traces = AGE_BRACKETS.map((b, i) => {
             const yVals = sorted.map(([,v]) => avg(v.vals[b]))
@@ -1472,7 +1475,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const sorted = PERIODOS_PRINCIPALES
             .filter(lbl => bucket[lbl])
             .map(lbl => [lbl, bucket[lbl]] as [string, typeof bucket[string]])
-          const periodos = sorted.map(([lbl]) => lbl)
+          const periodos = sorted.map(([lbl]) => displayPeriodo(lbl))
           const avg = (arr:number[]) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : null
           const traces = ANTIG_BRACKETS.map((b, i) => {
             const yVals = sorted.map(([,v]) => avg(v.vals[b]))
@@ -2845,6 +2848,22 @@ function normPeriodo(p: string | number): string {
   return `${y}-${sufRaw}`
 }
 
+/** Versión para mostrar al usuario: añade prefijo G / T / P según tipo.
+ *  Acepta tanto códigos crudos ('202301') como labels normalizados ('I-2023'). */
+function displayPeriodo(p: string | number): string {
+  const s = String(p).trim()
+  // Si ya está normalizado (empieza con letras o tiene formato I/II-YYYY)
+  if (s.startsWith('TEC-'))  return s.replace('TEC-', 'T·')
+  if (s.startsWith('Posg-')) return s.replace('Posg-', 'P·')
+  if (/^(I|II)-\d{4}$/.test(s)) return `G·${s}`
+  // Código crudo → normalizar primero
+  const norm = normPeriodo(s)
+  if (norm.startsWith('TEC-'))  return norm.replace('TEC-', 'T·')
+  if (norm.startsWith('Posg-')) return norm.replace('Posg-', 'P·')
+  if (/^(I|II)-\d{4}$/.test(norm)) return `G·${norm}`
+  return norm
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Main App
 // ══════════════════════════════════════════════════════════════════════════════
@@ -4023,7 +4042,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       : tendencias.map((t: any) => ({ ...t, periodo: String(t.anio) }))
                     // Ordenar por periodo raw (es alfanumérico comparable)
                     const sorted = [...src].sort((a: any, b: any) => String(a.periodo).localeCompare(String(b.periodo)))
-                    const labels = sorted.map((t: any) => normPeriodo(t.periodo ?? String(t.anio)))
+                    const labels = sorted.map((t: any) => displayPeriodo(t.periodo ?? String(t.anio)))
                     const yVals  = sorted.map((t: any) => +t.puntaje_100)
                     const yMin   = Math.max(0, Math.floor(Math.min(...yVals)) - 5)
                     const yMax   = Math.min(100, Math.ceil(Math.max(...yVals))  + 6)
