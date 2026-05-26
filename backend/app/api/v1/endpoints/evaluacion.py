@@ -59,7 +59,8 @@ def process_evaluaciones():
         try:
             count = etl_service.process_all_files(db)
             _etl_status["last_count"] = count
-            print(f"[ETL/bg] ✅ {count} registros cargados.")
+            kpi_service.clear_cache()
+            print(f"[ETL/bg] ✅ {count} registros cargados. Caché limpiado.")
         except Exception as e:
             _etl_status["last_error"] = str(e)
             print(f"[ETL/bg] ❌ Error: {e}")
