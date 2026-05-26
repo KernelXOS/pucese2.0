@@ -4282,29 +4282,20 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       'Psicología','TC Enfermería','Tecnologías de la Información',
                       'TG Desarrollo de Software','TG Gestión Culinaria',
                     ])
-                    const COMP_COLS = [
-                      { key:'het_estudiantil',  label:'Heteroevaluación Estudiantil' },
-                      { key:'autoevaluacion',   label:'Autoevaluación' },
-                      { key:'eval_pares',       label:'Evaluación de Pares' },
-                      { key:'comp_hetero_dir',  label:'Coevaluación Directiva' },
-                      { key:'aula_virtual',     label:'Entorno Virtual (CEV)' },
-                      { key:'comp_hetero_est',  label:'Heteroevaluación Est. (MEIPA)' },
-                      { key:'comp_auto',        label:'Autoevaluación (MEIPA)' },
-                      { key:'comp_pares',       label:'Eval. Pares (MEIPA)' },
-                    ]
-                    // Agrupar por carrera
+                    // todosDocentes usa 'puntaje' (no puntaje_100) y componentes=[{label,pct}]
                     const facBucket: Record<string,{ scores:number[], comps:Record<string,number[]> }> = {}
                     for (const d of todosDocentes) {
                       const fac = d.facultad || ''
                       if (!fac || !CARR_SET.has(fac)) continue
                       if (!facBucket[fac]) facBucket[fac] = { scores:[], comps:{} }
-                      if (d.puntaje_100 != null) facBucket[fac].scores.push(+d.puntaje_100)
-                      for (const c of COMP_COLS) {
-                        const v = d[c.key]
-                        if (v != null && +v > 0) {
-                          if (!facBucket[fac].comps[c.key]) facBucket[fac].comps[c.key] = []
-                          facBucket[fac].comps[c.key].push(+v)
-                        }
+                      if (d.puntaje != null && +d.puntaje > 0) facBucket[fac].scores.push(+d.puntaje)
+                      // componentes es array [{label, pct}]
+                      for (const comp of (d.componentes || [])) {
+                        const lbl: string = comp.label || ''
+                        const val: number = +(comp.pct ?? 0)
+                        if (!lbl || val <= 0) continue
+                        if (!facBucket[fac].comps[lbl]) facBucket[fac].comps[lbl] = []
+                        facBucket[fac].comps[lbl].push(val)
                       }
                     }
                     const ranked = Object.entries(facBucket)
@@ -4325,14 +4316,13 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     const TOP_CHART = 25
                     const chartData = ranked.slice(0, TOP_CHART)
 
-                    // Competencias
+                    // Competencias: usar los labels del array componentes
                     const compRows = ranked.map(r => {
                       const avgs: Record<string,number> = {}
-                      for (const c of COMP_COLS) {
-                        const vals = r.comps[c.key] || []
-                        if (vals.length) avgs[c.label] = Math.round(vals.reduce((a,v)=>a+v,0)/vals.length*10)/10
+                      for (const [lbl, vals] of Object.entries(r.comps)) {
+                        if (vals.length) avgs[lbl] = Math.round(vals.reduce((a,v)=>a+v,0)/vals.length*10)/10
                       }
-                      if (!Object.keys(avgs).length) return null
+                      if (Object.keys(avgs).length < 2) return null
                       const best  = Object.entries(avgs).reduce((a,b)=>b[1]>a[1]?b:a)
                       const worst = Object.entries(avgs).reduce((a,b)=>b[1]<a[1]?b:a)
                       return { carrera:r.fac, n:r.n, mejor_comp:best[0], mejor_puntaje:best[1], peor_comp:worst[0], peor_puntaje:worst[1] }
