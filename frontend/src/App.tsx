@@ -1289,83 +1289,6 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         )
       })()}
 
-      {/* ── Competencias por Carrera ─────────────────────────────────────────── */}
-      {compPorCarrera.length > 0 && (() => {
-        const CARRERAS_OFICIALES_SET = new Set([
-          'Administración de Empresas', 'Agroindustria', 'Contabilidad y Auditoría',
-          'Derecho', 'Diseño Gráfico', 'Edu. Básica Semi - Quinindé', 'Educación Básica',
-          'Enfermería', 'Enfermería – Quinindé', 'Enfermería – San Lorenzo',
-          'Fisioterapia', 'Ing. Recursos Naturales Renova', 'Laboratorio Clínico',
-          'Medicina', 'Negocios Internacionales', 'Pedagogía Idiomas Nac. Ext.',
-          'Psicología', 'TC Enfermería', 'Tecnologías de la Información',
-          'TG Desarrollo de Software', 'TG Gestión Culinaria',
-        ])
-        const filtered = compPorCarrera.filter((d: any) => CARRERAS_OFICIALES_SET.has(d.carrera))
-        if (!filtered.length) return null
-        return (
-          <div className="rounded-2xl shadow-sm border border-slate-100 bg-white overflow-hidden">
-            <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center gap-3">
-              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-violet-500 to-blue-500" />
-              <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Análisis · Competencias</p>
-                <h3 className="text-[13px] font-black text-slate-800 leading-tight">Mejor y Peor Competencia por Carrera</h3>
-              </div>
-              <span className="ml-auto text-[9px] font-semibold text-slate-300">{filtered.length} carreras</span>
-            </div>
-            <div className="overflow-y-auto" style={{ maxHeight: 560 }}>
-              <table className="w-full text-[11px] border-collapse">
-                <thead className="sticky top-0 z-10" style={{ background: '#f8fafc' }}>
-                  <tr>
-                    <th className="text-left py-2 px-3 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera / Programa</th>
-                    <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#059669' }}>✦ Mejor Competencia</th>
-                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
-                    <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#dc2626' }}>▼ Peor Competencia</th>
-                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
-                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-12">Brechat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row: any) => {
-                    const brecha = row.mejor_puntaje - row.peor_puntaje
-                    return (
-                      <tr key={row.carrera} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                        <td className="py-2 px-3">
-                          <span className="font-semibold text-slate-700 text-[10px] leading-tight"
-                            style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}
-                            title={row.carrera}>{row.carrera}</span>
-                          <span className="text-slate-300 text-[8px] ml-1">({row.n})</span>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                            style={{ background: '#ecfdf5', color: '#059669', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}
-                            title={row.mejor_comp}>{row.mejor_comp}</span>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <span className="font-black tabular-nums text-[12px]" style={{ color: '#059669' }}>{row.mejor_puntaje.toFixed(1)}</span>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                            style={{ background: '#fef2f2', color: '#dc2626', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}
-                            title={row.peor_comp}>{row.peor_comp}</span>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <span className="font-black tabular-nums text-[12px]" style={{ color: '#dc2626' }}>{row.peor_puntaje.toFixed(1)}</span>
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <span className="text-[10px] font-bold tabular-nums" style={{ color: brecha > 20 ? '#dc2626' : brecha > 10 ? '#d97706' : '#64748b' }}>
-                            {brecha.toFixed(1)}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* ── Row 4: Género | Edad | Antigüedad por período ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -3722,6 +3645,85 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 )}
                 <ComparativoPanel comparativo={comparativo} />
+
+              {/* ── Mejor / Peor Competencia por Carrera ───────────────────── */}
+              {compPorCarrera.length > 0 && (() => {
+                const CARR_SET = new Set([
+                  'Administración de Empresas', 'Agroindustria', 'Contabilidad y Auditoría',
+                  'Derecho', 'Diseño Gráfico', 'Edu. Básica Semi - Quinindé', 'Educación Básica',
+                  'Enfermería', 'Enfermería – Quinindé', 'Enfermería – San Lorenzo',
+                  'Fisioterapia', 'Ing. Recursos Naturales Renova', 'Laboratorio Clínico',
+                  'Medicina', 'Negocios Internacionales', 'Pedagogía Idiomas Nac. Ext.',
+                  'Psicología', 'TC Enfermería', 'Tecnologías de la Información',
+                  'TG Desarrollo de Software', 'TG Gestión Culinaria',
+                ])
+                const filtered = compPorCarrera.filter((d: any) => CARR_SET.has(d.carrera))
+                if (!filtered.length) return null
+                return (
+                  <div className="rounded-2xl shadow-sm border border-slate-100 bg-white overflow-hidden mt-5">
+                    <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center gap-3">
+                      <div className="w-1 h-6 rounded-full bg-gradient-to-b from-violet-500 to-blue-500" />
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Análisis · Competencias</p>
+                        <h3 className="text-[13px] font-black text-slate-800 leading-tight">Mejor y Peor Competencia por Carrera</h3>
+                      </div>
+                      <span className="ml-auto text-[9px] font-semibold text-slate-300">{filtered.length} carreras</span>
+                    </div>
+                    <div className="overflow-y-auto" style={{ maxHeight: 560 }}>
+                      <table className="w-full text-[11px] border-collapse">
+                        <thead className="sticky top-0 z-10" style={{ background: '#f8fafc' }}>
+                          <tr>
+                            <th className="text-left py-2 px-3 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera / Programa</th>
+                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#059669' }}>✦ Mejor Competencia</th>
+                            <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
+                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#dc2626' }}>▼ Peor Competencia</th>
+                            <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
+                            <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Brecha</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.map((row: any) => {
+                            const brecha = row.mejor_puntaje - row.peor_puntaje
+                            return (
+                              <tr key={row.carrera} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                <td className="py-2 px-3">
+                                  <span className="font-semibold text-slate-700 text-[10px] leading-tight"
+                                    style={{ maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                                    title={row.carrera}>{row.carrera}</span>
+                                  <span className="text-slate-300 text-[8px] ml-1">({row.n})</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={{ background:'#ecfdf5', color:'#059669', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                                    title={row.mejor_comp}>{row.mejor_comp}</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="font-black tabular-nums text-[12px]" style={{ color:'#059669' }}>{row.mejor_puntaje.toFixed(1)}</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={{ background:'#fef2f2', color:'#dc2626', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                                    title={row.peor_comp}>{row.peor_comp}</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="font-black tabular-nums text-[12px]" style={{ color:'#dc2626' }}>{row.peor_puntaje.toFixed(1)}</span>
+                                </td>
+                                <td className="py-2 px-2 text-center">
+                                  <span className="text-[10px] font-bold tabular-nums"
+                                    style={{ color: brecha > 20 ? '#dc2626' : brecha > 10 ? '#d97706' : '#64748b' }}>
+                                    {brecha.toFixed(1)}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {comparativo?.mejores_peores && Object.keys(comparativo.mejores_peores).length > 0 && (
                 <MejoresPeoresPanel mejoresPeores={comparativo.mejores_peores} />
               )}
