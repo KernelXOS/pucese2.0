@@ -4270,6 +4270,238 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     )
                   })()}
+
+                  {/* ── Ranking por Carrera + Competencias (calculado desde todosDocentes) ── */}
+                  {todosDocentes.length > 0 && (() => {
+                    const CARR_SET = new Set([
+                      'Administración de Empresas','Agroindustria','Contabilidad y Auditoría',
+                      'Derecho','Diseño Gráfico','Edu. Básica Semi - Quinindé','Educación Básica',
+                      'Enfermería','Enfermería – Quinindé','Enfermería – San Lorenzo',
+                      'Fisioterapia','Ing. Recursos Naturales Renova','Laboratorio Clínico',
+                      'Medicina','Negocios Internacionales','Pedagogía Idiomas Nac. Ext.',
+                      'Psicología','TC Enfermería','Tecnologías de la Información',
+                      'TG Desarrollo de Software','TG Gestión Culinaria',
+                    ])
+                    const COMP_COLS = [
+                      { key:'het_estudiantil',  label:'Heteroevaluación Estudiantil' },
+                      { key:'autoevaluacion',   label:'Autoevaluación' },
+                      { key:'eval_pares',       label:'Evaluación de Pares' },
+                      { key:'comp_hetero_dir',  label:'Coevaluación Directiva' },
+                      { key:'aula_virtual',     label:'Entorno Virtual (CEV)' },
+                      { key:'comp_hetero_est',  label:'Heteroevaluación Est. (MEIPA)' },
+                      { key:'comp_auto',        label:'Autoevaluación (MEIPA)' },
+                      { key:'comp_pares',       label:'Eval. Pares (MEIPA)' },
+                    ]
+                    // Agrupar por carrera
+                    const facBucket: Record<string,{ scores:number[], comps:Record<string,number[]> }> = {}
+                    for (const d of todosDocentes) {
+                      const fac = d.facultad || ''
+                      if (!fac || !CARR_SET.has(fac)) continue
+                      if (!facBucket[fac]) facBucket[fac] = { scores:[], comps:{} }
+                      if (d.puntaje_100 != null) facBucket[fac].scores.push(+d.puntaje_100)
+                      for (const c of COMP_COLS) {
+                        const v = d[c.key]
+                        if (v != null && +v > 0) {
+                          if (!facBucket[fac].comps[c.key]) facBucket[fac].comps[c.key] = []
+                          facBucket[fac].comps[c.key].push(+v)
+                        }
+                      }
+                    }
+                    const ranked = Object.entries(facBucket)
+                      .map(([fac, b]) => ({
+                        fac,
+                        avg: b.scores.length ? Math.round(b.scores.reduce((a,v)=>a+v,0)/b.scores.length*10)/10 : 0,
+                        n: b.scores.length,
+                        comps: b.comps,
+                      }))
+                      .filter(r => r.avg > 0)
+                      .sort((a,b) => b.avg - a.avg)
+
+                    if (!ranked.length) return null
+
+                    const pctColor = (v:number) => v>=90?'#059669':v>=80?'#0056b3':v>=70?'#d97706':'#dc2626'
+                    const pctBg    = (v:number) => v>=90?'#ecfdf5':v>=80?'#eff6ff':v>=70?'#fef3c7':'#fef2f2'
+                    const pctLabel = (v:number) => v>=90?'Excelente':v>=80?'Bueno':v>=70?'Regular':'Crítico'
+                    const TOP_CHART = 25
+                    const chartData = ranked.slice(0, TOP_CHART)
+
+                    // Competencias
+                    const compRows = ranked.map(r => {
+                      const avgs: Record<string,number> = {}
+                      for (const c of COMP_COLS) {
+                        const vals = r.comps[c.key] || []
+                        if (vals.length) avgs[c.label] = Math.round(vals.reduce((a,v)=>a+v,0)/vals.length*10)/10
+                      }
+                      if (!Object.keys(avgs).length) return null
+                      const best  = Object.entries(avgs).reduce((a,b)=>b[1]>a[1]?b:a)
+                      const worst = Object.entries(avgs).reduce((a,b)=>b[1]<a[1]?b:a)
+                      return { carrera:r.fac, n:r.n, mejor_comp:best[0], mejor_puntaje:best[1], peor_comp:worst[0], peor_puntaje:worst[1] }
+                    }).filter(Boolean) as any[]
+
+                    return (
+                      <div className="mt-6 flex flex-col gap-5">
+                        {/* ── Bar + tabla ranking ── */}
+                        <div className="bg-white border border-slate-200 overflow-hidden" style={{ borderRadius:10, boxShadow:'0 2px 12px rgba(0,0,0,0.07)' }}>
+                          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background:'#eff6ff' }}>
+                              <Award size={14} style={{ color:'#0056b3' }}/>
+                            </div>
+                            <div>
+                              <h3 className="text-[13px] font-black text-slate-800 leading-tight">Ranking por Carrera</h3>
+                              <p className="text-[9px] text-slate-400 font-medium">Promedio general por programa académico</p>
+                            </div>
+                            <div className="ml-auto flex items-center gap-2 flex-wrap">
+                              {[['#059669','≥90 Excelente'],['#0056b3','≥80 Bueno'],['#d97706','≥70 Regular'],['#dc2626','<70 Crítico']].map(([c,l])=>(
+                                <span key={l} className="flex items-center gap-1 text-[9px] font-bold" style={{ color:c }}>
+                                  <span style={{ width:7,height:7,borderRadius:2,background:c,display:'inline-block'}}/>
+                                  {l}
+                                </span>
+                              ))}
+                              <span className="text-[9px] text-slate-300 font-semibold">{ranked.length} carreras</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+                            {/* Bar chart */}
+                            <div className="p-4">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Top {Math.min(TOP_CHART,ranked.length)} por promedio</p>
+                              <Plot
+                                data={[{
+                                  type:'bar', orientation:'h',
+                                  x: chartData.map(d=>d.avg),
+                                  y: chartData.map(d=>d.fac.length>36?d.fac.slice(0,34)+'…':d.fac),
+                                  marker:{ color:chartData.map(d=>pctColor(d.avg)), opacity:0.88, line:{width:0} },
+                                  text: chartData.map(d=>`  ${d.avg.toFixed(1)}`),
+                                  textposition:'outside',
+                                  textfont:{ size:9.5, family:'Inter', color:chartData.map(d=>pctColor(d.avg)) },
+                                  hovertemplate:'<b>%{y}</b><br>Promedio: <b>%{x:.1f}/100</b><extra></extra>',
+                                  width:0.65,
+                                }]}
+                                layout={{
+                                  autosize:true, paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+                                  font:{ family:'Inter', size:9 },
+                                  margin:{ t:4, b:20, l:190, r:55 },
+                                  xaxis:{ range:[Math.max(50,Math.min(...chartData.map(d=>d.avg))-5),105], gridcolor:'#f1f5f9', zeroline:false, tickfont:{size:8,color:'#94a3b8'} },
+                                  yaxis:{ tickfont:{size:9,color:'#334155',family:'Inter'}, autorange:'reversed' },
+                                  shapes:[{ type:'line',x0:90,x1:90,y0:0,y1:1,yref:'paper', line:{color:'#10b981',width:1.5,dash:'dot'} }],
+                                  showlegend:false, bargap:0.3,
+                                }}
+                                config={{ responsive:true, displayModeBar:false }}
+                                style={{ width:'100%', height:`${Math.max(300,Math.min(TOP_CHART,ranked.length)*26+40)}px` }}
+                              />
+                            </div>
+                            {/* Ranking table */}
+                            <div className="p-4">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Ranking completo</p>
+                              <div className="overflow-y-auto" style={{ maxHeight:580 }}>
+                                <table className="w-full text-[11px] border-collapse">
+                                  <thead className="sticky top-0 z-10">
+                                    <tr style={{ background:'#f8fafc' }}>
+                                      <th className="text-left py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] w-7 border-b border-slate-200">#</th>
+                                      <th className="text-left py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera</th>
+                                      <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Prom.</th>
+                                      <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-16">Nivel</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {ranked.map(({ fac, avg, n }, idx) => (
+                                      <tr key={fac} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                        <td className="py-1.5 px-2 text-[9px] font-black tabular-nums text-slate-400">
+                                          {idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':<span style={{ color:idx<10?'#0056b3':'#cbd5e1' }}>{idx+1}</span>}
+                                        </td>
+                                        <td className="py-1.5 px-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <div style={{ width:50,background:'#f1f5f9',borderRadius:3,height:5,flexShrink:0 }}>
+                                              <div style={{ width:`${Math.min(avg,100)}%`,height:5,borderRadius:3,background:pctColor(avg) }}/>
+                                            </div>
+                                            <span className="font-semibold text-slate-700"
+                                              style={{ fontSize:'10px',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'inline-block' }}
+                                              title={fac}>{fac}</span>
+                                            <span className="text-slate-300 text-[8px]">({n})</span>
+                                          </div>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center">
+                                          <span className="font-black tabular-nums text-[12px]" style={{ color:pctColor(avg) }}>{avg.toFixed(1)}</span>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-center">
+                                          <span className="text-[7.5px] font-black px-1.5 py-0.5 rounded"
+                                            style={{ background:pctBg(avg), color:pctColor(avg) }}>{pctLabel(avg)}</span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ── Mejor / Peor Competencia ── */}
+                        {compRows.length > 0 && (
+                          <div className="bg-white border border-slate-200 overflow-hidden" style={{ borderRadius:10, boxShadow:'0 2px 12px rgba(0,0,0,0.07)' }}>
+                            <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center gap-3">
+                              <div className="w-1 h-6 rounded-full bg-gradient-to-b from-violet-500 to-blue-500" />
+                              <div>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Análisis · Competencias</p>
+                                <h3 className="text-[13px] font-black text-slate-800 leading-tight">Mejor y Peor Competencia por Carrera</h3>
+                              </div>
+                              <span className="ml-auto text-[9px] font-semibold text-slate-300">{compRows.length} carreras</span>
+                            </div>
+                            <div className="overflow-y-auto" style={{ maxHeight:480 }}>
+                              <table className="w-full text-[11px] border-collapse">
+                                <thead className="sticky top-0 z-10" style={{ background:'#f8fafc' }}>
+                                  <tr>
+                                    <th className="text-left py-2 px-3 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera</th>
+                                    <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#059669' }}>✦ Mejor</th>
+                                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-12">Ptje.</th>
+                                    <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#dc2626' }}>▼ Peor</th>
+                                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-12">Ptje.</th>
+                                    <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Brecha</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {compRows.map((row:any) => {
+                                    const brecha = row.mejor_puntaje - row.peor_puntaje
+                                    return (
+                                      <tr key={row.carrera} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                        <td className="py-2 px-3">
+                                          <span className="font-semibold text-slate-700 text-[10px]"
+                                            style={{ maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'inline-block' }}
+                                            title={row.carrera}>{row.carrera}</span>
+                                          <span className="text-slate-300 text-[8px] ml-1">({row.n})</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                            style={{ background:'#ecfdf5',color:'#059669',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'inline-block' }}
+                                            title={row.mejor_comp}>{row.mejor_comp}</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                          <span className="font-black tabular-nums text-[12px]" style={{ color:'#059669' }}>{row.mejor_puntaje.toFixed(1)}</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                            style={{ background:'#fef2f2',color:'#dc2626',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',display:'inline-block' }}
+                                            title={row.peor_comp}>{row.peor_comp}</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                          <span className="font-black tabular-nums text-[12px]" style={{ color:'#dc2626' }}>{row.peor_puntaje.toFixed(1)}</span>
+                                        </td>
+                                        <td className="py-2 px-2 text-center">
+                                          <span className="text-[10px] font-bold tabular-nums"
+                                            style={{ color:brecha>20?'#dc2626':brecha>10?'#d97706':'#64748b' }}>
+                                            {brecha.toFixed(1)}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </>
