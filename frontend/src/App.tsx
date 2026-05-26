@@ -1104,59 +1104,82 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         })).sort((a,b) => b.avg - a.avg)
 
         const pctColor = (v: number) => v >= 90 ? '#059669' : v >= 80 ? '#0056b3' : v >= 70 ? '#d97706' : '#dc2626'
+        const pctBg    = (v: number) => v >= 90 ? '#ecfdf5' : v >= 80 ? '#eff6ff' : v >= 70 ? '#fef3c7' : '#fef2f2'
+        const pctLabel = (v: number) => v >= 90 ? 'Excelente' : v >= 80 ? 'Bueno' : v >= 70 ? 'Regular' : 'Crítico'
 
-        // ── Barras horizontales: todas las unidades por último período con datos ──
-        const lastPeriod = periodLabels[periodLabels.length - 1]
-        const barData = avgByFac
-          .map(({ fac, avg }) => ({ fac, avg, last: facMap[fac]?.[lastPeriod] ?? avg }))
-          .sort((a, b) => b.avg - a.avg)
+        // Excluir vacíos y ordenar
+        const rankedCarreras = avgByFac.filter(d => d.fac && d.fac.trim() !== '')
+
+        // Vista controlada: top 25 para la gráfica, tabla completa paginada
+        const TOP_CHART = 25
+        const chartData = rankedCarreras.slice(0, TOP_CHART)
 
         const barTrace = [{
           type: 'bar' as const,
           orientation: 'h' as const,
-          x: barData.map(d => d.avg),
-          y: barData.map(d => d.fac.length > 40 ? d.fac.slice(0,38)+'…' : d.fac),
+          x: chartData.map(d => d.avg),
+          y: chartData.map(d => {
+            const name = d.fac.length > 36 ? d.fac.slice(0,34)+'…' : d.fac
+            return name
+          }),
           marker: {
-            color: barData.map(d => d.avg >= 90 ? '#059669' : d.avg >= 80 ? '#0056b3' : d.avg >= 70 ? '#d97706' : '#dc2626'),
-            opacity: 0.85,
+            color: chartData.map(d => pctColor(d.avg)),
+            opacity: 0.88,
+            line: { width: 0 },
           },
-          text: barData.map(d => `${d.avg.toFixed(1)}`),
+          text: chartData.map(d => `  ${d.avg.toFixed(1)}`),
           textposition: 'outside' as const,
-          textfont: { size: 8, family: 'Inter' },
-          hovertemplate: '<b>%{y}</b><br>Promedio: <b>%{x:.1f}</b>/100<extra></extra>',
+          textfont: { size: 9.5, family: 'Inter', color: chartData.map(d => pctColor(d.avg)) },
+          hovertemplate: '<b>%{y}</b><br>Promedio: <b>%{x:.1f} / 100</b><extra></extra>',
+          width: 0.65,
         }]
 
-        const barHeight = Math.max(400, barData.length * 22)
-        const TOP_N = 5
-
         return (
-          <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
-              <TrendingUp size={14} style={{ color:'#0f5ca8', opacity:0.8 }} />
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Análisis Temporal ·</span>
-              <h3 className="text-[13px] font-bold text-slate-700">Ranking de Escuelas / Unidades — Promedio General</h3>
-              <span className="ml-auto text-[9px] bg-blue-50 text-blue-600 font-bold px-2 py-0.5 rounded-full">{avgByFac.length} unidades · {periodLabels.length} períodos</span>
+          <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:10, boxShadow:'0 2px 12px rgba(0,0,0,0.07)' }}>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background:'#eff6ff' }}>
+                  <Award size={14} style={{ color:'#0056b3' }}/>
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-black text-slate-800 leading-tight">Ranking por Carrera</h3>
+                  <p className="text-[9px] text-slate-400 font-medium">Promedio general por programa académico</p>
+                </div>
+              </div>
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                {[['#059669','≥90 Excelente'],['#0056b3','≥80 Bueno'],['#d97706','≥70 Regular'],['#dc2626','<70 Crítico']].map(([c,l])=>(
+                  <span key={l} className="flex items-center gap-1 text-[9px] font-bold" style={{ color: c }}>
+                    <span style={{ width:8,height:8,borderRadius:2,background:c,display:'inline-block'}}/>
+                    {l}
+                  </span>
+                ))}
+                <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full ml-2">
+                  {rankedCarreras.length} carreras · {periodLabels.length} períodos
+                </span>
+              </div>
             </div>
 
-            <div className="p-5 space-y-5">
+            <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* ── Gráfica top 25 ── */}
               <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-1">
-                  Todas las unidades ordenadas por promedio general
-                  <span className="ml-3 font-normal text-slate-300">🟩 ≥90 · 🟦 ≥80 · 🟧 ≥70 · 🟥 &lt;70</span>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                  Top {Math.min(TOP_CHART, rankedCarreras.length)} carreras por promedio
                 </p>
                 <Plot data={barTrace} layout={{
-                  autosize: true, paper_bgcolor:'white', plot_bgcolor:'#fafbfc',
+                  autosize: true,
+                  paper_bgcolor: 'transparent',
+                  plot_bgcolor:  'transparent',
                   font: { family:'Inter', size:9 },
-                  margin: { t:8, b:30, l:230, r:50 },
+                  margin: { t:4, b:20, l:190, r:55 },
                   xaxis: {
-                    range: [55, 105],
-                    gridcolor:'#e8edf2', zeroline:false,
-                    tickfont:{ size:9, color:'#94a3b8' },
-                    ticksuffix:'%',
+                    range: [Math.max(50, Math.min(...chartData.map(d=>d.avg)) - 5), 105],
+                    gridcolor:'#f1f5f9', zeroline:false,
+                    tickfont:{ size:8, color:'#94a3b8' },
                     showgrid: true,
                   },
                   yaxis: {
-                    tickfont:{ size:9, color:'#334155' },
+                    tickfont:{ size:9, color:'#334155', family:'Inter' },
                     autorange: 'reversed' as const,
                   },
                   shapes:[{
@@ -1164,57 +1187,70 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                     line:{ color:'#10b981', width:1.5, dash:'dot' },
                   }],
                   annotations:[{
-                    x:90, xref:'x', y:0, yref:'paper', text:'Meta<br>90%',
+                    x:90.5, xref:'x', y:1, yref:'paper', text:'Meta 90',
                     showarrow:false, xanchor:'left', yanchor:'top',
-                    font:{size:8,color:'#10b981',family:'Inter'},
+                    font:{size:7.5,color:'#10b981',family:'Inter'},
                   }],
                   showlegend: false,
-                }} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:`${barHeight}px`}} />
+                  bargap: 0.3,
+                }}
+                config={{responsive:true, displayModeBar:false}}
+                style={{width:'100%', height:`${Math.max(300, Math.min(TOP_CHART, rankedCarreras.length)*26+40}px`}} />
               </div>
 
-              {/* Ranking table */}
+              {/* ── Tabla ranking completo ── */}
               <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-2">Ranking completo — Promedio general</p>
-                <div className="overflow-x-auto rounded-xl border border-slate-100">
-                  <table className="w-full text-[11px]">
-                    <thead>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                  Ranking completo — todas las carreras
+                </p>
+                <div className="overflow-y-auto" style={{ maxHeight: 640 }}>
+                  <table className="w-full text-[11px] border-collapse">
+                    <thead className="sticky top-0 z-10">
                       <tr style={{ background:'#f8fafc' }}>
-                        <th className="text-left py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em] w-8">#</th>
-                        <th className="text-left py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Unidad / Escuela</th>
-                        {periodLabels.map(p => (
-                          <th key={p} className="text-center py-2.5 px-2 font-black text-slate-500 uppercase tracking-[0.06em] whitespace-nowrap">{p}</th>
-                        ))}
-                        <th className="text-center py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Prom.</th>
-                        <th className="text-center py-2.5 px-3 font-black text-slate-500 uppercase tracking-[0.08em]">Tend.</th>
+                        <th className="text-left py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] w-7 border-b border-slate-200">#</th>
+                        <th className="text-left py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera / Programa</th>
+                        <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Prom.</th>
+                        <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-12">Nivel</th>
+                        <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-12">Tend.</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {avgByFac.map(({ fac, avg, first, last }, idx) => {
-                        const trend = last !== null && first !== null ? last - first : null
+                    <tbody>
+                      {rankedCarreras.map(({ fac, avg, first, last }, idx) => {
+                        const trend = (last !== null && first !== null) ? last - first : null
+                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null
                         return (
-                          <tr key={fac} className={`hover:bg-slate-50/60 transition-colors ${idx < TOP_N ? 'bg-blue-50/20' : ''}`}>
-                            <td className="py-2 px-3 font-black tabular-nums" style={{ color: idx < 3 ? '#0f5ca8' : '#94a3b8' }}>
-                              {idx < 3 ? ['🥇','🥈','🥉'][idx] : idx + 1}
+                          <tr key={fac} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                            <td className="py-1.5 px-2 text-[9px] font-black tabular-nums text-slate-400">
+                              {medal ?? <span style={{ color: idx < 10 ? '#0056b3' : '#cbd5e1' }}>{idx+1}</span>}
                             </td>
-                            <td className="py-2 px-3 font-semibold text-slate-700 max-w-[200px] truncate">{fac}</td>
-                            {periodLabels.map(p => {
-                              const v = facMap[fac]?.[p]
-                              return (
-                                <td key={p} className="py-2 px-2 text-center tabular-nums font-bold text-[10px]"
-                                  style={{ color: v ? pctColor(v) : '#cbd5e1', background: v ? `${pctColor(v)}08` : 'transparent' }}>
-                                  {v ? v.toFixed(1) : '—'}
-                                </td>
-                              )
-                            })}
-                            <td className="py-2 px-3 text-center">
-                              <span className="font-black text-[12px] tabular-nums" style={{ color: pctColor(avg) }}>{avg.toFixed(1)}</span>
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              {trend !== null ? (
-                                <span className="font-bold text-[10px]" style={{ color: trend >= 0 ? '#059669' : '#dc2626' }}>
-                                  {trend >= 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}
+                            <td className="py-1.5 px-2">
+                              <div className="flex items-center gap-1.5">
+                                {/* mini barra de progreso */}
+                                <div style={{ width:50, background:'#f1f5f9', borderRadius:3, height:5, flexShrink:0 }}>
+                                  <div style={{ width:`${Math.min(avg,100)}%`, height:5, borderRadius:3, background:pctColor(avg) }}/>
+                                </div>
+                                <span className="font-semibold text-slate-700 leading-tight"
+                                  style={{ fontSize:'10px', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                                  title={fac}>
+                                  {fac}
                                 </span>
-                              ) : <span className="text-slate-300">—</span>}
+                              </div>
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <span className="font-black tabular-nums text-[12px]" style={{ color:pctColor(avg) }}>
+                                {avg.toFixed(1)}
+                              </span>
+                            </td>
+                            <td className="py-1.5 px-2 text-center">
+                              <span className="text-[7.5px] font-black px-1.5 py-0.5 rounded"
+                                style={{ background:pctBg(avg), color:pctColor(avg) }}>
+                                {pctLabel(avg)}
+                              </span>
+                            </td>
+                            <td className="py-1.5 px-2 text-center text-[9px] font-bold tabular-nums">
+                              {trend !== null
+                                ? <span style={{ color: trend >= 0 ? '#059669' : '#dc2626' }}>{trend >= 0 ? '▲' : '▼'}{Math.abs(trend).toFixed(1)}</span>
+                                : <span className="text-slate-300">—</span>}
                             </td>
                           </tr>
                         )

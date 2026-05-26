@@ -38,112 +38,218 @@ STAFF_REF_DATE = datetime(2025, 1, 1)
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+# Mapa de carrera normalizada — claves ordenadas de más larga a más corta para
+# que el matching de substring use siempre la coincidencia más específica primero.
+# Se actualiza con todos los valores encontrados en los archivos Excel de la PUCESE.
 FACULTAD_MAP = {
-    # ── Ciencias Administrativas ──────────────────────────────────────────────
-    'CONTABILIDAD':            'Ciencias Administrativas',
-    'ADMINISTRACION':          'Ciencias Administrativas',
-    'ADMINISTRACI':            'Ciencias Administrativas',
-    'NEGOCIOS INTERNACIONALES':'Ciencias Administrativas',
-    'NEGOCIOS':                'Ciencias Administrativas',
-    'COMERCIO':                'Ciencias Administrativas',
-    'FINANZAS':                'Ciencias Administrativas',
-    'MARKETING':               'Ciencias Administrativas',
+    # ── Administración de Empresas ────────────────────────────────────────────
+    'CARRERA ADMINISTRACION DE EMPRESAS': 'Administración de Empresas',
+    'CARRERA ADMINISTRACION':             'Administración de Empresas',
+    'ADMINISTRACION DE EMPRESAS':         'Administración de Empresas',
+    'ADMINISTRACI':                       'Administración de Empresas',
+    'MARKETING':                          'Administración de Empresas',
+    'FINANZAS':                           'Administración de Empresas',
+    # ── Contabilidad y Auditoría ──────────────────────────────────────────────
+    'CARRERA CONTABILIDAD':               'Contabilidad y Auditoría',
+    'CONTABILIDAD Y AUDITORIA':           'Contabilidad y Auditoría',
+    'CONTABILIDAD':                       'Contabilidad y Auditoría',
+    # ── Negocios Internacionales ──────────────────────────────────────────────
+    'CARRERA NEGOCIOS INTERNACIONALES':   'Negocios Internacionales',
+    'NEGOCIOS INTERNACIONALES':           'Negocios Internacionales',
+    'COMERCIO EXTERIOR':                  'Negocios Internacionales',
+    'COMERCIO':                           'Negocios Internacionales',
+    'NEGOCIOS':                           'Negocios Internacionales',
     # ── Turismo y Hotelería ───────────────────────────────────────────────────
-    'TURISMO':                 'Turismo y Hotelería',
-    'HOTELERIA':               'Turismo y Hotelería',
-    'HOTELERÍA':               'Turismo y Hotelería',
-    'CULINARIA':               'Turismo y Hotelería',
-    'GASTRONOM':               'Turismo y Hotelería',
-    # ── Ciencias de la Salud ─────────────────────────────────────────────────
-    'MEDICINA':                'Ciencias de la Salud',
-    'LABORATORIO CLINICO':     'Ciencias de la Salud',
-    'LABORATORIO CL':          'Ciencias de la Salud',
-    'ENFERMERIA':              'Ciencias de la Salud',
-    'ENFERMERÍA':              'Ciencias de la Salud',
-    'NUTRICION':               'Ciencias de la Salud',
-    'NUTRICIÓN':               'Ciencias de la Salud',
-    'FISIOTERAPIA':            'Ciencias de la Salud',
-    'FISIO':                   'Ciencias de la Salud',
-    'TERAPIA':                 'Ciencias de la Salud',
-    'ODONTOLOG':               'Ciencias de la Salud',
-    'FARMACIA':                'Ciencias de la Salud',
-    'SALUD':                   'Ciencias de la Salud',
+    'TURISMO':                            'Turismo y Hotelería',
+    'HOTELERIA':                          'Turismo y Hotelería',
+    'HOTELERÍA':                          'Turismo y Hotelería',
+    # ── Gestión Culinaria ─────────────────────────────────────────────────────
+    'CULINARIA':                          'Gestión Culinaria',
+    'GASTRONOM':                          'Gestión Culinaria',
+    # ── Medicina ─────────────────────────────────────────────────────────────
+    'CARRERA DE MEDICINA':                'Medicina',
+    'MEDICINA':                           'Medicina',
+    # ── Laboratorio Clínico ───────────────────────────────────────────────────
+    'CARRERA LABORATORIO CLINICO':        'Laboratorio Clínico',
+    'LABORATORIO CLINICO':                'Laboratorio Clínico',
+    'LABORATORIO CL':                     'Laboratorio Clínico',
+    # ── Enfermería ────────────────────────────────────────────────────────────
+    'CARRERA ENFERMERIA':                 'Enfermería',
+    'ENFERMERIA':                         'Enfermería',
+    'ENFERMERÍA':                         'Enfermería',
+    # ── Fisioterapia ──────────────────────────────────────────────────────────
+    'CARRERA DE FISIOTERAPIA':            'Fisioterapia',
+    'FISIOTERAPIA':                       'Fisioterapia',
+    'FISIO':                              'Fisioterapia',
+    # ── Nutrición ────────────────────────────────────────────────────────────
+    'NUTRICION':                          'Nutrición y Dietética',
+    'NUTRICIÓN':                          'Nutrición y Dietética',
+    # ── Odontología / Farmacia ────────────────────────────────────────────────
+    'ODONTOLOG':                          'Odontología',
+    'FARMACIA':                           'Farmacia',
     # ── Psicología ────────────────────────────────────────────────────────────
-    'PSICOLOGIA':              'Psicología',
-    'PSICOLOGÍA':              'Psicología',
+    'CARRERA DE PSICOLOG':                'Psicología',
+    'PSICOLOGIA':                         'Psicología',
+    'PSICOLOGÍA':                         'Psicología',
     # ── Derecho ───────────────────────────────────────────────────────────────
-    'DERECHO':                 'Derecho',
-    'JURIDIC':                 'Derecho',
-    # ── Ingeniería ────────────────────────────────────────────────────────────
-    'INGENIERIA':              'Ingeniería',
-    'INGENIERÍA':              'Ingeniería',
-    'SISTEMAS':                'Ingeniería',
-    'COMPUTACION':             'Ingeniería',
-    'COMPUTACIÓN':             'Ingeniería',
-    'INFORMATICA':             'Ingeniería',
-    'INFORMÁTICA':             'Ingeniería',
-    'SOFTWARE':                'Ingeniería',
-    'ELECTRONICA':             'Ingeniería',
-    'ELECTRÓNICA':             'Ingeniería',
-    'INDUSTRIAL':              'Ingeniería',
-    'CIVIL':                   'Ingeniería',
-    'AMBIENTAL':               'Ingeniería',
-    'RECURSOS NATURALES':      'Ingeniería',
-    'GESTION AMBIENTAL':       'Ingeniería',
-    'GESTIÓN AMBIENTAL':       'Ingeniería',
-    # ── Educación ────────────────────────────────────────────────────────────
-    'EDUCACION':               'Educación',
-    'EDUCACIÓN':               'Educación',
-    'PEDAGOG':                 'Educación',
-    'IDIOMAS':                 'Educación',
-    'IDIOMA':                  'Educación',
-    'LENGUAS':                 'Educación',
-    'INTEGRACION CURRICULAR':  'Educación',
-    'INTEGRACIÓN CURRICULAR':  'Educación',
-    'PASTORAL':                'Educación',
-    'DOCENCIA':                'Educación',
-    # ── Comunicación ─────────────────────────────────────────────────────────
-    'COMUNICACION':            'Comunicación',
-    'COMUNICACIÓN':            'Comunicación',
-    'DISEÑO':                  'Comunicación',
-    'DISENO':                  'Comunicación',
-    'PERIODISMO':              'Comunicación',
-    'PUBLICIDAD':              'Comunicación',
+    'CARRERA DE DERECHO':                 'Derecho',
+    'DERECHO':                            'Derecho',
+    'JURIDIC':                            'Derecho',
+    # ── Sistemas y Computación ────────────────────────────────────────────────
+    'CARRERA DE SISTEMAS':                'Sistemas y Computación',
+    'SISTEMAS Y COMPUTACION':             'Sistemas y Computación',
+    'TECNOLOGIAS DE LA INFORMACION':      'Sistemas y Computación',
+    'TECNOLOGÍAS DE LA INFORMACIÓN':      'Sistemas y Computación',
+    'INGENIERIA EN SISTEMAS':             'Sistemas y Computación',
+    'SISTEMAS':                           'Sistemas y Computación',
+    'COMPUTACION':                        'Sistemas y Computación',
+    'COMPUTACIÓN':                        'Sistemas y Computación',
+    'INFORMATICA':                        'Sistemas y Computación',
+    'INFORMÁTICA':                        'Sistemas y Computación',
+    'SOFTWARE':                           'Sistemas y Computación',
+    # ── Ingeniería (otras) ────────────────────────────────────────────────────
+    'INGENIERIA':                         'Ingeniería',
+    'INGENIERÍA':                         'Ingeniería',
+    'ELECTRONICA':                        'Ingeniería',
+    'ELECTRÓNICA':                        'Ingeniería',
+    'INDUSTRIAL':                         'Ingeniería',
+    'CIVIL':                              'Ingeniería',
+    # ── Gestión Ambiental ─────────────────────────────────────────────────────
+    'CARRERA GESTION AMBIENTAL':          'Gestión Ambiental',
+    'GESTIÓN AMBIENTAL':                  'Gestión Ambiental',
+    'GESTION AMBIENTAL':                  'Gestión Ambiental',
+    'RECURSOS NATURALES':                 'Gestión Ambiental',
+    'AMBIENTAL':                          'Gestión Ambiental',
+    # ── Educación Básica ──────────────────────────────────────────────────────
+    'EDUCACION BASICA PRESENCIAL':        'Educación Básica (Presencial)',
+    'EDUCACIÓN BÁSICA PRESENCIAL':        'Educación Básica (Presencial)',
+    'EDUCACION BASICA SEMIPRESENCIAL':    'Educación Básica (Semipresencial)',
+    'EDUCACIÓN BÁSICA SEMIPRESENCIAL':    'Educación Básica (Semipresencial)',
+    'EDUCACION BASICA':                   'Educación Básica (Presencial)',
+    'EDUCACIÓN BÁSICA':                   'Educación Básica (Presencial)',
+    # ── Educación Inicial ─────────────────────────────────────────────────────
+    'EDUCACION INICIAL':                  'Educación Inicial',
+    'EDUCACIÓN INICIAL':                  'Educación Inicial',
+    # ── Pedagogía de Idiomas ──────────────────────────────────────────────────
+    'PEDAGOGIA DE LOS IDIOMAS':           'Pedagogía de Idiomas',
+    'PEDAGOGÍA DE LOS IDIOMAS':           'Pedagogía de Idiomas',
+    'PED. DE LOS IDIOMAS':                'Pedagogía de Idiomas',
+    'CENTRO DE IDIOMAS':                  'Pedagogía de Idiomas',
+    'IDIOMAS NACIONALES':                 'Pedagogía de Idiomas',
+    'PEDAGOG':                            'Pedagogía de Idiomas',
+    'IDIOMAS':                            'Pedagogía de Idiomas',
+    'IDIOMA':                             'Pedagogía de Idiomas',
+    'LENGUAS':                            'Pedagogía de Idiomas',
+    # ── Acción Pastoral ───────────────────────────────────────────────────────
+    'ACCION PASTORAL':                    'Acción Pastoral',
+    'ACCIÓN PASTORAL':                    'Acción Pastoral',
+    'PASTORAL':                           'Acción Pastoral',
+    # ── Comunicación / Diseño ─────────────────────────────────────────────────
+    'COMUNICACION INSTITUCIONAL':         'Comunicación',
+    'COMUNICACION':                       'Comunicación',
+    'COMUNICACIÓN':                       'Comunicación',
+    'PERIODISMO':                         'Comunicación',
+    'PUBLICIDAD':                         'Comunicación',
+    'CARRERA DISENO GRAFICO':             'Diseño Gráfico',
+    'DISEÑO GRAFICO':                     'Diseño Gráfico',
+    'DISENO GRAFICO':                     'Diseño Gráfico',
+    'DISEÑO':                             'Diseño Gráfico',
+    'DISENO':                             'Diseño Gráfico',
     # ── Agroindustria ─────────────────────────────────────────────────────────
-    'AGRO':                    'Agroindustria',
-    'AGROINDUSTRIA':           'Agroindustria',
-    'AGRICULTURA':             'Agroindustria',
-    'PECUARIA':                'Agroindustria',
+    'CARRERA AGROINDUSTRIA':              'Agroindustria',
+    'AGROINDUSTRIA':                      'Agroindustria',
+    'AGRICULTURA':                        'Agroindustria',
+    'PECUARIA':                           'Agroindustria',
+    'AGRO':                               'Agroindustria',
     # ── Tecnologado ───────────────────────────────────────────────────────────
-    'PUCETEC':                 'Tecnologado',
-    'TECNOLOGADO':             'Tecnologado',
-    'TECNOLOG':                'Tecnologado',
+    'PUCETEC':                            'Tecnologado',
+    'TECNOLOGADO':                        'Tecnologado',
+    'TECNOLOGIA SUPERIOR':                'Tecnologado',
     # ── Posgrado ──────────────────────────────────────────────────────────────
-    'POSGRADO':                'Posgrado',
-    'POSTGRADO':               'Posgrado',
-    'MAESTRIA':                'Posgrado',
-    'MAESTRÍA':                'Posgrado',
-    'DOCTORADO':               'Posgrado',
+    'MAESTRIA EN ELECTRICIDAD':           'Posgrado — Electricidad',
+    'MAESTRÍA EN ELECTRICIDAD':           'Posgrado — Electricidad',
+    'MAESTRIA EN GESTION DE RIESGOS':     'Posgrado — Gestión de Riesgos',
+    'MAESTRÍA EN GESTIÓN DEL TALENTO':    'Posgrado — Talento Humano',
+    'MAESTRIA EN GESTION DEL TALENTO':    'Posgrado — Talento Humano',
+    'MAESTRIA EN GESTION DEL CUIDADO':    'Posgrado — Gestión del Cuidado',
+    'MAESTRÍA EN GESTIÓN DEL CUIDADO':    'Posgrado — Gestión del Cuidado',
+    'MAESTRIA EN GENERO':                 'Posgrado — Género y Desarrollo',
+    'MAESTRÍA EN GÉNERO':                 'Posgrado — Género y Desarrollo',
+    'MAESTRIA EN INCLUSION':              'Posgrado — Inclusión Educativa',
+    'MAESTRÍA EN INCLUSIÓN':              'Posgrado — Inclusión Educativa',
+    'MAESTRIA EN INNOVACION EN EDUCACION':'Posgrado — Innovación Educativa',
+    'MAESTRÍA EN INNOVACIÓN EN EDUCACIÓN':'Posgrado — Innovación Educativa',
+    'MAESTRIA EN PEDAGOGIA':              'Posgrado — Pedagogía',
+    'MAESTRÍA EN PEDAGOGÍA':              'Posgrado — Pedagogía',
+    'MAESTRIA EN PEDOGAGIA':              'Posgrado — Pedagogía',
+    'MAESTRÍA EN PEDOGAGÍA':              'Posgrado — Pedagogía',
+    'MAESTRIA EN SALUD PUBLICA':          'Posgrado — Salud Pública',
+    'MAESTRÍA EN SALUD PÚBLICA':          'Posgrado — Salud Pública',
+    'PRO MAE EN SAL PUB':                 'Posgrado — Salud Pública',
+    'PRO MAE EN PED':                     'Posgrado — Pedagogía',
+    'MAESTRIA EN TECNOLOGIAS':            'Posgrado — Tecnologías de la Info.',
+    'MAESTRÍA EN TECNOLOGÍAS':            'Posgrado — Tecnologías de la Info.',
+    'POSGRADO':                           'Posgrado',
+    'POSTGRADO':                          'Posgrado',
+    'MAESTRIA':                           'Posgrado',
+    'MAESTRÍA':                           'Posgrado',
+    'DOCTORADO':                          'Posgrado',
+    'PRO MAE':                            'Posgrado',
+    # ── Administración Central (unidades no académicas) ───────────────────────
+    'PRORECTORADO':                       'Administración Central',
+    'RECTORADO':                          'Administración Central',
+    'PROCURADURIA':                       'Administración Central',
+    'PROCURADURÍA':                       'Administración Central',
+    'DIRECCION GENERAL':                  'Administración Central',
+    'DIRECCIÓN GENERAL':                  'Administración Central',
+    'DIRECCION GEN':                      'Administración Central',
+    'DIRECCIÓN GEN':                      'Administración Central',
+    'ALUMNI SEGUIMIENTO':                 'Administración Central',
+    'BIENESTAR ESTUDIANTIL':              'Administración Central',
+    'TALENTO HUMANO':                     'Administración Central',
+    'COORDINACION DE ADMISIONES':         'Administración Central',
+    'COORDINACIÓN DE ADMISIONES':         'Administración Central',
+    'INTERNACIONALIZACION':               'Administración Central',
+    'INTERNACIONALIZACIÓN':               'Administración Central',
+    'ASESORIA LABORAL':                   'Administración Central',
+    'ASESORÍA LABORAL':                   'Administración Central',
+    'EMPRENDIMIENTO':                     'Administración Central',
+    'AUDITORIA DE GESTION':               'Administración Central',
+    'AUDITORÍA DE GESTIÓN':               'Administración Central',
+    # ── Vinculación / Investigación ───────────────────────────────────────────
+    'VINCULACION':                        'Vinculación con la Sociedad',
+    'VINCULACIÓN':                        'Vinculación con la Sociedad',
+    'INVESTIGACION':                      'Investigación',
+    'INVESTIGACIÓN':                      'Investigación',
+    # ── Gestión (modelo MECDI) ────────────────────────────────────────────────
+    'OFICINA DE ADMIN':                   'Gestión Académica',
+    'OFIC DE ADMIN':                      'Gestión Académica',
+    'GESTION ACADEMICA':                  'Gestión Académica',
+    'GESTIÓN ACADÉMICA':                  'Gestión Académica',
     # ── Sin clasificar ────────────────────────────────────────────────────────
-    'MENTOR':                  'Sin clasificar',
-    'NO DEFINIDA':             'Sin clasificar',
-    'NO DEFINIDO':             'Sin clasificar',
+    'NO DEFINIDA':                        '',
+    'NO DEFINIDO':                        '',
+    'MENTOR':                             '',
+    'NAN':                                '',
 }
+
+# Orden de matching: claves más largas primero (más específicas)
+_FACULTAD_KEYS_SORTED = sorted(FACULTAD_MAP.keys(), key=len, reverse=True)
 
 
 def _map_facultad(text: str) -> str:
-    """Mapea texto de carrera/departamento a nombre de facultad.
-    Si no encuentra coincidencia, devuelve el texto original (nunca 'Otras Ciencias').
+    """Mapea texto de carrera/departamento a carrera normalizada.
+    Usa matching de substring ordenado de clave más larga a más corta.
     """
     if not text or (isinstance(text, float) and pd.isna(text)):
         return ''
     t = str(text).upper().strip()
-    if not t or t in ('NAN', 'NONE', 'NO DEFINIDA', 'NO DEFINIDO', 'ND', 'N/A'):
+    if not t or t in ('NAN', 'NONE', 'NO DEFINIDA', 'NO DEFINIDO', 'ND', 'N/A', 'CARRERA', 'NONE'):
         return ''
-    for k, v in FACULTAD_MAP.items():
+    for k in _FACULTAD_KEYS_SORTED:
         if k in t:
-            return v
-    # Fallback: devolver el texto original capitalizado, no "Otras Ciencias"
+            return FACULTAD_MAP[k]
+    # Fallback: devolver texto original capitalizado
     return str(text).strip().title()
 
 
