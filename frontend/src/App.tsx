@@ -4101,7 +4101,11 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   })()}
                   {/* ── Ranking por Carrera + Competencias (calculado desde todosDocentes) ── */}
                   {todosDocentes.length > 0 && (() => {
-                    const CARR_SET = new Set([
+                    const SALUD_CARRERAS = new Set([
+                      'Enfermería','Enfermería – Quinindé','Enfermería – San Lorenzo',
+                      'Fisioterapia','Laboratorio Clínico','Medicina','TC Enfermería',
+                    ])
+                    const TODAS_CARRERAS = new Set([
                       'Administración de Empresas','Agroindustria','Contabilidad y Auditoría',
                       'Derecho','Diseño Gráfico','Edu. Básica Semi - Quinindé','Educación Básica',
                       'Enfermería','Enfermería – Quinindé','Enfermería – San Lorenzo',
@@ -4110,6 +4114,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       'Psicología','TC Enfermería','Tecnologías de la Información',
                       'TG Desarrollo de Software','TG Gestión Culinaria',
                     ])
+                    const CARR_SET = sistema === 'salud' ? SALUD_CARRERAS : TODAS_CARRERAS
                     // todosDocentes usa 'puntaje' (no puntaje_100) y componentes=[{label,pct}]
                     const facBucket: Record<string,{ scores:number[], comps:Record<string,number[]> }> = {}
                     for (const d of todosDocentes) {
