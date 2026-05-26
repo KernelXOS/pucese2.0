@@ -605,7 +605,7 @@ function barLayout(opts: { tickAngle?: number; marginB?: number; maxY?: number }
 const PREGUNTAS = [
   '¿Cuál fue el mejor docente en general?',
   '¿Quién cumplió todos los parámetros de evaluación?',
-  '¿Qué sistema fue más efectivo, MEIPA o 360?',
+  '¿Qué modelo fue más efectivo, MEIPA o 360?',
   '¿Qué género tuvo mejor desempeño y por qué?',
   '¿Los docentes más antiguos son mejores evaluados?',
   '¿Cuál fue la mejor unidad académica?',
@@ -927,7 +927,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               annotations:[{ x:1, y:90, xref:'paper', yref:'y', text:'Meta 90', showarrow:false, font:{ size:9, color:'#10b981', family:'Inter' }, xanchor:'right', yanchor:'bottom', yshift:4 }],
             }
             return (
-              <ChartCard title="MEIPA + 360 por Período" sub="Puntaje promedio por sistema y modelo">
+              <ChartCard title="MEIPA + 360 por Período" sub="Puntaje promedio por modelo">
                 <Plot data={traces} layout={layout} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height: manyPeriods ? '380px' : '300px'}} />
               </ChartCard>
             )
@@ -2471,7 +2471,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
         {!context && (
           <select value={filterSis} onChange={e => { setFilterSis(e.target.value); setPage(1) }}
             className="text-[11px] font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white outline-none text-slate-600">
-            <option value="todos">Todos los sistemas</option>
+            <option value="todos">Todos los modelos</option>
             <option value="360">360 / MECDI</option>
             <option value="meipa">MEIPA</option>
           </select>
@@ -2518,7 +2518,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
       ) : (
         <div className="hidden lg:grid px-5 py-2 border-b border-slate-100 bg-slate-50/40 text-[9px] font-black uppercase tracking-widest text-slate-400"
           style={{ gridTemplateColumns:'2.5rem 1fr 7rem 8rem 5rem 6rem 1fr' }}>
-          <span>#</span><span>Docente</span><span>Sistema</span><span>Modelo</span>
+          <span>#</span><span>Docente</span><span>Modelo</span><span>Tipo</span>
           <span className="text-right">Puntaje</span><span className="text-center">Nivel</span>
           <span>Variables</span>
         </div>
@@ -3653,7 +3653,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
                   <h2 className="text-base font-bold text-slate-800">Vista Comparativa — MEIPA vs 360</h2>
-                  <p className="text-[11px] text-slate-400">Análisis cruzado de ambos sistemas de evaluación docente</p>
+                  <p className="text-[11px] text-slate-400">Análisis cruzado de ambos modelos de evaluación docente</p>
                 </div>
                 {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1e40af] animate-spin" />}
               </div>
@@ -3798,7 +3798,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <>
                     {has360 && (
                       <VariablesDetallePanel
-                        title="Puntaje por Variable — Sistema 360 / MECDI"
+                        title="Puntaje por Variable — Modelo 360 / MECDI"
                         accentColor="#0056b3"
                         tabs={VD_360_TABS}
                         varData={vd}
@@ -3806,7 +3806,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     )}
                     {hasMeipa && (
                       <VariablesDetallePanel
-                        title="Puntaje por Variable — Sistema MEIPA"
+                        title="Puntaje por Variable — Modelo MEIPA"
                         accentColor="#6d28d9"
                         tabs={[{ key: 'meipa_docencia', label: 'Docencia', icon: GraduationCap, color: '#6d28d9' }]}
                         varData={vd}
