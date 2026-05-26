@@ -3813,7 +3813,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               {desempVars && <DesempenoPorVariables data={desempVars} />}
 
               {todosDocentes.length > 0 && (
-                <TodosDocentesPanel docentes={todosDocentes} />
+                <div className="mt-10">
+                  <TodosDocentesPanel docentes={todosDocentes} />
+                </div>
               )}
 
               {/* ── Competencias y Preguntas ─────────────────────────────── */}
