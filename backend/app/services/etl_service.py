@@ -107,6 +107,10 @@ FACULTAD_MAP = {
     'CARRERA DE MEDICINA':                'Medicina',
     'MEDICINA':                           'Medicina',
     # ── Laboratorio Clínico ───────────────────────────────────────────────────
+    # CBS3/CBS4 son los códigos del 360/MECDI para Medicina de Laboratorio
+    'CBS3: MEDICINA DE LABORATORIO':      'Laboratorio Clínico',
+    'CBS4: MED. DE LABORATORIO':          'Laboratorio Clínico',
+    'MEDICINA DE LABORATORIO':            'Laboratorio Clínico',
     'CARRERA LABORATORIO CLINICO':        'Laboratorio Clínico',
     'LABORATORIO CLINICO':                'Laboratorio Clínico',
     'CARRERA LABORATORIO CL':             'Laboratorio Clínico',
