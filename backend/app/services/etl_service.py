@@ -332,8 +332,21 @@ def _parse_antiguedad(s) -> float:
 
 
 def _extract_period_code(s) -> str:
-    m = re.search(r'(20\d{4})', str(s))
+    """Extrae código de período de 6 dígitos. Maneja floats como 202361.0 → '202361'."""
+    if s is None:
+        return '202300'
+    # Si es número (int o float), convertir a int primero para eliminar el .0
+    try:
+        raw = str(int(float(s)))
+    except (ValueError, TypeError):
+        raw = str(s)
+    m = re.search(r'(20\d{4})', raw)
     return m.group(1) if m else '202300'
+
+
+def _clean_periodo(s) -> str:
+    """Convierte cualquier valor de período (float, str, int) a código limpio de 6 dígitos."""
+    return _extract_period_code(s)
 
 
 # ── Staff lookup ───────────────────────────────────────────────────────────────
@@ -1600,8 +1613,9 @@ class ETLService:
             h = hetero.get((ced, per))
             a = auto.get((ced, per))
 
+            _per_clean = _clean_periodo(per)
             anio = h['anio'] if h else (
-                int(str(per)[:4]) if len(str(per)) >= 4 and str(per)[:4].isdigit() else 2023)
+                int(_per_clean[:4]) if len(_per_clean) >= 4 and _per_clean[:4].isdigit() else 2023)
             dept        = h['dept']    if h else ''
             nresp       = h.get('nresp') if h else None
             nombre_raw  = (h['nombre'] if h else '') or (a['nombre'] if a else '')
@@ -1628,7 +1642,7 @@ class ETLService:
                 'docente_nombre':  nombre,
                 'facultad':        'Posgrado',
                 'carrera':         dept,
-                'periodo':         str(per),
+                'periodo':         _per_clean,
                 'anio':            anio,
                 'modelo':          'posgrado',
                 'sistema':         '360',
@@ -1923,7 +1937,7 @@ class ETLService:
                 'docente_nombre':  self._build_nombre(ced, staff, nombre_raw),
                 'facultad':        'Tecnologado',
                 'carrera':         dept,
-                'periodo':         str(per),
+                'periodo':         _clean_periodo(per),
                 'anio':            anio,
                 'modelo':          'tecnologado',
                 'sistema':         '360',
@@ -2028,7 +2042,7 @@ class ETLService:
             """(ced, periodo) → promedio 0-100"""
             result = {}
             df_s['_ced'] = df_s[col_ced_name].astype(str).str.strip().str.lstrip('0')
-            df_s['_per'] = df_s['periodo_evaluacion'].astype(str).str.strip()
+            df_s['_per'] = df_s['periodo_evaluacion'].apply(_clean_periodo)
             df_s['_cal'] = pd.to_numeric(df_s[col_cal_name], errors='coerce')
             for (ced, per), grp in df_s.dropna(subset=['_cal']).groupby(['_ced', '_per']):
                 if not ced or ced in ('nan',):
@@ -2092,11 +2106,11 @@ class ETLService:
             puntaje_100 = round(total_score / total_peso, 2)
 
             # Determinar periodo normalizado (202301→'202301', 202361→'202301' etc.)
+            periodo_norm = _clean_periodo(per)
             try:
-                anio = int(str(per)[:4])
+                anio = int(periodo_norm[:4])
             except:
                 anio = 2023
-            periodo_norm = str(per)
 
             s = staff.get(ced, {})
             nombre_raw = str(het_info.get('nombre', '')).strip()
