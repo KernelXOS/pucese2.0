@@ -4026,27 +4026,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     </div>
 
-                    {/* Bar por facultad */}
-                    <div className="lg:col-span-2 bg-white border border-slate-200 overflow-hidden" style={{ borderRadius: 6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-                      <div className="px-5 py-3.5 border-b border-slate-100 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Comparativo ·</span>
-                          <h3 className="text-[13px] font-bold text-slate-700">Puntaje Promedio por Unidad Académica</h3>
-                        </div>
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded border"
-                          style={{ color:currentTabCfg.color, background:`${currentTabCfg.color}08`, borderColor:`${currentTabCfg.color}25`, borderRadius: 4 }}>
-                          Sobre 100 pts
-                        </span>
-                      </div>
-                      <div className="p-5">{(() => {
-                        const fE = Object.entries(kpis?.promedio_por_facultad||{}).slice(0,15)
-                        const fL = fE.map(([k])=>k)
-                        const fV = fE.map(([,v])=>Number(v))
-                        const fC = fV.map(v=>v>=90?'#047857':v>=75?currentTabCfg.color:v>=60?'#b45309':'#b91c1c')
-                        const ch = excel3DBar(fL, fV, fC, {maxY:108,tickAngle:-35,marginB:120})
-                        return <Plot data={ch.data} layout={ch.layout} config={{responsive:true,displayModeBar:false}} style={{width:'100%',height:'400px'}} />
-                      })()}</div>
-                    </div>
                   </div>
 
                   {/* ── Tendencia por Período ── */}
