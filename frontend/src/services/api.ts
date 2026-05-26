@@ -105,13 +105,13 @@ export const api = {
 
   // ── Nuevos: períodos ────────────────────────────────────────────────────────
   getPeriodos: () =>
-    axios.get(`${ETL}/periodos`),
+    axios.get(`${EVAL}/etl/periodos`),
 
   getEstadoETL: () =>
-    axios.get(`${ETL}/estado`),
+    axios.get(`${EVAL}/etl/status`),
 
   procesarPeriodo: (periodo: string) =>
-    axios.post(`${ETL}/procesar-periodo/${periodo}`),
+    axios.post(`${EVAL}/etl/process`),
 
   // ── Nuevos: docentes ────────────────────────────────────────────────────────
   getDocentes: (opts: { periodo?: string; facultad?: string; modelo?: string; q?: string; limit?: number }) =>

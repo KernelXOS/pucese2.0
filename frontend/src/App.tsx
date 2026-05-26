@@ -2841,6 +2841,11 @@ const PERIODO_TO_ANIO: Record<string, number> = {
 function normPeriodo(p: string | number): string {
   const s = String(p).trim()
   if (s.length < 4) return s
+  // Handle DB format 'YYYY-[I|II]' → '[I|II]-YYYY'
+  if (/^\d{4}-(I|II)$/.test(s)) {
+    const [year, sem] = s.split('-')
+    return `${sem}-${year}`
+  }
   const y = s.slice(0, 4)
   const sufRaw = s.slice(4)
   if (!sufRaw) return `I-${y}`

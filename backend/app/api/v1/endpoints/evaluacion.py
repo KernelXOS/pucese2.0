@@ -3,11 +3,36 @@ from fastapi.responses import StreamingResponse
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import distinct
 from app.db.session import get_db, SessionLocal
+from app.models.evaluacion import Evaluacion
 from app.services.kpi_service import kpi_service
 from app.services.gemini_service import gemini_service
 from app.services.etl_service import etl_service
 import io, threading
+
+
+def _periodo_to_codigo(p: str) -> str:
+    """'2024-II' → '202402',  '2025-I' → '202501'"""
+    if not p or '-' not in p:
+        return p
+    parts = p.split('-')
+    if len(parts) == 2:
+        year_p = parts[0] if parts[0].isdigit() else parts[1]
+        sem_p  = parts[1] if parts[0].isdigit() else parts[0]
+        if year_p.isdigit() and sem_p in ('I', 'II'):
+            suf = '02' if sem_p == 'II' else '01'
+            return f'{year_p}{suf}'
+    return p
+
+
+def _codigo_to_periodo(c: str) -> str:
+    """'202402' → '2024-II',  '202501' → '2025-I'"""
+    if len(c) == 6 and c.isdigit():
+        year = c[:4]
+        sem  = 'II' if int(c[4:]) >= 2 else 'I'
+        return f'{year}-{sem}'
+    return c
 
 _etl_status: dict = {"running": False, "last_count": None, "last_error": None}
 
@@ -51,6 +76,33 @@ def process_evaluaciones():
 def etl_status():
     """Check if background ETL is still running."""
     return _etl_status
+
+
+@router.get("/etl/periodos")
+def get_periodos_disponibles(db: Session = Depends(get_db)):
+    """
+    Devuelve los períodos disponibles en la BD, convertidos al formato
+    codigo='202402' (lo que espera el sidebar del frontend).
+    """
+    LABEL_MAP = {
+        '2023-I': 'I Período 2023',  '2023-II': 'II Período 2023',
+        '2024-I': 'I Período 2024',  '2024-II': 'II Período 2024',
+        '2025-I': 'I Período 2025',  '2025-II': 'II Período 2025',
+    }
+    rows = db.query(distinct(Evaluacion.periodo)).all()
+    result = []
+    seen = set()
+    for (p,) in rows:
+        if not p:
+            continue
+        codigo = _periodo_to_codigo(p)
+        if codigo in seen:
+            continue
+        seen.add(codigo)
+        label = LABEL_MAP.get(p) or LABEL_MAP.get(_codigo_to_periodo(codigo)) or p
+        result.append({'codigo': codigo, 'label': label, 'cargado': True})
+    result.sort(key=lambda x: x['codigo'])
+    return result
 
 
 @router.get("/kpis/institucionales")

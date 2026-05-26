@@ -38,12 +38,31 @@ MEIPA_MODEL_CONFIG = {
 }
 
 
+def _norm_periodo(p: str) -> str:
+    """Normaliza el código de período al formato 'YYYY-[I|II]' que usa la DB.
+    Acepta tanto '202402' (frontend) como '2024-II' (DB) → siempre devuelve 'YYYY-[I|II]'.
+    """
+    if not p:
+        return p
+    s = p.strip()
+    # Ya está en formato DB: '2024-II', '2025-I'
+    if '-' in s:
+        return s
+    # Formato numérico del frontend: '202402' → '2024-II'
+    if len(s) == 6 and s.isdigit():
+        year = s[:4]
+        sem  = 'II' if int(s[4:]) >= 2 else 'I'
+        return f'{year}-{sem}'
+    return s
+
+
 def _base_q(db: Session, modelo: str = None, anio: int = None, sistema: str = None, periodo: str = None):
     q = db.query(Evaluacion)
     if modelo:
         q = q.filter(Evaluacion.modelo == modelo)
     if periodo:
-        q = q.filter(Evaluacion.periodo == periodo)
+        # Normalizar: acepta '202402' del frontend o '2024-II' de la DB
+        q = q.filter(Evaluacion.periodo == _norm_periodo(periodo))
     elif anio:
         # Solo filtrar por año cuando no hay período específico
         q = q.filter(Evaluacion.anio == anio)
