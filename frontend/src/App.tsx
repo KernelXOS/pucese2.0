@@ -1160,6 +1160,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         }]
 
         return (
+          <>
           <div className="bg-white border border-slate-200 overflow-hidden mb-5" style={{ borderRadius:10, boxShadow:'0 2px 12px rgba(0,0,0,0.07)' }}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
@@ -1286,6 +1287,69 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               </div>
             </div>
           </div>
+
+          {/* ── Tabla pivot: Carrera × Período ── */}
+          {rankedCarreras.length > 0 && periodLabels.length > 0 && (
+            <div className="bg-white border border-slate-200 overflow-hidden mt-5" style={{ borderRadius:10, boxShadow:'0 2px 12px rgba(0,0,0,0.07)' }}>
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background:'#f0fdf4' }}>
+                  <BarChart3 size={14} style={{ color:'#059669' }}/>
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-black text-slate-800 leading-tight">Análisis Temporal por Carrera</h3>
+                  <p className="text-[9px] text-slate-400 font-medium">Promedio por carrera desglosado por período académico</p>
+                </div>
+                <span className="ml-auto text-[9px] font-semibold text-slate-400">{rankedCarreras.length} carreras · {periodLabels.length} períodos</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] border-collapse" style={{ minWidth: 600 }}>
+                  <thead className="sticky top-0 z-10" style={{ background:'#f8fafc' }}>
+                    <tr>
+                      <th className="text-left py-2.5 px-4 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-44">Carrera / Programa</th>
+                      <th className="text-center py-2.5 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-16">Prom.</th>
+                      {periodLabels.map(lbl => (
+                        <th key={lbl} className="text-center py-2.5 px-2 font-black text-[8.5px] uppercase tracking-[0.08em] border-b border-slate-200 w-20"
+                          style={{ color: lbl.startsWith('TEC-') ? '#7c3aed' : lbl.startsWith('Posg-') ? '#0891b2' : '#0056b3' }}>
+                          {lbl}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankedCarreras.map(({ fac, avg }, idx) => (
+                      <tr key={fac} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="py-2 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[8.5px] font-black tabular-nums text-slate-300 w-4">{idx+1}</span>
+                            <span className="font-semibold text-slate-700 text-[10px] leading-tight"
+                              style={{ maxWidth:150, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                              title={fac}>{fac}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="font-black tabular-nums text-[12px]" style={{ color:pctColor(avg) }}>{avg.toFixed(1)}</span>
+                        </td>
+                        {periodLabels.map(lbl => {
+                          const val = facMap[fac]?.[lbl] ?? null
+                          return (
+                            <td key={lbl} className="py-2 px-2 text-center">
+                              {val !== null
+                                ? <span className="font-bold tabular-nums text-[11px] px-2 py-0.5 rounded"
+                                    style={{ background: pctBg(val), color: pctColor(val) }}>
+                                    {val.toFixed(1)}
+                                  </span>
+                                : <span className="text-slate-200 text-[9px]">—</span>}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          </>
         )
       })()}
 
