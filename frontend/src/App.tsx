@@ -83,7 +83,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
 
           {/* Stat pills */}
           <div className="flex gap-3 mt-6">
-            {[['MEIPA', 'Evaluación interna'],['360°','Heteroevaluación'],['SIGA','Gestión académica']].map(([tag, desc]) => (
+            {[['MEIPA', 'Evaluación interna'],['MECDI','Heteroevaluación'],['SIGA','Gestión académica']].map(([tag, desc]) => (
               <div key={tag} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}>
                 <p style={{ fontSize: 13, fontWeight: 800, color: '#7ec8f0' }}>{tag}</p>
                 <p style={{ fontSize: 10, opacity: 0.6 }}>{desc}</p>
@@ -605,7 +605,7 @@ function barLayout(opts: { tickAngle?: number; marginB?: number; maxY?: number }
 const PREGUNTAS = [
   '¿Cuál fue el mejor docente en general?',
   '¿Quién cumplió todos los parámetros de evaluación?',
-  '¿Qué modelo fue más efectivo, MEIPA o 360?',
+  '¿Qué modelo fue más efectivo, MEIPA o MECDI?',
   '¿Qué género tuvo mejor desempeño y por qué?',
   '¿Los docentes más antiguos son mejores evaluados?',
   '¿Cuál fue la mejor unidad académica?',
@@ -805,7 +805,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
         <div className="bg-white border border-slate-200 col-span-1"
           style={{ borderRadius: 6, borderTop:'3px solid #1e40af', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">360 / MECDI · 2024–2025</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">MECDI · 2024–2025</p>
           <div className="flex items-baseline gap-1.5 mb-1">
             <span className="font-black text-[#1e40af]" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
@@ -944,7 +944,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             })
 
           if (allPeriods360.length === 0) return (
-            <ChartCard title="Evolución 360 / MECDI" sub="Puntaje promedio por modelo y período">
+            <ChartCard title="Evolución MECDI" sub="Puntaje promedio por modelo y período">
               <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Sin datos</div>
             </ChartCard>
           )
@@ -986,7 +986,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const manyPeriods = allPeriods360.length > 4
 
           return (
-            <ChartCard title="Evolución 360 / MECDI" sub="Puntaje promedio por modelo y período">
+            <ChartCard title="Evolución MECDI" sub="Puntaje promedio por modelo y período">
               <Plot
                 data={traces as any}
                 layout={{
@@ -1063,7 +1063,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               </div>
               <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SysCard title="MEIPA" color="#6d28d9" d={est.meipa} />
-                <SysCard title="360 / MECDI" color="#0f5ca8" d={est['360']} />
+                <SysCard title="MECDI" color="#0f5ca8" d={est['360']} />
               </div>
             </div>
           )
@@ -2468,7 +2468,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
           <select value={filterSis} onChange={e => { setFilterSis(e.target.value); setPage(1) }}
             className="text-[11px] font-bold border border-slate-200 rounded-lg px-3 py-1.5 bg-white outline-none text-slate-600">
             <option value="todos">Todos los modelos</option>
-            <option value="360">360 / MECDI</option>
+            <option value="360">MECDI</option>
             <option value="meipa">MEIPA</option>
           </select>
         )}
@@ -2572,7 +2572,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
                   {!context && (
                     <span className="text-[9px] font-black px-2 py-0.5 rounded-full"
                       style={{ background:`${sisC}15`, color:sisC }}>
-                      {d.sistema === 'meipa' ? 'MEIPA' : '360/MECDI'}
+                      {d.sistema === 'meipa' ? 'MEIPA' : 'MECDI'}
                     </span>
                   )}
                   {!context && (
@@ -2621,7 +2621,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
                       <p className="text-[9px] text-slate-400 truncate">{d.cedula}</p>
                       <div className="flex gap-1 mt-1">
                         <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full"
-                          style={{ background:`${sisC}15`, color:sisC }}>{d.sistema === 'meipa' ? 'MEIPA' : '360'}</span>
+                          style={{ background:`${sisC}15`, color:sisC }}>{d.sistema === 'meipa' ? 'MEIPA' : 'MECDI'}</span>
                         <span className="text-[8px] font-bold px-1.5 py-0.5 rounded border"
                           style={{ background:`${modC}10`, color:modC, borderColor:`${modC}30` }}>
                           {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)}
@@ -2642,7 +2642,7 @@ function TodosDocentesPanel({ docentes, context }: { docentes: any[]; context?: 
                 <div className="px-5 pb-5 bg-slate-50/60 border-t border-slate-100">
                   <div className="flex items-center justify-between pt-3 mb-2 flex-wrap gap-2">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                      Componentes del Modelo — {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)} · {d.sistema === 'meipa' ? 'MEIPA' : '360/MECDI'}
+                      Componentes del Modelo — {d.modelo.charAt(0).toUpperCase()+d.modelo.slice(1)} · {d.sistema === 'meipa' ? 'MEIPA' : 'MECDI'}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {d.tiempo_servicio && (
@@ -3170,7 +3170,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const exportComparativoPDF2 = () =>
     comparativoRef.current && exportPanelToPDF(
       comparativoRef.current,
-      'Vista Comparativa MEIPA vs 360',
+      'Vista Comparativa MEIPA vs MECDI',
       setExportingComp,
       `Vista_Comparativa_PUCESE_${new Date().toISOString().slice(0,10)}.pdf`,
     )
@@ -3349,7 +3349,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               <BarChart3 size={17} style={{ flexShrink:0, color: sistema === '360' ? '#67e8f9' : 'inherit' }} />
               {sidebarOpen && <>
                 <div className="flex-1 min-w-0">
-                  <div style={{ fontSize:13, fontWeight:700, letterSpacing:'-0.01em' }}>360 / MECDI</div>
+                  <div style={{ fontSize:13, fontWeight:700, letterSpacing:'-0.01em' }}>MECDI</div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', fontWeight:600, letterSpacing:'0.1em' }}>2024 – 2025</div>
                 </div>
                 <span style={{ color:'rgba(255,255,255,0.3)' }}>
@@ -3543,7 +3543,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             <div className="flex items-center gap-3">
               <div>
                 <span className="text-slate-800 font-black" style={{ fontSize: 14 }}>
-                  {sistema === 'overview' ? 'Vista General' : sistema === 'meipa' ? 'MEIPA — Evaluación Docente' : sistema === 'salud' ? 'Salud — Docencia ABP' : `360 / MECDI — ${currentTabCfg.label}`}
+                  {sistema === 'overview' ? 'Vista General' : sistema === 'meipa' ? 'MEIPA — Evaluación Docente' : sistema === 'salud' ? 'Salud — Docencia ABP' : `MECDI — ${currentTabCfg.label}`}
                 </span>
               </div>
               {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin" />}
@@ -3665,7 +3665,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             <>
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
-                  <h2 className="text-base font-bold text-slate-800">Vista Comparativa — MEIPA vs 360</h2>
+                  <h2 className="text-base font-bold text-slate-800">Vista Comparativa — MEIPA vs MECDI</h2>
                   <p className="text-[11px] text-slate-400">Análisis cruzado de ambos modelos de evaluación docente</p>
                 </div>
                 {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1e40af] animate-spin" />}
@@ -3682,7 +3682,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <div>
                     <p className="text-[13px] font-black text-white leading-tight">Informe General Institucional</p>
                     <p className="text-[10px] mt-0.5" style={{ color:'rgba(255,255,255,0.55)' }}>
-                      PDF completo con todos los evaluados, tendencias, ranking y estadísticas — MEIPA + 360°
+                      PDF completo con todos los evaluados, tendencias, ranking y estadísticas — MEIPA + MECDI
                     </p>
                   </div>
                 </div>
@@ -3811,7 +3811,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <>
                     {has360 && (
                       <VariablesDetallePanel
-                        title="Puntaje por Variable — Modelo 360 / MECDI"
+                        title="Puntaje por Variable — Modelo MECDI"
                         accentColor="#0056b3"
                         tabs={VD_360_TABS}
                         varData={vd}
@@ -4479,8 +4479,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   {/* Todos los Docentes — filtrado por modelo/periodo de esta sección */}
                   {todosDocentes.length > 0 && (() => {
                     const tabLabel = sistema === 'meipa' ? 'MEIPA · Docencia'
-                      : sistema === 'salud' ? 'Salud / ABP · 360/MECDI'
-                      : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} · 360/MECDI`
+                      : sistema === 'salud' ? 'Salud / ABP · MECDI'
+                      : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} · MECDI`
                     const { modelo, sistemaParam } = getQueryParams()
                     return (
                       <div className="mt-6">
