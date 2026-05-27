@@ -4819,8 +4819,34 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                ══════════════════════════════════════════════════════════════════ */}
           {activeView === 'competencias-detalle' && (() => {
             const periodos: string[] = compDetalle?.periodos || []
-            const todasComp: any[]   = compDetalle?.todas_competencias || []
-            const todasPreg: any[]   = compDetalle?.todas_preguntas || []
+            // Usa todas_competencias si está disponible (backend actualizado),
+            // si no combina top + peor como fallback para backend anterior
+            const rawTodas: any[] = compDetalle?.todas_competencias || []
+            const topComp: any[]  = compDetalle?.competencias_top  || []
+            const peorComp: any[] = compDetalle?.competencias_peor || []
+            const todasComp: any[] = rawTodas.length > 0
+              ? rawTodas
+              : (() => {
+                  const seen = new Set<string>()
+                  const merged: any[] = []
+                  for (const c of [...topComp, ...peorComp]) {
+                    if (!seen.has(c.competencia)) { seen.add(c.competencia); merged.push(c) }
+                  }
+                  return merged.sort((a,b) => b.promedio - a.promedio)
+                })()
+            const rawTodaPreg: any[] = compDetalle?.todas_preguntas || []
+            const topPreg: any[]  = compDetalle?.preguntas_top  || []
+            const peorPreg: any[] = compDetalle?.preguntas_peor || []
+            const todasPreg: any[] = rawTodaPreg.length > 0
+              ? rawTodaPreg
+              : (() => {
+                  const seen = new Set<string>()
+                  const merged: any[] = []
+                  for (const p of [...topPreg, ...peorPreg]) {
+                    if (!seen.has(p.pregunta)) { seen.add(p.pregunta); merged.push(p) }
+                  }
+                  return merged.sort((a,b) => b.promedio - a.promedio)
+                })()
             const porCarrera: any[]  = compDetalle?.por_carrera || []
 
             const periodLabel = (p: string) =>
@@ -5002,7 +5028,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
                     <p className="text-slate-500 font-bold text-sm">Cargando análisis de competencias…</p>
                   </div>
-                ) : !compDetalle || todasComp.length === 0 ? (
+                ) : !compDetalle || (todasComp.length === 0 && todasPreg.length === 0) ? (
                   <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
                     <AlertCircle size={36} className="opacity-40" />
                     <p className="font-bold">No hay datos de competencias disponibles</p>
