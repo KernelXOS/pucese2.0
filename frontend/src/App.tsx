@@ -1077,17 +1077,16 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const s = String(p).trim()
           const y = s.slice(0, 4)
           const suf = parseInt(s.slice(4) || '0')
-          if (suf === 1 || suf === 2)   return suf === 1 ? `I-${y}` : `II-${y}`
+          if (suf === 0 || suf === 1)   return `I-${y}`
+          if (suf === 2)                 return `II-${y}`
           if (suf >= 10 && suf <= 20)   return `TEC-I-${y}`
           if (suf >= 21 && suf <= 30)   return `TEC-II-${y}`
-          if (suf >= 51 && suf <= 57)   return `Posg-I-${y}`
-          if (suf >= 58 && suf <= 65)   return `Posg-II-${y}`
-          if (suf >= 60 && suf <= 68)   return `I-${y}`
-          // Posgrado periods: 71-73 → Posg-I, 74-79 → Posg-II
+          // suf=56 (202456,202556) y suf=66 (202466,202566) = evaluaciones MECDI G·II
+          if (suf === 56 || suf === 66)  return `II-${y}`
+          // Posgrado real: sufijos 70-79 (202371,202376,202471,202476,202477,202571,202572,202576)
           if (suf >= 70 && suf <= 73)   return `Posg-I-${y}`
           if (suf >= 74 && suf <= 79)   return `Posg-II-${y}`
-          if (suf >= 69 && suf <= 80)   return `II-${y}`
-          return `${y}-${suf}`
+          return `II-${y}`
         }
 
         // pivot con períodos normalizados (agrupar por label = promedio weighted)
@@ -2932,14 +2931,12 @@ function normPeriodo(p: string | number): string {
   if (suf === 2)                return `II-${y}`
   if (suf >= 10 && suf <= 20)  return `TEC-I-${y}`
   if (suf >= 21 && suf <= 30)  return `TEC-II-${y}`
-  if (suf >= 51 && suf <= 57)  return `Posg-I-${y}`
-  if (suf >= 58 && suf <= 65)  return `Posg-II-${y}`
-  if (suf >= 56 && suf <= 68)  return `I-${y}`
-  // Posgrado: 71-73 → Posg-I, 74-79 → Posg-II
+  // suf=56 (202456,202556) y suf=66 (202466,202566) = evaluaciones MECDI G·II
+  if (suf === 56 || suf === 66) return `II-${y}`
+  // Posgrado real: sufijos 70-79 (202371,202376,202471,202476,202477,202571,202572,202576)
   if (suf >= 70 && suf <= 73)  return `Posg-I-${y}`
   if (suf >= 74 && suf <= 79)  return `Posg-II-${y}`
-  if (suf >= 69 && suf <= 80)  return `II-${y}`
-  return `${y}-${sufRaw}`
+  return `II-${y}`
 }
 
 /** Versión para mostrar al usuario: añade prefijo G / T / P según tipo.

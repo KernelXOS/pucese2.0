@@ -68,15 +68,13 @@ def _all_codes_for_sem(periodo: str) -> list:
     if suf <= 1:  # Semester I
         codes = [periodo]
         codes += [f'{year}{s:02d}' for s in range(10, 21)]   # TEC-I (10-20)
-        codes += [f'{year}{s:02d}' for s in range(51, 58)]   # Posg-I (51-57)
-        codes += [f'{year}{s:02d}' for s in range(70, 74)]   # Posg-I (70-73)
+        codes += [f'{year}{s:02d}' for s in range(70, 74)]   # Posg-I real (70-73)
         return codes
     else:  # Semester II
         codes = [periodo]
         codes += [f'{year}{s:02d}' for s in range(21, 31)]   # TEC-II (21-30)
-        codes += [f'{year}{s:02d}' for s in range(58, 66)]   # Posg-II (58-65)
-        codes += [f'{year}{s:02d}' for s in range(66, 70)]   # catch-all (66-69)
-        codes += [f'{year}{s:02d}' for s in range(74, 81)]   # Posg-II (74-80)
+        codes += [f'{year}56', f'{year}66']                   # MECDI G·II (202456,202466 etc)
+        codes += [f'{year}{s:02d}' for s in range(74, 80)]   # Posg-II real (74-79)
         return codes
 
 

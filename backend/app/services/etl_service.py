@@ -61,10 +61,16 @@ FACULTAD_MAP = {
     'EDUCACION BASICA QUININDE':          'Edu. Básica Semi - Quinindé',
     'EDUCACION BASICA PRESENCIAL':        'Educación Básica',
     'EDUCACIÓN BÁSICA PRESENCIAL':        'Educación Básica',
-    'C DE EDUCACION BASICA SP':           'Educación Básica',
+    'EDUCACION BASICA PRESEN REPO':       'Educación Básica',  # CSV 202556/202566
+    'C DE EDUCACION BASICA SP':           'Edu. Básica Semi - Quinindé',
+    'C.EDUCACION BASICA P':               'Educación Básica',  # 202466 hetero dept
+    'C.EDUCAC. BASICA SP':                'Edu. Básica Semi - Quinindé',  # 202466 hetero
+    'C.EDUCAC. BASICA':                   'Edu. Básica Semi - Quinindé',
     'EDUCACION BASICA':                   'Educación Básica',
     'EDUCACIÓN BÁSICA':                   'Educación Básica',
     # ── PUCETEC — Tecnologías de Nivel Superior (TC/TG) ───────────────────────
+    'TC SUP ENFERMERIA':                  'TC Enfermería',  # 202466 hetero dept
+    'TC SUP ENFERMERÍA':                  'TC Enfermería',
     'TC ENFERMERIA':                      'TC Enfermería',
     'TC ENFERMERÍA':                      'TC Enfermería',
     'T ENFERMERIA':                       'TC Enfermería',
@@ -90,14 +96,20 @@ FACULTAD_MAP = {
     # ── Contabilidad y Auditoría ──────────────────────────────────────────────
     'CARRERA CONTABILIDAD':               'Contabilidad y Auditoría',
     'CONTABILIDAD Y AUDITORIA':           'Contabilidad y Auditoría',
+    'C.CONTAB Y AUDIT':                   'Contabilidad y Auditoría',  # 202466 hetero
+    'ESC.CONTAB Y AUDIT':                 'Contabilidad y Auditoría',
+    'ESC.CS. ADM.Y CONTAB':               'Contabilidad y Auditoría',
+    'CONTAB Y AUDIT':                     'Contabilidad y Auditoría',
     'CONTABILIDAD':                       'Contabilidad y Auditoría',
     # ── Negocios Internacionales ──────────────────────────────────────────────
     'CARRERA NEGOCIOS INTERNACIONALES':   'Negocios Internacionales',
     'NEGOCIOS INTERNACIONALES':           'Negocios Internacionales',
     'C DE NEGOCIOS INTERNACIONALES':      'Negocios Internacionales',
+    'C.NEGOCIOS INTERNACI':               'Negocios Internacionales',  # 202466 hetero
     'COMERCIO EXTERIOR':                  'Negocios Internacionales',
     'CARRERA DE COMERCIO  EXTERIOR':      'Negocios Internacionales',
     'CARRERA DE COMERCIO EXTERIOR':       'Negocios Internacionales',
+    'M. NEGOCIOS':                        '',   # maestría — excluir del ranking grado
     'COMERCIO':                           'Negocios Internacionales',
     'NEGOCIOS':                           'Negocios Internacionales',
     # ── Gestión Culinaria (sin prefijo TG = también válido) ──────────────────
@@ -114,6 +126,13 @@ FACULTAD_MAP = {
     'CARRERA LABORATORIO CLINICO':        'Laboratorio Clínico',
     'LABORATORIO CLINICO':                'Laboratorio Clínico',
     'CARRERA LABORATORIO CL':             'Laboratorio Clínico',
+    'ESC.LABORAT. CLINICO':               'Laboratorio Clínico',  # 202466 hetero
+    'ESC.LABORAT. CL':                    'Laboratorio Clínico',
+    'LABORAT. CLINICO':                   'Laboratorio Clínico',
+    'LABORAT. CL':                        'Laboratorio Clínico',
+    'C. DE LAB. CLINICO':                 'Laboratorio Clínico',  # CSV 202556/202566
+    'C. DE LAB. CL':                      'Laboratorio Clínico',
+    'LAB. CLINICO':                       'Laboratorio Clínico',
     'LABORATORIO CL':                     'Laboratorio Clínico',
     # ── Enfermería (genérico) ─────────────────────────────────────────────────
     'CARRERA ENFERMERIA':                 'Enfermería',
@@ -130,6 +149,7 @@ FACULTAD_MAP = {
     'PSICOLOGÍA':                         'Psicología',
     # ── Derecho ───────────────────────────────────────────────────────────────
     'CARRERA DE DERECHO':                 'Derecho',
+    'JURISPRUDENCIA':                     'Derecho',  # 202466: Car. Jurisprudencia
     'DERECHO':                            'Derecho',
     'JURIDIC':                            'Derecho',
     # ── Tecnologías de la Información ────────────────────────────────────────
@@ -138,6 +158,9 @@ FACULTAD_MAP = {
     'SISTEMAS Y COMPUTACION':             'Tecnologías de la Información',
     'TECNOLOGIAS DE LA INFORMACION':      'Tecnologías de la Información',
     'TECNOLOGÍAS DE LA INFORMACIÓN':      'Tecnologías de la Información',
+    'C. TECN. INFORMACI':                 'Tecnologías de la Información',  # 202466 hetero
+    'C.TECN. INFORMACI':                  'Tecnologías de la Información',
+    'TECN. INFORMACI':                    'Tecnologías de la Información',
     'INGENIERIA EN SISTEMAS':             'Tecnologías de la Información',
     'SISTEMAS':                           'Tecnologías de la Información',
     'COMPUTACION':                        'Tecnologías de la Información',
@@ -163,7 +186,10 @@ FACULTAD_MAP = {
     'PEDAGOGIA DE LOS IDIOMAS':           'Pedagogía Idiomas Nac. Ext.',
     'PEDAGOGÍA DE LOS IDIOMAS':           'Pedagogía Idiomas Nac. Ext.',
     'PED. DE LOS IDIOMAS':                'Pedagogía Idiomas Nac. Ext.',
-    'CENTRO DE IDIOMAS':                  'Pedagogía Idiomas Nac. Ext.',
+    'C. PEDAGOGIA INGLES':                'Pedagogía Idiomas Nac. Ext.',  # 202466 hetero
+    'CENTRO DE IDIOMAS':                  '',   # servicio, no carrera
+    'CURSOS DE IDIOMAS':                  '',   # servicio, no carrera
+    'M. PED.':                            '',   # maestría pedagogía — excluir
     'IDIOMAS NACIONALES':                 'Pedagogía Idiomas Nac. Ext.',
     'PEDAGOG':                            'Pedagogía Idiomas Nac. Ext.',
     'IDIOMAS':                            'Pedagogía Idiomas Nac. Ext.',
@@ -610,9 +636,9 @@ class ETLService:
         records += self._build_360_records_2025(model_scores, staff)
         records += self._source_posgrado_historico(staff)
         records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202501, '202501', 2025)
-        # eval_det_202402: procesar para carreras NO cubiertas por _source_360_mecdi_2024
-        # (ej. Educación Básica presencial que solo aparece en los archivos detallados)
-        records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202402, '202402', 2024)
+        # eval_det_202402 usa convención distinta de cod_instrumento (001= hetero, no auto),
+        # por lo que no puede procesarse con el mismo INSTR_MAP. Los datos de 202402 vienen
+        # de _source_360_mecdi_2024 + _source_hetero_xlsx (202456 / 202466).
         records += self._source_pucetec_hetero(staff)
         records += self._source_meipa_pucese_data(staff)
 
@@ -1770,7 +1796,10 @@ class ETLService:
         }
 
         try:
-            xlsx_files = [f for f in os.listdir(dir_path) if f.endswith('.xlsx')]
+            # Sort so that hetero-est files (004_*) come before auto files (01_*).
+            # Alphabetical sort puts '004' < '01' because '0' < '1' at second char.
+            # This ensures extras dict captures the carrera name from hetero files first.
+            xlsx_files = sorted([f for f in os.listdir(dir_path) if f.endswith('.xlsx')])
             if not xlsx_files:
                 return []
             frames = []
@@ -1820,25 +1849,17 @@ class ETLService:
             by_instr['score'] / by_instr['max_score'].replace(0, 1) * 100
         ).clip(0, 100).round(2)
 
-        # Nombres y programa:
-        # Preferir el programa que corresponda a una carrera reconocida (de archivos 004/hetero_est)
-        # sobre nombres de materias (de archivos 01/auto). Si ya hay un valor reconocido, no sobreescribir.
+        # Nombres y programa: usar primer valor por cedula.
+        # Los archivos están ordenados (sorted) para que 004_* (hetero-est, con carrera real)
+        # aparezcan antes que 01_* (auto, con nombres de materias).
         extras: dict = {}
         for _, row in df.iterrows():
             ced = str(row['_ced']).strip()
-            ap = _clean_nombre(row.get(col_ap, '')) if col_ap else ''
-            nm = _clean_nombre(row.get(col_nm, '')) if col_nm else ''
-            pr = _clean_nombre(row.get(col_pr, '')) if col_pr else ''
-            nombre_val = f"{ap} {nm}".strip()
             if ced not in extras:
-                extras[ced] = {'nombre': nombre_val, 'programa': pr}
-            else:
-                # Upgrade programa if the current one is unrecognized and the new one is recognized
-                current_pr = extras[ced].get('programa', '')
-                if pr and _map_facultad(pr) and not _map_facultad(current_pr):
-                    extras[ced]['programa'] = pr
-                if nombre_val and not extras[ced].get('nombre'):
-                    extras[ced]['nombre'] = nombre_val
+                ap = _clean_nombre(row.get(col_ap, '')) if col_ap else ''
+                nm = _clean_nombre(row.get(col_nm, '')) if col_nm else ''
+                pr = _clean_nombre(row.get(col_pr, '')) if col_pr else ''
+                extras[ced] = {'nombre': f"{ap} {nm}".strip(), 'programa': pr}
 
         # Acumular scores por (ced, modelo)
         model_scores: dict = {}
