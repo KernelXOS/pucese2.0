@@ -1073,18 +1073,66 @@ class KPIService:
         if not files:
             return {}
 
-        dfs = []
+        # Primera pasada: leer todos los archivos y separar los que tienen competencia
+        # de los que no la tienen (para enriquecerlos después)
+        dfs_with    = []   # tienen columna 'competencia'
+        dfs_without = []   # no tienen 'competencia' pero tienen pregunta+calificacion
+
         for fpath in files:
             try:
                 df = pd.read_excel(fpath, dtype=str)
-                # normalise column names
                 df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
-                needed = {'pregunta', 'calificacion', 'competencia', 'periodo_evaluacion'}
-                if needed.issubset(set(df.columns)):
-                    extra_cols = [c for c in ['programa', 'carrera', 'modelo', 'cod_instrumento'] if c in df.columns]
-                    dfs.append(df[list(needed) + extra_cols])
+                base_needed = {'pregunta', 'calificacion', 'periodo_evaluacion'}
+                if not base_needed.issubset(set(df.columns)):
+                    continue
+                extra_cols = [c for c in ['programa', 'carrera', 'modelo', 'cod_instrumento', 'num_pregunta'] if c in df.columns]
+                if 'competencia' in df.columns:
+                    dfs_with.append(df[list(base_needed) + ['competencia'] + extra_cols])
+                else:
+                    dfs_without.append(df[list(base_needed) + extra_cols])
             except Exception:
                 continue
+
+        if not dfs_with and not dfs_without:
+            return {}
+
+        # Construir mapeo (cod_instrumento, num_pregunta) → competencia
+        # y (cod_instrumento, pregunta_text) → competencia
+        # usando los archivos que ya tienen la columna competencia
+        comp_map_num  = {}   # (cod, num) → competencia
+        comp_map_text = {}   # (cod, pregunta_lower) → competencia
+        if dfs_with:
+            ref_df = pd.concat(dfs_with, ignore_index=True)
+            for _, r in ref_df[['cod_instrumento','num_pregunta','pregunta','competencia']].dropna(
+                    subset=['competencia','pregunta']).iterrows():
+                cod  = str(r.get('cod_instrumento', '')).strip()
+                nump = str(r.get('num_pregunta',    '')).strip()
+                txt  = str(r.get('pregunta',         '')).strip().lower()[:80]
+                comp = str(r['competencia']).strip()
+                if comp and comp.lower() not in ('no definida', 'nan', ''):
+                    if cod and nump:
+                        comp_map_num[(cod, nump)] = comp
+                    if cod and txt:
+                        comp_map_text[(cod, txt)] = comp
+
+        # Segunda pasada: enriquecer archivos sin competencia
+        dfs_enriched = []
+        for df in dfs_without:
+            def _get_comp(row):
+                cod  = str(row.get('cod_instrumento', '')).strip()
+                nump = str(row.get('num_pregunta',    '')).strip()
+                txt  = str(row.get('pregunta',        '')).strip().lower()[:80]
+                return (comp_map_num.get((cod, nump))
+                        or comp_map_text.get((cod, txt))
+                        or None)
+            df = df.copy()
+            df['competencia'] = df.apply(_get_comp, axis=1)
+            df = df.dropna(subset=['competencia'])
+            if len(df) > 0:
+                dfs_enriched.append(df[['pregunta','calificacion','periodo_evaluacion','competencia']
+                                       + [c for c in ['programa','carrera','modelo','cod_instrumento'] if c in df.columns]])
+
+        dfs = dfs_with + dfs_enriched
 
         if not dfs:
             return {}
