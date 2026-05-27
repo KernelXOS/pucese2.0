@@ -3129,12 +3129,12 @@ function displayPeriodo(p: string | number): string {
   // Si ya está normalizado (empieza con letras o tiene formato I/II-YYYY)
   if (s.startsWith('TEC-'))  return s.replace('TEC-', 'T·')
   if (s.startsWith('Posg-')) return s.replace('Posg-', 'P·')
-  if (/^(I|II)-\d{4}$/.test(s)) return `G·${s}`
+  if (/^(I|II)-\d{4}$/.test(s)) return `P·${s}`
   // Código crudo → normalizar primero
   const norm = normPeriodo(s)
   if (norm.startsWith('TEC-'))  return norm.replace('TEC-', 'T·')
-  if (norm.startsWith('Posg-')) return norm.replace('Posg-', 'P·')
-  if (/^(I|II)-\d{4}$/.test(norm)) return `G·${norm}`
+  if (norm.startsWith('Posg-')) return norm.replace('Posg-', 'Posg·')
+  if (/^(I|II)-\d{4}$/.test(norm)) return `P·${norm}`
   return norm
 }
 
