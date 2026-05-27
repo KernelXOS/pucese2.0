@@ -1296,23 +1296,46 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
             // Períodos por categoría
             const periodGrado = periodLabels.filter(l => !l.startsWith('TEC-') && !l.startsWith('Posg-'))
-            // Tecnologado: muestra todos los períodos donde las carreras tech tienen datos
-            // (incluye I-*/II-* de TC/TG, pero en el header se muestran con prefijo T· en lugar de G·)
-            const periodTec = periodLabels.filter(l =>
-              !l.startsWith('Posg-') && [...TECH_SET].some(fac => facMap[fac]?.[l] !== undefined)
-            )
             const periodPosg  = periodLabels.filter(l => l.startsWith('Posg-'))
 
-            // En el bloque Tecnologado, los períodos G· se muestran con T· (son el mismo dato,
-            // solo diferenciamos visualmente que corresponden a tecnologado)
-            const displayTecPeriodo = (lbl: string) => {
-              const d = displayPeriodo(lbl)
-              return d.startsWith('G·') ? d.replace('G·', 'T·') : d
+            // ── Tecnologado: fusionar I-YYYY y TEC-I-YYYY en un solo key TEC-I-YYYY ──
+            // Esto evita columnas duplicadas cuando la misma carrera tiene datos en
+            // períodos grado (I-2023) y en períodos tec (TEC-I-2023) que muestran el mismo label.
+            const toTecKey = (lbl: string): string => {
+              if (lbl.startsWith('TEC-') || lbl.startsWith('Posg-')) return lbl
+              const m = lbl.match(/^(I|II)-(\d{4})$/)
+              if (m) return `TEC-${m[1]}-${m[2]}`
+              return lbl
             }
+            // Construir tecFacMap (promedio de todas las fuentes que caen en el mismo TEC key)
+            const tecBuckets: Record<string, Record<string, number[]>> = {}
+            for (const lbl of periodLabels) {
+              if (lbl.startsWith('Posg-')) continue
+              const tLbl = toTecKey(lbl)
+              for (const fac of [...TECH_SET]) {
+                const val = facMap[fac]?.[lbl]
+                if (val === undefined) continue
+                if (!tecBuckets[tLbl]) tecBuckets[tLbl] = {}
+                if (!tecBuckets[tLbl][fac]) tecBuckets[tLbl][fac] = []
+                tecBuckets[tLbl][fac].push(val)
+              }
+            }
+            const tecFacMap: Record<string, Record<string, number>> = {}
+            for (const [tLbl, facVals] of Object.entries(tecBuckets)) {
+              for (const [fac, vals] of Object.entries(facVals)) {
+                if (!tecFacMap[fac]) tecFacMap[fac] = {}
+                tecFacMap[fac][tLbl] = Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10
+              }
+            }
+            // Orden canónico de períodos tec (sin duplicados)
+            const TEC_LABEL_ORDER = ['TEC-I-2023','TEC-II-2023','TEC-I-2024','TEC-II-2024','TEC-I-2025','TEC-II-2025']
+            const periodTec = TEC_LABEL_ORDER.filter(l =>
+              Object.values(tecFacMap).some(m => m[l] !== undefined)
+            )
 
             // Promedio de una carrera sólo en los períodos de su bloque
-            const avgP = (fac: string, ps: string[]) => {
-              const v = ps.map(l => facMap[fac]?.[l]).filter((x): x is number => x !== undefined)
+            const avgP = (fac: string, ps: string[], srcMap: Record<string, Record<string, number>> = facMap) => {
+              const v = ps.map(l => srcMap[fac]?.[l]).filter((x): x is number => x !== undefined)
               return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : 0
             }
 
@@ -1322,11 +1345,10 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodGrado) }))
               .sort((a,b) => b.avg - a.avg)
 
-            // Tecnologado: todas las carreras tech con cualquier dato (G· o TEC-*),
-            // mostradas con prefijo T· en los encabezados
-            const carrerasTec = avgByFac
-              .filter(d => TECH_SET.has(d.fac) && periodTec.length > 0 && periodTec.some(p => facMap[d.fac]?.[p] !== undefined))
-              .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodTec) }))
+            // Tecnologado: carreras tech con datos en al menos un período tec fusionado
+            const carrerasTec = [...TECH_SET]
+              .filter(fac => tecFacMap[fac] && periodTec.some(p => tecFacMap[fac]?.[p] !== undefined))
+              .map(fac => ({ fac, avg: avgP(fac, periodTec, tecFacMap) }))
               .sort((a,b) => b.avg - a.avg)
 
             const carrerasPosg = avgByFac
@@ -1334,15 +1356,17 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodPosg) }))
               .sort((a,b) => b.avg - a.avg)
 
-            // Render helper: una tabla pivot genérica
-            // displayFn opcional: permite sobreescribir cómo se muestra el label de período
+            // Render helper: tabla pivot genérica
+            // overrideFacMap: usa un facMap alternativo (p.ej. tecFacMap para tecnologado)
             const renderPivot = (
               title: string, sub: string,
               accentColor: string, iconBg: string,
               periods: string[],
               carreras: { fac: string; avg: number }[],
-              displayFn: (lbl: string) => string = displayPeriodo
+              displayFn: (lbl: string) => string = displayPeriodo,
+              overrideFacMap?: Record<string, Record<string, number>>
             ) => {
+              const srcMap = overrideFacMap ?? facMap
               if (!carreras.length || !periods.length) return null
               return (
                 <div key={title} className="bg-white border border-slate-200 overflow-hidden mt-5"
@@ -1388,7 +1412,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                               <span className="font-black tabular-nums text-[12px]" style={{ color:pctColor(avg) }}>{avg.toFixed(1)}</span>
                             </td>
                             {periods.map(lbl => {
-                              const val = facMap[fac]?.[lbl] ?? null
+                              const val = srcMap[fac]?.[lbl] ?? null
                               return (
                                 <td key={lbl} className="py-2 px-2 text-center">
                                   {val !== null
@@ -1423,7 +1447,8 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                   'Programas de tecnología superior · Promedio por período académico',
                   '#7c3aed', '#f5f3ff',
                   periodTec, carrerasTec,
-                  displayTecPeriodo  // G· → T· en este bloque
+                  (lbl) => lbl.replace('TEC-', 'T·'),  // TEC-I-2023 → T·I-2023
+                  tecFacMap
                 )}
                 {renderPivot(
                   'Análisis Temporal — Posgrado',
