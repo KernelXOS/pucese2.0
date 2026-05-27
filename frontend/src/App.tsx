@@ -4951,6 +4951,11 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                                   <th className="text-left py-3 px-4 font-black text-slate-500 uppercase tracking-[0.07em]">#</th>
                                   <th className="text-left py-3 px-4 font-black text-slate-500 uppercase tracking-[0.07em]">Carrera / Programa</th>
                                   <th className="text-center py-3 px-3 font-black text-slate-500 uppercase tracking-[0.07em]">Promedio</th>
+                                  {['202301','202302','202401','202402','202501','202502'].map(pc => (
+                                    <th key={pc} className="text-center py-3 px-2 font-black text-indigo-500 uppercase tracking-[0.06em] whitespace-nowrap" style={{ fontSize: 10 }}>
+                                      {({'202301':'I-2023','202302':'II-2023','202401':'I-2024','202402':'II-2024','202501':'I-2025','202502':'II-2025'} as any)[pc]}
+                                    </th>
+                                  ))}
                                   <th className="text-left py-3 px-4 font-black text-emerald-600 uppercase tracking-[0.07em]">Mejor Instrumento</th>
                                   <th className="text-center py-3 px-3 font-black text-emerald-600 uppercase tracking-[0.07em]">Puntaje</th>
                                   <th className="text-left py-3 px-4 font-black text-red-500 uppercase tracking-[0.07em]">Peor Instrumento</th>
@@ -4981,6 +4986,17 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                                             {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
                                           </span>
                                         </td>
+                                        {['202301','202302','202401','202402','202501','202502'].map(pc => {
+                                          const v = car.por_periodo?.[pc]
+                                          return (
+                                            <td key={pc} className="py-3 px-2 text-center">
+                                              {v != null
+                                                ? <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-black"
+                                                    style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                                : <span className="text-slate-200 text-[10px]">—</span>}
+                                            </td>
+                                          )
+                                        })}
                                         <td className="py-3 px-4 text-slate-700 font-medium max-w-[200px]">
                                           <span className="truncate block" title={String(car.mejor_componente || '')}>{car.mejor_componente || '—'}</span>
                                         </td>

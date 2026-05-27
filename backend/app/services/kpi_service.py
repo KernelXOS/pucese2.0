@@ -1456,40 +1456,83 @@ class KPIService:
                     return FACULTAD_MAP[k]
             return raw.strip()  # fallback: keep as-is
 
+        # Canonical period codes → display labels
+        PERIOD_CODES = ['202301', '202302', '202401', '202402', '202501', '202502']
+        PERIOD_LABELS = {
+            '202301': 'I-2023', '202302': 'II-2023',
+            '202401': 'I-2024', '202402': 'II-2024',
+            '202501': 'I-2025', '202502': 'II-2025',
+        }
+
+        def _periodo_canonical(raw: str) -> str:
+            """Map any raw period code → canonical 6-digit code."""
+            if not raw:
+                return ''
+            raw = str(raw).strip()
+            if len(raw) == 6 and raw.isdigit():
+                suf = int(raw[4:])
+                year = raw[:4]
+                if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+                    return f'{year}01'
+                return f'{year}02'
+            if '-' in raw:
+                parts = raw.split('-')
+                year = parts[0] if parts[0].isdigit() else parts[1]
+                sem  = parts[1] if parts[0].isdigit() else parts[0]
+                if sem == 'I':  return f'{year}01'
+                if sem == 'II': return f'{year}02'
+            return raw
+
         q = _base_q(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
         recs = q.filter(Evaluacion.facultad != None, Evaluacion.facultad != '').all()
 
-        # Accumulate component values per carrera (normalized)
-        buckets: dict = {}  # carrera_normalizada -> {col -> [vals]}
+        # Accumulate component values per (carrera, periodo)
+        # buckets[fac][per_code][col] = [vals]
+        from collections import defaultdict
+        buckets: dict = {}
         for r in recs:
             raw_fac = r.facultad or ''
             fac = _normalize_fac(raw_fac)
-            if not fac:  # empty string = excluded (non-academic unit)
+            if not fac:
                 continue
-            if fac not in CARRERAS_OFICIALES:  # excluir materias/asignaturas sueltas
+            if fac not in CARRERAS_OFICIALES:
                 continue
+            per = _periodo_canonical(r.periodo or '')
             if fac not in buckets:
-                buckets[fac] = {col: [] for col in COMP_COLS}
-                buckets[fac]['_n'] = 0
+                buckets[fac] = {'_total': {col: [] for col in COMP_COLS}, '_n': 0}
             buckets[fac]['_n'] += 1
+            if per and per in PERIOD_CODES:
+                if per not in buckets[fac]:
+                    buckets[fac][per] = {col: [] for col in COMP_COLS}
+                for col in COMP_COLS:
+                    val = getattr(r, col, None)
+                    if val is not None and val > 0:
+                        buckets[fac][per][col].append(float(val))
             for col in COMP_COLS:
                 val = getattr(r, col, None)
                 if val is not None and val > 0:
-                    buckets[fac][col].append(float(val))
+                    buckets[fac]['_total'][col].append(float(val))
+
+        def _avgs(data_dict):
+            return {col: round(sum(v)/len(v), 2) for col in COMP_COLS
+                    if (v := data_dict.get(col, [])) and len(v) > 0}
 
         result = []
         for fac, data in sorted(buckets.items()):
-            avgs = {}
-            for col in COMP_COLS:
-                vals = data[col]
-                if vals:
-                    avgs[col] = round(sum(vals) / len(vals), 2)
-
+            avgs = _avgs(data['_total'])
             if not avgs:
                 continue
 
-            best_col = max(avgs, key=lambda c: avgs[c])
+            best_col  = max(avgs, key=lambda c: avgs[c])
             worst_col = min(avgs, key=lambda c: avgs[c])
+
+            # Per-period promedio general (avg of all active components)
+            por_periodo = {}
+            for pcode in PERIOD_CODES:
+                if pcode in data:
+                    pavgs = _avgs(data[pcode])
+                    if pavgs:
+                        por_periodo[pcode] = round(sum(pavgs.values()) / len(pavgs), 2)
 
             result.append({
                 'carrera':            fac,
@@ -1499,12 +1542,13 @@ class KPIService:
                 'mejor_val':          round(avgs[best_col], 2),
                 'peor_componente':    COMP_LABELS[worst_col],
                 'peor_val':           round(avgs[worst_col], 2),
-                # legacy names kept for backward compatibility
                 'mejor_comp':         COMP_LABELS[best_col],
                 'mejor_puntaje':      round(avgs[best_col], 2),
                 'peor_comp':          COMP_LABELS[worst_col],
                 'peor_puntaje':       round(avgs[worst_col], 2),
                 'componentes':        {COMP_LABELS[c]: v for c, v in avgs.items()},
+                'por_periodo':        por_periodo,  # {'202301': 82.5, '202402': 79.3, ...}
+                'periodos_labels':    PERIOD_LABELS,
             })
 
         result.sort(key=lambda x: x['carrera'])
