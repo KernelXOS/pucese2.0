@@ -1400,7 +1400,29 @@ class KPIService:
         modelo: str = None,
         periodo: str = None,
     ):
-        """Avg of each component column grouped by facultad, returns best/worst per carrera."""
+        """Avg of each component column grouped by facultad (normalized), returns best/worst per carrera."""
+        # Solo estas 19 carreras oficiales PUCESE
+        CARRERAS_OFICIALES = {
+            'Pedagogía Idiomas Nac. Ext.',
+            'Psicología',
+            'Derecho',
+            'Agroindustria',
+            'Negocios Internacionales',
+            'Contabilidad y Auditoría',
+            'Laboratorio Clínico',
+            'Administración de Empresas',
+            'TC Enfermería',
+            'Edu. Básica Semi - Quinindé',
+            'Fisioterapia',
+            'Enfermería',
+            'Ing. Recursos Naturales Renova',
+            'Tecnologías de la Información',
+            'Educación Básica',
+            'Diseño Gráfico',
+            'TG Gestión Culinaria',
+            'Medicina',
+            'TG Desarrollo de Software',
+        }
         COMP_LABELS = {
             'het_estudiantil':  'Heteroevaluación Estudiantil',
             'autoevaluacion':   'Autoevaluación',
@@ -1443,6 +1465,8 @@ class KPIService:
             raw_fac = r.facultad or ''
             fac = _normalize_fac(raw_fac)
             if not fac:  # empty string = excluded (non-academic unit)
+                continue
+            if fac not in CARRERAS_OFICIALES:  # excluir materias/asignaturas sueltas
                 continue
             if fac not in buckets:
                 buckets[fac] = {col: [] for col in COMP_COLS}
