@@ -1154,28 +1154,67 @@ class KPIService:
         worst_comp  = _enrich_comp(comp_sorted.tail(6).sort_values('promedio'))
         todas_comp  = _enrich_comp(comp_sorted)   # ← todas sin límite
 
-        # ── Por carrera (si el Excel tiene columna programa/carrera) ──────────
+        # ── Por carrera — normalizar con FACULTAD_MAP a las 19 carreras oficiales ──
         por_carrera_data: list = []
         carrera_col = next((c for c in ['programa', 'carrera'] if c in all_df.columns), None)
         if carrera_col:
-            all_df['_carrera'] = all_df[carrera_col].apply(_norm_name)
-            carreras_uniq = [c for c in all_df['_carrera'].dropna().unique() if c and c != 'Nan']
-            for car in sorted(carreras_uniq):
-                df_car = all_df[all_df['_carrera'] == car]
+            try:
+                from app.services.etl_service import FACULTAD_MAP
+            except Exception:
+                FACULTAD_MAP = {}
+
+            CARRERAS_OFICIALES_CP = {
+                'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+                'Contabilidad y Auditoría', 'Administración de Empresas',
+                'Negocios Internacionales', 'Tecnologías de la Información',
+                'Ing. Recursos Naturales Renova', 'Agroindustria',
+                'Laboratorio Clínico', 'Enfermería', 'TC Enfermería',
+                'Fisioterapia', 'Medicina', 'Educación Básica',
+                'Edu. Básica Semi - Quinindé', 'Diseño Gráfico',
+                'TG Desarrollo de Software', 'TG Gestión Culinaria',
+            }
+
+            def _map_carrera(raw: str) -> str:
+                """Mapea nombre raw → carrera oficial usando FACULTAD_MAP."""
+                if not raw or not isinstance(raw, str):
+                    return ''
+                s = raw.strip()
+                # Búsqueda exacta primero
+                if s in FACULTAD_MAP:
+                    return FACULTAD_MAP[s]
+                # Búsqueda case-insensitive
+                s_lower = s.lower()
+                for k, v in FACULTAD_MAP.items():
+                    if k.lower() == s_lower:
+                        return v
+                # Búsqueda parcial: si alguna clave contiene el raw o viceversa
+                for k, v in FACULTAD_MAP.items():
+                    if s_lower in k.lower() or k.lower() in s_lower:
+                        return v
+                return ''
+
+            all_df['_carrera'] = all_df[carrera_col].apply(
+                lambda x: _map_carrera(str(x)) if isinstance(x, str) else ''
+            )
+            # Solo las 19 carreras oficiales
+            df_oficial = all_df[all_df['_carrera'].isin(CARRERAS_OFICIALES_CP)]
+            carreras_uniq = sorted(df_oficial['_carrera'].dropna().unique().tolist())
+
+            for car in carreras_uniq:
+                df_car = df_oficial[df_oficial['_carrera'] == car]
                 if len(df_car) < 3:
                     continue
-                # Competencias de esta carrera por período
                 cg = df_car.groupby('competencia')['pct'].agg(promedio='mean', n='count').reset_index()
                 cg['promedio'] = cg['promedio'].round(2)
                 cg = cg[cg['competencia'] != '']
                 cp = df_car.groupby(['competencia','periodo_evaluacion'])['pct'].mean().round(2).reset_index()
                 cp.columns = ['competencia','periodo','promedio']
-                def _ec(rows):
+                def _ec(rows, _cp=cp):
                     result = []
                     for _, r in rows.iterrows():
                         entry = {'competencia': r['competencia'], 'promedio': round(r['promedio'],2), 'n': int(r['n'])}
                         for p in periodos:
-                            val = cp[(cp['competencia']==r['competencia'])&(cp['periodo']==p)]['promedio']
+                            val = _cp[(_cp['competencia']==r['competencia'])&(_cp['periodo']==p)]['promedio']
                             entry[p] = round(float(val.values[0]),2) if len(val) else None
                         result.append(entry)
                     return result
