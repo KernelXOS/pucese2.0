@@ -325,16 +325,51 @@ def reporte_general_pdf(
 
 @router.post("/consulta-ia")
 def consulta_ia(body: ConsultaRequest, db: Session = Depends(get_db)):
-    """Answer a free-form question about teacher evaluation using real data + Gemini."""
-    comparativo = kpi_service.get_comparativo(db, anio=body.anio)
-    ranking_top = kpi_service.get_ranking_docentes(db, limit=50)
-    criticos    = kpi_service.get_docentes_criticos(db, threshold=3.5)  # <70/100
+    """Answer a free-form question about teacher evaluation using rich real data + Gemini."""
+    comparativo        = kpi_service.get_comparativo(db, anio=body.anio)
+    ranking_top        = kpi_service.get_ranking_docentes(db, limit=50)
+    criticos           = kpi_service.get_docentes_criticos(db, threshold=3.5)
+    tendencias         = kpi_service.get_tendencias(db)
+    variables          = kpi_service.get_variables_kpis(db)
+    try:
+        comp_por_carrera = kpi_service.get_competencias_por_carrera(db)
+    except Exception:
+        comp_por_carrera = []
 
     context = {
-        'comparativo': comparativo,
-        'ranking_top': ranking_top,
-        'criticos':    criticos,
+        'comparativo':           comparativo,
+        'ranking_top':           ranking_top,
+        'criticos':              criticos,
+        'tendencias':            tendencias,
+        'variables':             variables,
+        'competencias_por_carrera': comp_por_carrera,
     }
 
     answer = gemini_service.answer_question(body.pregunta, context)
     return {'respuesta': answer, 'pregunta': body.pregunta}
+
+
+@router.post("/informe-ia")
+def generar_informe_ia(db: Session = Depends(get_db)):
+    """Genera un informe ejecutivo completo con IA usando todos los datos disponibles."""
+    comparativo        = kpi_service.get_comparativo(db)
+    ranking_top        = kpi_service.get_ranking_docentes(db, limit=100)
+    criticos           = kpi_service.get_docentes_criticos(db, threshold=3.5)
+    tendencias         = kpi_service.get_tendencias(db)
+    variables          = kpi_service.get_variables_kpis(db)
+    try:
+        comp_por_carrera = kpi_service.get_competencias_por_carrera(db)
+    except Exception:
+        comp_por_carrera = []
+
+    data = {
+        'comparativo':           comparativo,
+        'ranking_top':           ranking_top,
+        'criticos':              criticos,
+        'tendencias':            tendencias,
+        'variables':             variables,
+        'competencias_por_carrera': comp_por_carrera,
+    }
+
+    informe = gemini_service.generate_informe_ia(data)
+    return {'informe': informe}

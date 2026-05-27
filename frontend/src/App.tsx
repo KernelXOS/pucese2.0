@@ -7,7 +7,7 @@ import {
   Microscope, Heart, Link2, Briefcase, GraduationCap, Calendar,
   Activity, UserCheck, Menu, Bell, LogOut, ChevronDown, ChevronRight,
   LayoutDashboard, Building2, Cpu, Download, FileSpreadsheet, Loader2, Stethoscope,
-  Eye, EyeOff, Lock, Mail,
+  Eye, EyeOff, Lock, Mail, Copy,
 } from 'lucide-react'
 
 const LOGO_URL = 'https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png'
@@ -602,98 +602,227 @@ function barLayout(opts: { tickAngle?: number; marginB?: number; maxY?: number }
 }
 
 // ── AI Q&A Panel ──────────────────────────────────────────────────────────────
-const PREGUNTAS = [
+const PREGUNTAS_GENERAL = [
   '¿Cuál fue el mejor docente en general?',
-  '¿Quién cumplió todos los parámetros de evaluación?',
   '¿Qué modelo fue más efectivo, MEIPA o MECDI?',
-  '¿Qué género tuvo mejor desempeño y por qué?',
+  '¿Cuál fue la mejor unidad académica y por qué?',
   '¿Los docentes más antiguos son mejores evaluados?',
-  '¿Cuál fue la mejor unidad académica?',
-  '¿Qué docentes necesitan apoyo o plan de mejora?',
+  '¿Qué género tuvo mejor desempeño y por qué?',
   '¿Cómo influye la edad en el desempeño docente?',
+]
+const PREGUNTAS_CARRERAS = [
+  '¿Qué carrera tuvo el puntaje más bajo y por qué?',
+  '¿Cuál es el componente más débil en Enfermería?',
+  '¿Por qué Educación Básica tiene esos resultados?',
+  '¿Qué carreras mejoraron más entre 2023 y 2025?',
+  '¿Cuáles son las 3 carreras que más necesitan apoyo?',
+  '¿Qué diferencia hay entre Medicina y Derecho?',
+]
+const PREGUNTAS_DOCENTES = [
+  '¿Qué docentes necesitan un plan de mejora urgente?',
   '¿Quiénes mejoraron más entre años?',
+  '¿Cuáles son los docentes con mejor hetero-evaluación?',
   '¿Las mujeres jóvenes rinden mejor que las mayores?',
+  '¿Qué docentes cumplen todos los parámetros?',
+  '¿Quién tuvo la mayor mejora entre períodos?',
 ]
 
+/** Renderiza markdown básico en JSX sin dependencias externas */
+function MarkdownView({ text }: { text: string }) {
+  const lines = text.split('\n')
+  const elements: React.ReactNode[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    // H2
+    if (line.startsWith('## ')) {
+      elements.push(<h2 key={i} className="text-[12px] font-black text-slate-800 mt-4 mb-1 border-b border-slate-100 pb-1">{line.slice(3)}</h2>)
+    }
+    // H3
+    else if (line.startsWith('### ')) {
+      elements.push(<h3 key={i} className="text-[11px] font-bold text-indigo-700 mt-3 mb-1">{line.slice(4)}</h3>)
+    }
+    // H1
+    else if (line.startsWith('# ')) {
+      elements.push(<h1 key={i} className="text-[13px] font-black text-slate-900 mt-4 mb-2">{line.slice(2)}</h1>)
+    }
+    // Horizontal rule
+    else if (line.trim() === '---' || line.trim() === '***') {
+      elements.push(<hr key={i} className="border-slate-200 my-3" />)
+    }
+    // List item
+    else if (line.match(/^[\-\*]\s/)) {
+      elements.push(
+        <div key={i} className="flex gap-1.5 ml-3 mb-0.5">
+          <span className="text-indigo-400 font-bold text-[10px] mt-0.5 flex-shrink-0">•</span>
+          <span className="text-[11px] text-slate-700 leading-relaxed">{renderInline(line.replace(/^[\-\*]\s/, ''))}</span>
+        </div>
+      )
+    }
+    // Numbered list
+    else if (line.match(/^\d+\.\s/)) {
+      const num = line.match(/^(\d+)\.\s/)![1]
+      elements.push(
+        <div key={i} className="flex gap-2 ml-3 mb-0.5">
+          <span className="text-indigo-500 font-bold text-[10px] w-4 flex-shrink-0">{num}.</span>
+          <span className="text-[11px] text-slate-700 leading-relaxed">{renderInline(line.replace(/^\d+\.\s/, ''))}</span>
+        </div>
+      )
+    }
+    // Empty line
+    else if (line.trim() === '') {
+      elements.push(<div key={i} className="h-2" />)
+    }
+    // Normal paragraph
+    else {
+      elements.push(<p key={i} className="text-[11px] text-slate-700 leading-relaxed mb-1">{renderInline(line)}</p>)
+    }
+    i++
+  }
+  return <div className="space-y-0">{elements}</div>
+}
+
+function renderInline(text: string): React.ReactNode {
+  // Bold **text**
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/)
+  return parts.map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**')) return <strong key={i} className="font-bold text-slate-900">{p.slice(2,-2)}</strong>
+    if (p.startsWith('`') && p.endsWith('`')) return <code key={i} className="bg-slate-100 text-indigo-700 px-1 rounded text-[10px] font-mono">{p.slice(1,-1)}</code>
+    return p
+  })
+}
+
 function AIConsultaPanel({ anio }: { anio?: number }) {
-  const [pregunta, setPregunta] = useState('')
-  const [respuesta, setRespuesta] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [pregunta, setPregunta]         = useState('')
+  const [respuesta, setRespuesta]       = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [loadingInforme, setLoadingInforme] = useState(false)
   const [preguntaActiva, setPreguntaActiva] = useState<string | null>(null)
+  const [tabPreg, setTabPreg]           = useState<'general'|'carreras'|'docentes'>('general')
+  const [modoInforme, setModoInforme]   = useState(false)
+  const [informe, setInforme]           = useState('')
+
+  const TABS_MAP = { general: PREGUNTAS_GENERAL, carreras: PREGUNTAS_CARRERAS, docentes: PREGUNTAS_DOCENTES }
+  const TABS_LABEL = { general: 'General', carreras: 'Por Carrera', docentes: 'Por Docente' }
 
   const preguntar = async (q: string) => {
     if (!q.trim() || loading) return
     setLoading(true)
+    setModoInforme(false)
     setRespuesta('')
     setPreguntaActiva(q)
+    setPregunta('')
     try {
       const res = await api.consultaIA(q, anio)
       setRespuesta(res.data.respuesta)
     } catch {
-      setRespuesta('Error al conectar con la IA. Verifica que la API Key de Gemini esté configurada.')
+      setRespuesta('⚠️ Error al conectar con la IA. Verifica que la API Key de Gemini esté configurada.')
     } finally {
       setLoading(false)
     }
   }
+
+  const generarInforme = async () => {
+    if (loadingInforme) return
+    setLoadingInforme(true)
+    setModoInforme(true)
+    setRespuesta('')
+    setInforme('')
+    try {
+      const res = await api.informeIA()
+      setInforme(res.data.informe)
+    } catch {
+      setInforme('⚠️ Error al generar el informe. Verifica que la API Key de Gemini esté configurada.')
+    } finally {
+      setLoadingInforme(false)
+    }
+  }
+
+  const copiarTexto = (txt: string) => {
+    navigator.clipboard.writeText(txt).catch(() => {})
+  }
+
+  const contenidoActual = modoInforme ? informe : respuesta
+  const isWorking = modoInforme ? loadingInforme : loading
 
   return (
     <div className="bg-white border border-slate-200 overflow-hidden mb-6"
       style={{ borderRadius: 6, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', borderLeft: '3px solid #4f46e5' }}>
 
       {/* Header */}
-      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <BrainCircuit size={14} className="text-indigo-400" />
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Inteligencia Artificial ·</span>
-          <h3 className="text-[13px] font-bold text-slate-700">Consulta sobre Evaluación Docente</h3>
+          <h3 className="text-[13px] font-bold text-slate-700">Análisis IA sobre Evaluación Docente</h3>
         </div>
-        <span className="text-[9px] font-bold px-2 py-1 rounded text-indigo-500 border border-indigo-100 bg-indigo-50" style={{ borderRadius: 4 }}>
-          Gemini
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={generarInforme}
+            disabled={loadingInforme || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 transition-all"
+            style={{ background: 'linear-gradient(135deg,#059669,#0891b2)', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+          >
+            {loadingInforme
+              ? <><div className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Generando…</>
+              : <><FileText size={10} /> Generar Informe IA</>
+            }
+          </button>
+          <span className="text-[9px] font-bold px-2 py-1 rounded text-indigo-500 border border-indigo-100 bg-indigo-50">
+            Gemini
+          </span>
+        </div>
       </div>
 
-      <div className="p-6 space-y-5">
-        {/* Preset chips */}
+      <div className="p-5 space-y-4">
+        {/* Tabs de categorías */}
         <div>
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">
-            Preguntas frecuentes — haz clic para consultar
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {PREGUNTAS.map(q => (
-              <button
-                key={q}
-                onClick={() => preguntar(q)}
-                disabled={loading}
-                className="text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-all disabled:opacity-50"
+          <div className="flex gap-1 mb-3">
+            {(Object.keys(TABS_MAP) as Array<keyof typeof TABS_MAP>).map(t => (
+              <button key={t} onClick={() => setTabPreg(t)}
+                className="text-[9px] font-bold px-3 py-1 rounded-full border transition-all"
                 style={{
-                  borderColor: preguntaActiva === q && respuesta ? '#4f46e5' : '#e2e8f0',
-                  background: preguntaActiva === q && respuesta ? '#eef2ff' : '#f8fafc',
-                  color: preguntaActiva === q && respuesta ? '#4f46e5' : '#64748b',
-                }}
-              >
+                  background: tabPreg === t ? '#eef2ff' : '#f8fafc',
+                  borderColor: tabPreg === t ? '#4f46e5' : '#e2e8f0',
+                  color: tabPreg === t ? '#4f46e5' : '#94a3b8',
+                }}>
+                {TABS_LABEL[t]}
+              </button>
+            ))}
+            <span className="ml-auto text-[9px] text-slate-400 font-medium self-center">Haz clic para consultar</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {TABS_MAP[tabPreg].map(q => (
+              <button key={q} onClick={() => preguntar(q)} disabled={loading || loadingInforme}
+                className="text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 text-left"
+                style={{
+                  borderColor: preguntaActiva === q && respuesta && !modoInforme ? '#4f46e5' : '#e2e8f0',
+                  background:  preguntaActiva === q && respuesta && !modoInforme ? '#eef2ff' : '#f8fafc',
+                  color:       preguntaActiva === q && respuesta && !modoInforme ? '#4f46e5' : '#64748b',
+                }}>
                 {q}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Custom input */}
-        <div className="flex gap-3">
+        {/* Input libre */}
+        <div className="flex gap-2">
           <div className="flex-1 relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Escribe tu propia pregunta sobre los datos de evaluación…"
+              placeholder="Escribe cualquier pregunta sobre los datos… (Enter para enviar)"
               className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-400 transition-all"
               value={pregunta}
               onChange={e => setPregunta(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && preguntar(pregunta)}
-              disabled={loading}
+              disabled={loading || loadingInforme}
             />
           </div>
           <button
             onClick={() => preguntar(pregunta)}
-            disabled={loading || !pregunta.trim()}
+            disabled={loading || loadingInforme || !pregunta.trim()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-all"
             style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', boxShadow: '0 4px 12px rgba(79,70,229,0.25)' }}
           >
@@ -704,33 +833,60 @@ function AIConsultaPanel({ anio }: { anio?: number }) {
           </button>
         </div>
 
-        {/* Response */}
-        {(loading || respuesta) && (
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-5 min-h-[80px]">
-            {loading ? (
-              <div className="flex items-center gap-3 text-indigo-400">
-                <div className="w-4 h-4 rounded-full border-2 border-indigo-200 border-t-indigo-500 animate-spin flex-shrink-0" />
-                <span className="text-xs font-semibold animate-pulse">Analizando los datos reales de evaluación…</span>
+        {/* Área de respuesta */}
+        {(isWorking || contenidoActual) && (
+          <div className="rounded-xl border overflow-hidden"
+            style={{ borderColor: modoInforme ? '#a7f3d0' : '#c7d2fe', background: modoInforme ? '#f0fdf4' : '#eef2ff20' }}>
+            {/* Sub-header de respuesta */}
+            <div className="px-4 py-2 border-b flex items-center justify-between"
+              style={{ borderColor: modoInforme ? '#a7f3d0' : '#c7d2fe', background: modoInforme ? '#d1fae5' : '#eef2ff' }}>
+              <div className="flex items-center gap-2">
+                {isWorking
+                  ? <div className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
+                  : <BrainCircuit size={12} className={modoInforme ? 'text-emerald-600' : 'text-indigo-500'} />}
+                <span className="text-[9px] font-black uppercase tracking-widest"
+                  style={{ color: modoInforme ? '#059669' : '#4f46e5' }}>
+                  {isWorking
+                    ? (modoInforme ? 'Generando informe completo…' : 'Analizando datos reales…')
+                    : (modoInforme ? 'Informe Ejecutivo IA' : `Respuesta a: "${preguntaActiva}"`)
+                  }
+                </span>
               </div>
-            ) : (
-              <>
-                {preguntaActiva && (
-                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-3">
-                    Respuesta a: "{preguntaActiva}"
-                  </p>
-                )}
-                <p className="text-[11px] text-slate-700 leading-relaxed whitespace-pre-wrap">{respuesta}</p>
-              </>
-            )}
+              {!isWorking && contenidoActual && (
+                <button onClick={() => copiarTexto(contenidoActual)}
+                  className="flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-all hover:bg-white"
+                  style={{ borderColor: modoInforme ? '#6ee7b7' : '#c7d2fe', color: modoInforme ? '#059669' : '#4f46e5' }}>
+                  <Copy size={9} /> Copiar
+                </button>
+              )}
+            </div>
+            {/* Contenido */}
+            <div className="p-5 max-h-[600px] overflow-y-auto">
+              {isWorking
+                ? <div className="flex items-center gap-3 text-slate-400 py-4">
+                    <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin flex-shrink-0" />
+                    <span className="text-xs font-semibold animate-pulse">
+                      {modoInforme
+                        ? 'Analizando todos los datos: ranking, tendencias, carreras, demografía… Esto puede tardar ~15s'
+                        : 'Consultando datos reales de evaluación docente…'}
+                    </span>
+                  </div>
+                : <MarkdownView text={contenidoActual} />
+              }
+            </div>
           </div>
         )}
 
-        {!loading && !respuesta && (
-          <div className="flex items-center gap-3 py-4 text-slate-400">
-            <BrainCircuit size={20} className="text-indigo-200 flex-shrink-0" />
-            <p className="text-xs font-semibold">
-              Selecciona una pregunta frecuente o escribe la tuya. La IA analizará los datos reales de evaluación docente para responder.
-            </p>
+        {!isWorking && !contenidoActual && (
+          <div className="flex items-start gap-3 py-3 px-4 rounded-xl bg-slate-50 border border-slate-100">
+            <BrainCircuit size={18} className="text-indigo-200 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-bold text-slate-600 mb-1">¿Qué puedo analizar?</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                Selecciona una pregunta frecuente, escribe la tuya, o haz clic en <strong>Generar Informe IA</strong> para obtener
+                un análisis ejecutivo completo con ranking, tendencias, carreras con problemas y recomendaciones estratégicas.
+              </p>
+            </div>
           </div>
         )}
       </div>

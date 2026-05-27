@@ -103,6 +103,9 @@ export const api = {
   consultaIA: (pregunta: string, anio?: number) =>
     axios.post(`${EVAL}/consulta-ia`, { pregunta, anio }),
 
+  informeIA: () =>
+    axios.post(`${EVAL}/informe-ia`),
+
   // ── Nuevos: períodos ────────────────────────────────────────────────────────
   getPeriodos: () =>
     axios.get(`${EVAL}/etl/periodos`),
