@@ -1890,6 +1890,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 // ── Mejores y Peores panel ────────────────────────────────────────────────────
 const CATEGORIA_ICONS: Record<string, any> = {
   'Pregrado':      GraduationCap,
+  'Docencia':      GraduationCap,
   'Salud / ABP':   Heart,
   'Vinculación':   Link2,
   'Investigación': Microscope,
@@ -1897,6 +1898,7 @@ const CATEGORIA_ICONS: Record<string, any> = {
 }
 const CATEGORIA_COLORS: Record<string, string> = {
   'Pregrado':      '#0056b3',
+  'Docencia':      '#0056b3',
   'Salud / ABP':   '#dc2626',
   'Vinculación':   '#059669',
   'Investigación': '#7c3aed',
@@ -1953,7 +1955,7 @@ function MejoresPeoresPanel({ mejoresPeores }: { mejoresPeores: Record<string, a
         <div className="flex items-center gap-2">
           <Icon size={14} style={{ color }} />
           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Ranking ·</span>
-          <h3 className="text-[13px] font-bold text-slate-700">Mejores y Peores Docentes por Área</h3>
+          <h3 className="text-[13px] font-bold text-slate-700">Mejores y Peores Docentes por Rol</h3>
         </div>
         <span className="text-[9px] font-bold px-2 py-1 rounded border"
           style={{ color, background:`${color}08`, borderColor:`${color}25` }}>
@@ -4012,8 +4014,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center gap-3">
                       <div className="w-1 h-6 rounded-full bg-gradient-to-b from-violet-500 to-blue-500" />
                       <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Análisis · Competencias</p>
-                        <h3 className="text-[13px] font-black text-slate-800 leading-tight">Mejor y Peor Competencia por Carrera</h3>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.18em]">Análisis · Instrumentos</p>
+                        <h3 className="text-[13px] font-black text-slate-800 leading-tight">Mejor y Peor Instrumento por Carrera</h3>
                       </div>
                       <span className="ml-auto text-[9px] font-semibold text-slate-300">{filtered.length} carreras</span>
                     </div>
@@ -4022,9 +4024,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                         <thead className="sticky top-0 z-10" style={{ background: '#f8fafc' }}>
                           <tr>
                             <th className="text-left py-2 px-3 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200">Carrera / Programa</th>
-                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#059669' }}>✦ Mejor Competencia</th>
+                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#059669' }}>✦ Mejor Instrumento</th>
                             <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
-                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#dc2626' }}>▼ Peor Competencia</th>
+                            <th className="text-center py-2 px-2 font-black text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200" style={{ color:'#dc2626' }}>▼ Peor Instrumento</th>
                             <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Ptje.</th>
                             <th className="text-center py-2 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-14">Brecha</th>
                           </tr>

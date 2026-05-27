@@ -399,7 +399,7 @@ class KPIService:
 
         # ── Mejores y Peores por modelo 360 ──────────────────────────────────
         RANKING_MODELS = {
-            'Pregrado':             'docencia',
+            'Docencia':             'docencia',
             'Salud / ABP':          'abp',
             'Salud / Servicios':    'servicios',
             'Vinculación':          'vinculacion',
