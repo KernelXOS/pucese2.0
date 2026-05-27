@@ -1413,14 +1413,36 @@ class KPIService:
         }
         COMP_COLS = list(COMP_LABELS.keys())
 
+        # Import FACULTAD_MAP to normalize raw facultad → official carrera name
+        try:
+            from app.services.etl_service import FACULTAD_MAP
+        except Exception:
+            FACULTAD_MAP = {}
+
+        def _normalize_fac(raw: str) -> str:
+            """Map raw facultad → official carrera name using FACULTAD_MAP."""
+            if not raw:
+                return ''
+            raw_upper = raw.strip().upper()
+            # Try exact match first
+            for k, v in FACULTAD_MAP.items():
+                if raw_upper == k.upper():
+                    return v
+            # Try prefix match (longest first)
+            for k in sorted(FACULTAD_MAP.keys(), key=len, reverse=True):
+                if raw_upper.startswith(k.upper()):
+                    return FACULTAD_MAP[k]
+            return raw.strip()  # fallback: keep as-is
+
         q = _base_q(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
         recs = q.filter(Evaluacion.facultad != None, Evaluacion.facultad != '').all()
 
-        # Accumulate component values per carrera
-        buckets: dict = {}  # facultad -> {col -> [vals]}
+        # Accumulate component values per carrera (normalized)
+        buckets: dict = {}  # carrera_normalizada -> {col -> [vals]}
         for r in recs:
-            fac = r.facultad or ''
-            if not fac:
+            raw_fac = r.facultad or ''
+            fac = _normalize_fac(raw_fac)
+            if not fac:  # empty string = excluded (non-academic unit)
                 continue
             if fac not in buckets:
                 buckets[fac] = {col: [] for col in COMP_COLS}
@@ -1446,13 +1468,19 @@ class KPIService:
             worst_col = min(avgs, key=lambda c: avgs[c])
 
             result.append({
-                'carrera':          fac,
-                'n':                data['_n'],
-                'mejor_comp':       COMP_LABELS[best_col],
-                'mejor_puntaje':    avgs[best_col],
-                'peor_comp':        COMP_LABELS[worst_col],
-                'peor_puntaje':     avgs[worst_col],
-                'componentes':      {COMP_LABELS[c]: v for c, v in avgs.items()},
+                'carrera':            fac,
+                'n':                  data['_n'],
+                'promedio':           round(sum(avgs.values()) / len(avgs), 2),
+                'mejor_componente':   COMP_LABELS[best_col],
+                'mejor_val':          round(avgs[best_col], 2),
+                'peor_componente':    COMP_LABELS[worst_col],
+                'peor_val':           round(avgs[worst_col], 2),
+                # legacy names kept for backward compatibility
+                'mejor_comp':         COMP_LABELS[best_col],
+                'mejor_puntaje':      round(avgs[best_col], 2),
+                'peor_comp':          COMP_LABELS[worst_col],
+                'peor_puntaje':       round(avgs[worst_col], 2),
+                'componentes':        {COMP_LABELS[c]: v for c, v in avgs.items()},
             })
 
         result.sort(key=lambda x: x['carrera'])
