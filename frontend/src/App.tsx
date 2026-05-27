@@ -1290,10 +1290,21 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             const TECH_SET = new Set(['TC Enfermería','TG Gestión Culinaria','TG Desarrollo de Software','Tecnologado'])
             const POSG_SET = new Set(['Posgrado'])
 
-            // Períodos por categoría — Tecnologado SÓLO muestra columnas T·
+            // Períodos por categoría
             const periodGrado = periodLabels.filter(l => !l.startsWith('TEC-') && !l.startsWith('Posg-'))
-            const periodTec   = periodLabels.filter(l => l.startsWith('TEC-'))
+            // Tecnologado: muestra todos los períodos donde las carreras tech tienen datos
+            // (incluye I-*/II-* de TC/TG, pero en el header se muestran con prefijo T· en lugar de G·)
+            const periodTec = periodLabels.filter(l =>
+              !l.startsWith('Posg-') && [...TECH_SET].some(fac => facMap[fac]?.[l] !== undefined)
+            )
             const periodPosg  = periodLabels.filter(l => l.startsWith('Posg-'))
+
+            // En el bloque Tecnologado, los períodos G· se muestran con T· (son el mismo dato,
+            // solo diferenciamos visualmente que corresponden a tecnologado)
+            const displayTecPeriodo = (lbl: string) => {
+              const d = displayPeriodo(lbl)
+              return d.startsWith('G·') ? d.replace('G·', 'T·') : d
+            }
 
             // Promedio de una carrera sólo en los períodos de su bloque
             const avgP = (fac: string, ps: string[]) => {
@@ -1301,14 +1312,14 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : 0
             }
 
-            // Grado: todas las carreras oficiales (incluyendo TC/TG que sólo tienen datos en G·)
-            // que tengan al menos un período Grado con datos
+            // Grado: carreras oficiales que NO son del set tecnologado
             const carrerasGrado = avgByFac
-              .filter(d => CARRERAS_OFICIALES.has(d.fac) && !POSG_SET.has(d.fac) && periodGrado.some(p => facMap[d.fac]?.[p] !== undefined))
+              .filter(d => CARRERAS_OFICIALES.has(d.fac) && !TECH_SET.has(d.fac) && !POSG_SET.has(d.fac) && periodGrado.some(p => facMap[d.fac]?.[p] !== undefined))
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodGrado) }))
               .sort((a,b) => b.avg - a.avg)
 
-            // Tecnologado: sólo carreras con datos en períodos T· (TEC-*)
+            // Tecnologado: todas las carreras tech con cualquier dato (G· o TEC-*),
+            // mostradas con prefijo T· en los encabezados
             const carrerasTec = avgByFac
               .filter(d => TECH_SET.has(d.fac) && periodTec.length > 0 && periodTec.some(p => facMap[d.fac]?.[p] !== undefined))
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodTec) }))
@@ -1320,11 +1331,13 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               .sort((a,b) => b.avg - a.avg)
 
             // Render helper: una tabla pivot genérica
+            // displayFn opcional: permite sobreescribir cómo se muestra el label de período
             const renderPivot = (
               title: string, sub: string,
               accentColor: string, iconBg: string,
               periods: string[],
-              carreras: { fac: string; avg: number }[]
+              carreras: { fac: string; avg: number }[],
+              displayFn: (lbl: string) => string = displayPeriodo
             ) => {
               if (!carreras.length || !periods.length) return null
               return (
@@ -1350,8 +1363,8 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                           <th className="text-center py-2.5 px-2 font-black text-slate-500 text-[8.5px] uppercase tracking-[0.1em] border-b border-slate-200 w-16">Prom.</th>
                           {periods.map(lbl => (
                             <th key={lbl} className="text-center py-2.5 px-2 font-black text-[8.5px] uppercase tracking-[0.08em] border-b border-slate-200 w-20"
-                              style={{ color: lbl.startsWith('TEC-') ? '#7c3aed' : lbl.startsWith('Posg-') ? '#0891b2' : '#0056b3' }}>
-                              {displayPeriodo(lbl)}
+                              style={{ color: accentColor }}>
+                              {displayFn(lbl)}
                             </th>
                           ))}
                         </tr>
@@ -1398,19 +1411,22 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
                   'Análisis Temporal — Grado',
                   'Carreras de pregrado · Promedio por período académico',
                   '#059669', '#f0fdf4',
-                  periodGrado, carrerasGrado
+                  periodGrado, carrerasGrado,
+                  displayPeriodo
                 )}
                 {renderPivot(
                   'Análisis Temporal — Tecnologado',
                   'Programas de tecnología superior · Promedio por período académico',
                   '#7c3aed', '#f5f3ff',
-                  periodTec, carrerasTec
+                  periodTec, carrerasTec,
+                  displayTecPeriodo  // G· → T· en este bloque
                 )}
                 {renderPivot(
                   'Análisis Temporal — Posgrado',
                   'Programas de maestría y especialización · Promedio por período académico',
                   '#0891b2', '#ecfeff',
-                  periodPosg, carrerasPosg
+                  periodPosg, carrerasPosg,
+                  displayPeriodo
                 )}
               </>
             )
