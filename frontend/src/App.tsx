@@ -1290,9 +1290,9 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
             const TECH_SET = new Set(['TC Enfermería','TG Gestión Culinaria','TG Desarrollo de Software','Tecnologado'])
             const POSG_SET = new Set(['Posgrado'])
 
-            // Períodos por categoría
+            // Períodos por categoría — Tecnologado SÓLO muestra columnas T·
             const periodGrado = periodLabels.filter(l => !l.startsWith('TEC-') && !l.startsWith('Posg-'))
-            const periodTec   = periodLabels.filter(l => [...TECH_SET].some(fac => facMap[fac]?.[l] !== undefined))
+            const periodTec   = periodLabels.filter(l => l.startsWith('TEC-'))
             const periodPosg  = periodLabels.filter(l => l.startsWith('Posg-'))
 
             // Promedio de una carrera sólo en los períodos de su bloque
@@ -1301,12 +1301,14 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
               return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : 0
             }
 
-            // Carreras de cada bloque, con promedio recalculado sobre sus propios períodos
-            const carrerasGrado = rankedCarreras
-              .filter(d => !TECH_SET.has(d.fac) && !POSG_SET.has(d.fac) && periodGrado.some(p => facMap[d.fac]?.[p] !== undefined))
+            // Grado: todas las carreras oficiales (incluyendo TC/TG que sólo tienen datos en G·)
+            // que tengan al menos un período Grado con datos
+            const carrerasGrado = avgByFac
+              .filter(d => CARRERAS_OFICIALES.has(d.fac) && !POSG_SET.has(d.fac) && periodGrado.some(p => facMap[d.fac]?.[p] !== undefined))
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodGrado) }))
               .sort((a,b) => b.avg - a.avg)
 
+            // Tecnologado: sólo carreras con datos en períodos T· (TEC-*)
             const carrerasTec = avgByFac
               .filter(d => TECH_SET.has(d.fac) && periodTec.length > 0 && periodTec.some(p => facMap[d.fac]?.[p] !== undefined))
               .map(d => ({ fac: d.fac, avg: avgP(d.fac, periodTec) }))
