@@ -1079,8 +1079,13 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           const suf = parseInt(s.slice(4) || '0')
           if (suf === 1 || suf === 2)   return suf === 1 ? `I-${y}` : `II-${y}`
           if (suf >= 10 && suf <= 20)   return `TEC-I-${y}`
+          if (suf >= 21 && suf <= 30)   return `TEC-II-${y}`
           if (suf >= 51 && suf <= 57)   return `Posg-I-${y}`
+          if (suf >= 58 && suf <= 65)   return `Posg-II-${y}`
           if (suf >= 60 && suf <= 68)   return `I-${y}`
+          // Posgrado periods: 71-73 → Posg-I, 74-79 → Posg-II
+          if (suf >= 70 && suf <= 73)   return `Posg-I-${y}`
+          if (suf >= 74 && suf <= 79)   return `Posg-II-${y}`
           if (suf >= 69 && suf <= 80)   return `II-${y}`
           return `${y}-${suf}`
         }
@@ -1094,7 +1099,7 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           labelAcc[lbl][row.facultad].push(row.promedio)
         }
         // Ordered unique labels — internos en formato norm, display usa displayPeriodo
-        const labelOrder = ['I-2023','TEC-I-2023','Posg-I-2023','II-2023','I-2024','TEC-I-2024','Posg-I-2024','II-2024','I-2025','TEC-I-2025','Posg-I-2025','II-2025']
+        const labelOrder = ['I-2023','TEC-I-2023','Posg-I-2023','II-2023','Posg-II-2023','I-2024','TEC-I-2024','Posg-I-2024','II-2024','Posg-II-2024','I-2025','TEC-I-2025','Posg-I-2025','Posg-II-2025','II-2025']
         const periodLabels = labelOrder.filter(l => labelAcc[l])
 
         const facMap: Record<string, Record<string, number>> = {}
@@ -2930,6 +2935,9 @@ function normPeriodo(p: string | number): string {
   if (suf >= 51 && suf <= 57)  return `Posg-I-${y}`
   if (suf >= 58 && suf <= 65)  return `Posg-II-${y}`
   if (suf >= 56 && suf <= 68)  return `I-${y}`
+  // Posgrado: 71-73 → Posg-I, 74-79 → Posg-II
+  if (suf >= 70 && suf <= 73)  return `Posg-I-${y}`
+  if (suf >= 74 && suf <= 79)  return `Posg-II-${y}`
   if (suf >= 69 && suf <= 80)  return `II-${y}`
   return `${y}-${sufRaw}`
 }
