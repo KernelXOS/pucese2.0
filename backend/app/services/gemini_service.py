@@ -28,11 +28,20 @@ class GeminiService:
         lines.append(f"  MECDI/360 (evaluación 360°):        promedio {tres60.get('promedio','N/D')}/100, {tres60.get('n',0)} registros")
 
         # ── TENDENCIA TEMPORAL ────────────────────────────────────────────
-        tend = context.get('tendencias', [])
+        tend_raw = context.get('tendencias', [])
+        # get_tendencias puede devolver lista o dict {'meipa':[...], '360':[...]}
+        if isinstance(tend_raw, dict):
+            tend = []
+            for v in tend_raw.values():
+                if isinstance(v, list):
+                    tend.extend(v)
+        else:
+            tend = tend_raw if isinstance(tend_raw, list) else []
         if tend:
             lines.append("\n=== TENDENCIA POR PERÍODO ===")
             for t in tend[:14]:
-                lines.append(f"  Período {t.get('periodo','?')}: {t.get('promedio','?')}/100 — {t.get('n',0)} evaluaciones")
+                if isinstance(t, dict):
+                    lines.append(f"  Período {t.get('periodo','?')}: {t.get('promedio','?')}/100 — {t.get('n',0)} evaluaciones")
 
         # ── RANKING DOCENTES ──────────────────────────────────────────────
         ranking = context.get('ranking_top', [])
