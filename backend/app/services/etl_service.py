@@ -610,7 +610,9 @@ class ETLService:
         records += self._build_360_records_2025(model_scores, staff)
         records += self._source_posgrado_historico(staff)
         records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202501, '202501', 2025)
-        # eval_det_202402 no se procesa — ya está cubierto por _source_360_mecdi_2024
+        # eval_det_202402: procesar para carreras NO cubiertas por _source_360_mecdi_2024
+        # (ej. Educación Básica presencial que solo aparece en los archivos detallados)
+        records += self._source_eval_detalladas_periodo(staff, EVAL_DIR_202402, '202402', 2024)
         records += self._source_pucetec_hetero(staff)
         records += self._source_meipa_pucese_data(staff)
 
@@ -1818,15 +1820,25 @@ class ETLService:
             by_instr['score'] / by_instr['max_score'].replace(0, 1) * 100
         ).clip(0, 100).round(2)
 
-        # Nombres y programa (primer valor por cedula)
+        # Nombres y programa:
+        # Preferir el programa que corresponda a una carrera reconocida (de archivos 004/hetero_est)
+        # sobre nombres de materias (de archivos 01/auto). Si ya hay un valor reconocido, no sobreescribir.
         extras: dict = {}
         for _, row in df.iterrows():
             ced = str(row['_ced']).strip()
+            ap = _clean_nombre(row.get(col_ap, '')) if col_ap else ''
+            nm = _clean_nombre(row.get(col_nm, '')) if col_nm else ''
+            pr = _clean_nombre(row.get(col_pr, '')) if col_pr else ''
+            nombre_val = f"{ap} {nm}".strip()
             if ced not in extras:
-                ap = _clean_nombre(row.get(col_ap, '')) if col_ap else ''
-                nm = _clean_nombre(row.get(col_nm, '')) if col_nm else ''
-                pr = _clean_nombre(row.get(col_pr, '')) if col_pr else ''
-                extras[ced] = {'nombre': f"{ap} {nm}".strip(), 'programa': pr}
+                extras[ced] = {'nombre': nombre_val, 'programa': pr}
+            else:
+                # Upgrade programa if the current one is unrecognized and the new one is recognized
+                current_pr = extras[ced].get('programa', '')
+                if pr and _map_facultad(pr) and not _map_facultad(current_pr):
+                    extras[ced]['programa'] = pr
+                if nombre_val and not extras[ced].get('nombre'):
+                    extras[ced]['nombre'] = nombre_val
 
         # Acumular scores por (ced, modelo)
         model_scores: dict = {}
