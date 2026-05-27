@@ -4308,8 +4308,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
                   </div>
 
-                  {/* ── Tendencia por Período ── */}
-                  {(tendenciasPorPeriodo.length > 1 || tendencias.length > 1) && (() => {
+                  {/* ── Tendencia por Período ── solo en Vista General */}
+                  {!periodoActivo && (tendenciasPorPeriodo.length > 1 || tendencias.length > 1) && (() => {
                     // Priorizar datos por período; fallback a por año
                     const src = tendenciasPorPeriodo.length > 1
                       ? tendenciasPorPeriodo
