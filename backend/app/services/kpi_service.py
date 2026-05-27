@@ -1080,7 +1080,8 @@ class KPIService:
                 df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
                 needed = {'pregunta', 'calificacion', 'competencia', 'periodo_evaluacion'}
                 if needed.issubset(set(df.columns)):
-                    dfs.append(df[list(needed)])
+                    extra_cols = [c for c in ['programa', 'carrera', 'modelo', 'cod_instrumento'] if c in df.columns]
+                    dfs.append(df[list(needed) + extra_cols])
             except Exception:
                 continue
 
@@ -1150,6 +1151,40 @@ class KPIService:
         comp_sorted = comp_g.sort_values('promedio', ascending=False)
         top_comp    = _enrich_comp(comp_sorted.head(6))
         worst_comp  = _enrich_comp(comp_sorted.tail(6).sort_values('promedio'))
+        todas_comp  = _enrich_comp(comp_sorted)   # ← todas sin límite
+
+        # ── Por carrera (si el Excel tiene columna programa/carrera) ──────────
+        por_carrera_data: list = []
+        carrera_col = next((c for c in ['programa', 'carrera'] if c in all_df.columns), None)
+        if carrera_col:
+            all_df['_carrera'] = all_df[carrera_col].apply(_norm_name)
+            carreras_uniq = [c for c in all_df['_carrera'].dropna().unique() if c and c != 'Nan']
+            for car in sorted(carreras_uniq):
+                df_car = all_df[all_df['_carrera'] == car]
+                if len(df_car) < 3:
+                    continue
+                # Competencias de esta carrera por período
+                cg = df_car.groupby('competencia')['pct'].agg(promedio='mean', n='count').reset_index()
+                cg['promedio'] = cg['promedio'].round(2)
+                cg = cg[cg['competencia'] != '']
+                cp = df_car.groupby(['competencia','periodo_evaluacion'])['pct'].mean().round(2).reset_index()
+                cp.columns = ['competencia','periodo','promedio']
+                def _ec(rows):
+                    result = []
+                    for _, r in rows.iterrows():
+                        entry = {'competencia': r['competencia'], 'promedio': round(r['promedio'],2), 'n': int(r['n'])}
+                        for p in periodos:
+                            val = cp[(cp['competencia']==r['competencia'])&(cp['periodo']==p)]['promedio']
+                            entry[p] = round(float(val.values[0]),2) if len(val) else None
+                        result.append(entry)
+                    return result
+                cg_s = cg.sort_values('promedio', ascending=False)
+                por_carrera_data.append({
+                    'carrera': car,
+                    'n': int(len(df_car)),
+                    'promedio': round(float(df_car['pct'].mean()), 2),
+                    'competencias': _ec(cg_s),
+                })
 
         # ── Preguntas ─────────────────────────────────────────────────────────
         preg_g = (
@@ -1187,13 +1222,17 @@ class KPIService:
         preg_sorted = preg_g.sort_values('promedio', ascending=False)
         top_preg    = _enrich_preg(preg_sorted.head(6))
         worst_preg  = _enrich_preg(preg_sorted.tail(6).sort_values('promedio'))
+        todas_preg  = _enrich_preg(preg_sorted)   # ← todas sin límite
 
         return {
-            'periodos':          periodos,
-            'competencias_top':  top_comp,
-            'competencias_peor': worst_comp,
-            'preguntas_top':     top_preg,
-            'preguntas_peor':    worst_preg,
+            'periodos':            periodos,
+            'competencias_top':    top_comp,
+            'competencias_peor':   worst_comp,
+            'todas_competencias':  todas_comp,
+            'preguntas_top':       top_preg,
+            'preguntas_peor':      worst_preg,
+            'todas_preguntas':     todas_preg,
+            'por_carrera':         por_carrera_data,
         }
 
 

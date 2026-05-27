@@ -3308,6 +3308,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     setSearchTerm('')
     setAiAnalysis('')
     if (s === '360') setActiveTab('docencia')
+    setActiveView('dashboard')  // volver al dashboard principal al cambiar sistema
   }
 
   const handleTabChange = (tab: string) => {
@@ -3462,6 +3463,26 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const [expanded360, setExpanded360]     = useState(true)
   const [expandedSalud, setExpandedSalud] = useState(true)
 
+  // ── Módulo Análisis de Instrumentos ─────────────────────────────────────
+  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'>('dashboard')
+  const [compDetalle, setCompDetalle]           = useState<any>(null)
+  const [loadingCompDetalle, setLoadingCompDetalle] = useState(false)
+  const [cdFiltroCarrera, setCdFiltroCarrera]   = useState('__todas__')
+  const [cdFiltroPeriodo, setCdFiltroPeriodo]   = useState('__todos__')
+  const [cdBusqueda, setCdBusqueda]             = useState('')
+  const [cdOrden, setCdOrden]                   = useState<'promedio'|'nombre'>('promedio')
+
+  const goToCompDetalle = async () => {
+    setActiveView('competencias-detalle')
+    if (compDetalle) return
+    setLoadingCompDetalle(true)
+    try {
+      const res = await api.getCompetenciasPreguntas()
+      setCompDetalle(res.data)
+    } catch { setCompDetalle({}) }
+    finally { setLoadingCompDetalle(false) }
+  }
+
   const SIDEBAR_W = sidebarOpen ? 268 : 68
 
   if (loading && !kpis && !comparativo) {
@@ -3531,6 +3552,22 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             >
               <LayoutDashboard size={17} style={{ flexShrink: 0 }} />
               {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Vista General</span>}
+            </button>
+
+            {/* ── Análisis de Instrumentos ── */}
+            <button
+              onClick={goToCompDetalle}
+              className="w-full flex items-center gap-3 text-left transition-all rounded-xl"
+              style={{
+                padding: sidebarOpen ? '10px 12px' : '10px',
+                justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                color: activeView === 'competencias-detalle' ? '#fff' : 'rgba(255,255,255,0.5)',
+                background: activeView === 'competencias-detalle' ? 'linear-gradient(135deg,rgba(16,185,129,0.35),rgba(16,185,129,0.15))' : 'transparent',
+                borderLeft: activeView === 'competencias-detalle' ? '2px solid #34d399' : '2px solid transparent',
+              }}
+            >
+              <Microscope size={17} style={{ flexShrink:0, color: activeView === 'competencias-detalle' ? '#6ee7b7' : 'inherit' }} />
+              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Análisis Instrumentos</span>}
             </button>
 
             {sidebarOpen && <div style={{ height: 1, background:'rgba(255,255,255,0.06)', margin:'6px 4px' }} />}
@@ -3817,7 +3854,12 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             <div className="flex items-center gap-3">
               <div>
                 <span className="text-slate-800 font-black" style={{ fontSize: 14 }}>
-                  {sistema === 'overview' ? 'Vista General' : sistema === 'meipa' ? 'MEIPA — Evaluación Docente' : sistema === 'salud' ? 'Salud — Docencia ABP' : `MECDI — ${currentTabCfg.label}`}
+                  {activeView === 'competencias-detalle'
+                    ? 'Análisis Detallado de Instrumentos y Competencias'
+                    : sistema === 'overview' ? 'Vista General'
+                    : sistema === 'meipa' ? 'MEIPA — Evaluación Docente'
+                    : sistema === 'salud' ? 'Salud — Docencia ABP'
+                    : `MECDI — ${currentTabCfg.label}`}
                 </span>
               </div>
               {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin" />}
@@ -3935,7 +3977,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
           <main className="flex-1 overflow-y-auto p-6" style={{ background:'#f5f7fa' }}>
 
           {/* ── OVERVIEW / COMPARATIVO ─────────────────────────────────────── */}
-          {sistema === 'overview' && (
+          {activeView === 'dashboard' && sistema === 'overview' && (
             <>
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
@@ -4120,7 +4162,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
           )}
 
           {/* ── MEIPA or 360 view ──────────────────────────────────────────── */}
-          {sistema !== 'overview' && (
+          {activeView === 'dashboard' && sistema !== 'overview' && (
             <>
               {/* No data */}
               {!kpis && !loading && (
@@ -4772,6 +4814,508 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
           )}
 
           {/* Footer */}
+          {/* ══════════════════════════════════════════════════════════════════
+               MÓDULO: Análisis Detallado de Instrumentos y Competencias
+               ══════════════════════════════════════════════════════════════════ */}
+          {activeView === 'competencias-detalle' && (() => {
+            const periodos: string[] = compDetalle?.periodos || []
+            const todasComp: any[]   = compDetalle?.todas_competencias || []
+            const todasPreg: any[]   = compDetalle?.todas_preguntas || []
+            const porCarrera: any[]  = compDetalle?.por_carrera || []
+
+            const periodLabel = (p: string) =>
+              p === '202501' ? 'I-2025' : p === '202502' ? 'II-2025' :
+              p === '202402' ? 'II-2024' : p === '202401' ? 'I-2024' : p
+
+            const scoreColor = (v: number) =>
+              v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
+
+            const scoreBg = (v: number) =>
+              v >= 85 ? '#f0fdf4' : v >= 70 ? '#fefce8' : '#fef2f2'
+
+            // Filtros aplicados
+            const filtPeriodo = cdFiltroPeriodo
+            const filtCarrera = cdFiltroCarrera
+            const busq = cdBusqueda.toLowerCase()
+
+            const filterComp = (rows: any[]) => rows
+              .filter(r => !busq || (r.competencia||r.pregunta||'').toLowerCase().includes(busq))
+              .filter(r => filtPeriodo === '__todos__' || r[filtPeriodo] != null)
+
+            const allCarreras = porCarrera.map((c:any) => c.carrera)
+
+            // ── tabla reutilizable ──────────────────────────────────────────
+            const TablaTodas = ({ rows, nameKey, titulo, icon }: {
+              rows: any[]; nameKey: string; titulo: string; icon: string
+            }) => {
+              const sorted = cdOrden === 'promedio'
+                ? [...rows].sort((a,b) => b.promedio - a.promedio)
+                : [...rows].sort((a,b) => String(a[nameKey]||'').localeCompare(String(b[nameKey]||'')))
+              return (
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="px-5 py-3 flex items-center gap-2 border-b border-slate-100"
+                    style={{ background:'#f8fafc' }}>
+                    <span className="text-base">{icon}</span>
+                    <span className="text-[12px] font-black text-slate-700 uppercase tracking-[0.1em]">{titulo}</span>
+                    <span className="ml-auto text-[10px] text-slate-400 font-semibold">{sorted.length} ítems</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr style={{ background:'#f8fafc' }}>
+                          <th className="text-left py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em] w-8">#</th>
+                          <th className="text-left py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em]">Descripción</th>
+                          {periodos
+                            .filter(p => filtPeriodo === '__todos__' || p === filtPeriodo)
+                            .map(p => (
+                            <th key={p} className="text-center py-2 px-2 font-black text-slate-500 uppercase tracking-[0.07em] whitespace-nowrap">
+                              {periodLabel(p)}
+                            </th>
+                          ))}
+                          <th className="text-right py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em] whitespace-nowrap">Promedio</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map((row, i) => {
+                          const name = String(row[nameKey]||'')
+                          const disp = name.length > 80 ? name.slice(0,80)+'…' : name
+                          return (
+                            <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/40 transition-colors">
+                              <td className="py-2.5 px-3 font-black text-slate-400">{i+1}</td>
+                              <td className="py-2.5 px-3 text-slate-700 font-medium max-w-[260px]" title={name}>{disp}</td>
+                              {periodos
+                                .filter(p => filtPeriodo === '__todos__' || p === filtPeriodo)
+                                .map(p => {
+                                const v = row[p]
+                                return (
+                                  <td key={p} className="py-2.5 px-2 text-center">
+                                    {v != null
+                                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                          style={{ background: scoreBg(v), color: scoreColor(v) }}>
+                                          {v.toFixed(1)}%
+                                        </span>
+                                      : <span className="text-slate-300">—</span>}
+                                  </td>
+                                )
+                              })}
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden min-w-[40px]">
+                                    <div className="h-full rounded-full" style={{ width:`${row.promedio}%`, background:scoreColor(row.promedio) }} />
+                                  </div>
+                                  <span className="text-[11px] font-black tabular-nums w-10 text-right flex-shrink-0"
+                                    style={{ color:scoreColor(row.promedio) }}>
+                                    {row.promedio.toFixed(1)}%
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div>
+                {/* ── Header ─────────────────────────────────────────────────── */}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 rounded-xl" style={{ background:'linear-gradient(135deg,#064e3b,#065f46)' }}>
+                    <Microscope size={22} style={{ color:'#6ee7b7' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-[17px] font-black text-slate-800 leading-tight">
+                      Análisis Detallado — Instrumentos y Competencias
+                    </h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Todas las competencias evaluadas · {todasComp.length} competencias · {todasPreg.length} preguntas · {periodos.length} períodos
+                    </p>
+                  </div>
+                  {loadingCompDetalle && (
+                    <div className="ml-auto flex items-center gap-2 text-slate-500">
+                      <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-emerald-500 animate-spin" />
+                      <span className="text-xs">Cargando…</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Filtros ─────────────────────────────────────────────────── */}
+                <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Filtros</span>
+
+                  {/* Busqueda */}
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 flex-1 min-w-[180px]">
+                    <Search size={12} className="text-slate-400 flex-shrink-0" />
+                    <input
+                      className="text-xs bg-transparent outline-none w-full text-slate-700 placeholder-slate-400"
+                      placeholder="Buscar competencia o pregunta…"
+                      value={cdBusqueda}
+                      onChange={e => setCdBusqueda(e.target.value)}
+                    />
+                    {cdBusqueda && (
+                      <button onClick={() => setCdBusqueda('')} className="text-slate-400 hover:text-slate-600 flex-shrink-0">✕</button>
+                    )}
+                  </div>
+
+                  {/* Período */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                    <Calendar size={12} className="text-slate-400" />
+                    <select
+                      className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
+                      value={cdFiltroPeriodo}
+                      onChange={e => setCdFiltroPeriodo(e.target.value)}
+                    >
+                      <option value="__todos__">Todos los períodos</option>
+                      {periodos.map(p => (
+                        <option key={p} value={p}>{periodLabel(p)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Orden */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                    <TrendingUp size={12} className="text-slate-400" />
+                    <select
+                      className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
+                      value={cdOrden}
+                      onChange={e => setCdOrden(e.target.value as any)}
+                    >
+                      <option value="promedio">Ordenar por puntaje</option>
+                      <option value="nombre">Ordenar por nombre</option>
+                    </select>
+                  </div>
+
+                  {/* Reset */}
+                  <button
+                    onClick={() => { setCdBusqueda(''); setCdFiltroPeriodo('__todos__'); setCdFiltroCarrera('__todas__'); setCdOrden('promedio') }}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+
+                {loadingCompDetalle ? (
+                  <div className="flex flex-col items-center justify-center py-24 gap-4">
+                    <div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
+                    <p className="text-slate-500 font-bold text-sm">Cargando análisis de competencias…</p>
+                  </div>
+                ) : !compDetalle || todasComp.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
+                    <AlertCircle size={36} className="opacity-40" />
+                    <p className="font-bold">No hay datos de competencias disponibles</p>
+                    <p className="text-xs">Verifica que los archivos eval_detalladas estén cargados</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* ── Resumen global en cards ──────────────────────────────── */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      {[
+                        { label:'Total Competencias', value: todasComp.length, icon:'📊', color:'#6366f1' },
+                        { label:'Total Preguntas', value: todasPreg.length, icon:'❓', color:'#0891b2' },
+                        { label:'Períodos Evaluados', value: periodos.length, icon:'📅', color:'#059669' },
+                        { label:'Carreras/Programas', value: allCarreras.length || '—', icon:'🎓', color:'#d97706' },
+                      ].map((card, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">{card.icon}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.12em]">{card.label}</span>
+                          </div>
+                          <span className="text-2xl font-black" style={{ color: card.color }}>{card.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* ── Top 5 y Peores 5 resumen visual ─────────────────────── */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      {/* Top 5 */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">🏆</span>
+                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-[0.1em]">Top 5 — Mejor Evaluadas</span>
+                        </div>
+                        {todasComp.slice(0,5).map((c:any,i:number) => (
+                          <div key={i} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
+                            <span className="text-[11px] font-black text-emerald-600 w-5">{i+1}</span>
+                            <span className="text-[11px] text-slate-700 flex-1 min-w-0 truncate" title={c.competencia}>{c.competencia}</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width:`${c.promedio}%`, background:'#16a34a' }} />
+                              </div>
+                              <span className="text-[11px] font-black text-emerald-600 w-10 text-right">{c.promedio.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Peores 5 */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-base">⚠️</span>
+                          <span className="text-[11px] font-black text-slate-700 uppercase tracking-[0.1em]">Top 5 — Necesitan Mejora</span>
+                        </div>
+                        {[...todasComp].reverse().slice(0,5).map((c:any,i:number) => (
+                          <div key={i} className="flex items-center gap-3 py-1.5 border-b border-slate-50 last:border-0">
+                            <span className="text-[11px] font-black text-red-500 w-5">{i+1}</span>
+                            <span className="text-[11px] text-slate-700 flex-1 min-w-0 truncate" title={c.competencia}>{c.competencia}</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width:`${c.promedio}%`, background: scoreColor(c.promedio) }} />
+                              </div>
+                              <span className="text-[11px] font-black w-10 text-right" style={{ color: scoreColor(c.promedio) }}>{c.promedio.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ── Gráfico barras: todas las competencias ─────────────── */}
+                    {todasComp.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
+                        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ranking ·</span>
+                          <span className="text-[13px] font-black text-slate-700">
+                            Todas las Competencias — {filtPeriodo === '__todos__' ? 'Promedio General' : `Período ${periodLabel(filtPeriodo)}`}
+                          </span>
+                        </div>
+                        <div className="p-4">
+                          <Plot
+                            data={[{
+                              type: 'bar' as const,
+                              orientation: 'h' as const,
+                              x: [...filterComp(todasComp)].sort((a,b)=>a.promedio-b.promedio).map((c:any) => {
+                                const v = filtPeriodo !== '__todos__' && c[filtPeriodo] != null ? c[filtPeriodo] : c.promedio
+                                return v
+                              }),
+                              y: [...filterComp(todasComp)].sort((a,b)=>a.promedio-b.promedio).map((c:any) => c.competencia),
+                              marker: {
+                                color: [...filterComp(todasComp)].sort((a,b)=>a.promedio-b.promedio).map((c:any) => {
+                                  const v = filtPeriodo !== '__todos__' && c[filtPeriodo] != null ? c[filtPeriodo] : c.promedio
+                                  return scoreColor(v)
+                                }),
+                                opacity: 0.85,
+                              },
+                              text: [...filterComp(todasComp)].sort((a,b)=>a.promedio-b.promedio).map((c:any) => {
+                                const v = filtPeriodo !== '__todos__' && c[filtPeriodo] != null ? c[filtPeriodo] : c.promedio
+                                return `${v.toFixed(1)}%`
+                              }),
+                              textposition: 'outside' as const,
+                              textfont: { size: 9, family: 'Inter' },
+                              hovertemplate: '<b>%{y}</b><br>%{x:.1f}%<extra></extra>',
+                            }]}
+                            layout={{
+                              autosize: true,
+                              height: Math.max(300, filterComp(todasComp).length * 28),
+                              paper_bgcolor: 'white', plot_bgcolor: 'white',
+                              font: { family:'Inter', size:10, color:'#64748b' },
+                              margin: { t:10, b:40, l:220, r:60 },
+                              xaxis: { range:[0,115], showgrid:true, gridcolor:'#f0f4f8', zeroline:false, ticksuffix:'%', tickfont:{size:9} },
+                              yaxis: { tickfont:{size:10,color:'#334155'}, showgrid:false },
+                              shapes: [{ type:'line' as const, x0:90, x1:90, y0:-0.5, y1:filterComp(todasComp).length-0.5,
+                                line:{ color:'#16a34a', width:1, dash:'dot' } }],
+                            }}
+                            config={{ displayModeBar:false, responsive:true }}
+                            style={{ width:'100%' }}
+                            useResizeHandler
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Tabla completa competencias ─────────────────────────── */}
+                    <div className="mb-6">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                        Todas las competencias evaluadas
+                      </p>
+                      <TablaTodas
+                        rows={filterComp(todasComp)}
+                        nameKey="competencia"
+                        titulo={`Ranking Completo — ${filterComp(todasComp).length} Competencias`}
+                        icon="📊"
+                      />
+                    </div>
+
+                    {/* ── Tabla completa preguntas ────────────────────────────── */}
+                    {todasPreg.length > 0 && (
+                      <div className="mb-6">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                          Todas las preguntas individuales
+                        </p>
+                        <TablaTodas
+                          rows={filterComp(todasPreg)}
+                          nameKey="pregunta"
+                          titulo={`Ranking Completo — ${filterComp(todasPreg).length} Preguntas`}
+                          icon="❓"
+                        />
+                      </div>
+                    )}
+
+                    {/* ── Desglose por carrera/programa ──────────────────────── */}
+                    {porCarrera.length > 0 && (
+                      <div className="mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">
+                            Desglose por Carrera / Programa ({porCarrera.length})
+                          </p>
+                          {allCarreras.length > 1 && (
+                            <select
+                              className="text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                              value={cdFiltroCarrera}
+                              onChange={e => setCdFiltroCarrera(e.target.value)}
+                            >
+                              <option value="__todas__">Todas las carreras</option>
+                              {allCarreras.map((c:string) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                        {porCarrera
+                          .filter((c:any) => cdFiltroCarrera === '__todas__' || c.carrera === cdFiltroCarrera)
+                          .map((car:any, ci:number) => {
+                            const compsFilt = car.competencias
+                              .filter((c:any) => !busq || c.competencia.toLowerCase().includes(busq))
+                              .filter((c:any) => filtPeriodo === '__todos__' || c[filtPeriodo] != null)
+                            const sorted = cdOrden === 'promedio'
+                              ? [...compsFilt].sort((a:any,b:any)=>b.promedio-a.promedio)
+                              : [...compsFilt].sort((a:any,b:any)=>a.competencia.localeCompare(b.competencia))
+                            return (
+                              <div key={ci} className="bg-white rounded-xl border border-slate-200 shadow-sm mb-4 overflow-hidden">
+                                {/* Carrera header */}
+                                <div className="px-5 py-3 flex items-center gap-3 border-b border-slate-100"
+                                  style={{ background:'linear-gradient(135deg,#f0fdf4,#ecfdf5)' }}>
+                                  <div className="p-1.5 rounded-lg" style={{ background:'#dcfce7' }}>
+                                    <GraduationCap size={14} style={{ color:'#16a34a' }} />
+                                  </div>
+                                  <div className="flex-1">
+                                    <span className="text-[12px] font-black text-slate-800">{car.carrera}</span>
+                                    <span className="ml-2 text-[10px] text-slate-400">{sorted.length} competencias · {car.n} evaluaciones</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-slate-500">Promedio carrera:</span>
+                                    <span className="text-[13px] font-black" style={{ color: scoreColor(car.promedio) }}>
+                                      {car.promedio.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </div>
+                                {/* Tabla competencias de esta carrera */}
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-[11px]">
+                                    <thead>
+                                      <tr style={{ background:'#f8fafc' }}>
+                                        <th className="text-left py-2 px-3 font-black text-slate-400 uppercase tracking-[0.07em] w-8">#</th>
+                                        <th className="text-left py-2 px-3 font-black text-slate-400 uppercase tracking-[0.07em]">Competencia</th>
+                                        {periodos
+                                          .filter(p => filtPeriodo === '__todos__' || p === filtPeriodo)
+                                          .map(p => (
+                                          <th key={p} className="text-center py-2 px-2 font-black text-slate-400 uppercase tracking-[0.07em] whitespace-nowrap">
+                                            {periodLabel(p)}
+                                          </th>
+                                        ))}
+                                        <th className="text-right py-2 px-3 font-black text-slate-400 uppercase tracking-[0.07em]">Promedio</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sorted.map((c:any, idx:number) => (
+                                        <tr key={idx} className="border-t border-slate-50 hover:bg-emerald-50/30 transition-colors">
+                                          <td className="py-2 px-3 font-black text-slate-300">{idx+1}</td>
+                                          <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
+                                          {periodos
+                                            .filter(p => filtPeriodo === '__todos__' || p === filtPeriodo)
+                                            .map(p => {
+                                            const v = c[p]
+                                            return (
+                                              <td key={p} className="py-2 px-2 text-center">
+                                                {v != null
+                                                  ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                      style={{ background:scoreBg(v), color:scoreColor(v) }}>
+                                                      {v.toFixed(1)}%
+                                                    </span>
+                                                  : <span className="text-slate-300">—</span>}
+                                              </td>
+                                            )
+                                          })}
+                                          <td className="py-2 px-3">
+                                            <div className="flex items-center gap-2 justify-end">
+                                              <div className="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                                <div className="h-full rounded-full" style={{ width:`${c.promedio}%`, background:scoreColor(c.promedio) }} />
+                                              </div>
+                                              <span className="text-[11px] font-black w-10 text-right" style={{ color:scoreColor(c.promedio) }}>
+                                                {c.promedio.toFixed(1)}%
+                                              </span>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    )}
+
+                    {/* ── Comparativo entre períodos (si hay 2+) ─────────────── */}
+                    {periodos.length >= 2 && filterComp(todasComp).length > 0 && filtPeriodo === '__todos__' && (
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
+                        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Comparativo ·</span>
+                          <span className="text-[13px] font-black text-slate-700">Evolución por Competencia y Período</span>
+                        </div>
+                        <div className="p-4 overflow-x-auto">
+                          <table className="w-full text-[11px]">
+                            <thead>
+                              <tr style={{ background:'#f8fafc' }}>
+                                <th className="text-left py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em]">Competencia</th>
+                                {periodos.map(p => (
+                                  <th key={p} className="text-center py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em] whitespace-nowrap">{periodLabel(p)}</th>
+                                ))}
+                                <th className="text-center py-2 px-3 font-black text-slate-500 uppercase tracking-[0.07em]">Tendencia</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filterComp(todasComp).map((c:any, i:number) => {
+                                const vals = periodos.map(p => c[p]).filter((v:any) => v != null)
+                                const trend = vals.length >= 2 ? vals[vals.length-1] - vals[0] : 0
+                                return (
+                                  <tr key={i} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
+                                    <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
+                                    {periodos.map(p => {
+                                      const v = c[p]
+                                      return (
+                                        <td key={p} className="py-2 px-3 text-center">
+                                          {v != null
+                                            ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                style={{ background:scoreBg(v), color:scoreColor(v) }}>
+                                                {v.toFixed(1)}%
+                                              </span>
+                                            : <span className="text-slate-300">—</span>}
+                                        </td>
+                                      )
+                                    })}
+                                    <td className="py-2 px-3 text-center">
+                                      {vals.length >= 2
+                                        ? <span className={`text-[11px] font-black ${trend > 0 ? 'text-emerald-600' : trend < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                            {trend > 0 ? '▲' : trend < 0 ? '▼' : '→'} {Math.abs(trend).toFixed(1)}%
+                                          </span>
+                                        : <span className="text-slate-300">—</span>}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
           <div className="mt-12 pt-8 border-t border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <img src={LOGO_URL} alt="PUCESE" className="h-7 object-contain opacity-50" />
