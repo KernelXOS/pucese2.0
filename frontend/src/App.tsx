@@ -4822,8 +4822,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             const peorComp: any[] = compPreguntas?.competencias_peor || []
             const topPreg: any[]  = compPreguntas?.preguntas_top     || []
             const peorPreg: any[] = compPreguntas?.preguntas_peor    || []
-            // Si también hay datos del fetch extra (todas_competencias), usarlos
-            const rawTodas: any[] = compDetalle?.todas_competencias || []
+            // todas_competencias — preferir compPreguntas (ya cargado al inicio)
+            const rawTodas: any[] = compPreguntas?.todas_competencias || compDetalle?.todas_competencias || []
             const todasComp: any[] = rawTodas.length > 0
               ? rawTodas
               : (() => {
@@ -4834,7 +4834,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   }
                   return merged.sort((a,b) => b.promedio - a.promedio)
                 })()
-            const porCarrera: any[]  = compDetalle?.por_carrera || []
+            // por_carrera — competencias desglosadas por carrera
+            const porCarreraComp: any[] = compPreguntas?.por_carrera || compDetalle?.por_carrera || []
 
             const periodLabel = (p: string) =>
               p === '202501' ? 'I-2025' : p === '202502' ? 'II-2025' :
@@ -5109,61 +5110,136 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     )}
 
-                    {/* Competencias globales */}
-                    {(topComp.length > 0 || peorComp.length > 0) && (
+                    {/* ── Todas las Competencias (tabla completa) ── */}
+                    {todasComp.length > 0 && (
                       <div className="mb-8">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Competencias Globales Evaluadas</p>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#f0fdf4' }}>
-                              <span className="text-base">&#127942;</span>
-                              <span className="text-[11px] font-black text-emerald-800 uppercase tracking-[0.1em]">Mejores Competencias</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{topComp.length} items</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-[11px]">
-                                <thead><tr style={{ background: '#f8fafc' }}>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400 w-8">#</th>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400">Competencia</th>
-                                  {periodos.map(p => <th key={p} className="text-center py-2 px-2 font-black text-slate-400 whitespace-nowrap">{periodLabel(p)}</th>)}
-                                  <th className="text-right py-2 px-3 font-black text-slate-400">Prom.</th>
-                                </tr></thead>
-                                <tbody>{topComp.map((c: any, i: number) => (
-                                  <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/30">
-                                    <td className="py-2 px-3 font-black text-emerald-500">{i + 1}</td>
-                                    <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
-                                    {periodos.map(p => { const v = c[p]; return <td key={p} className="py-2 px-2 text-center">{v != null ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span> : <span className="text-slate-300">-</span>}</td> })}
-                                    <td className="py-2 px-3 text-right font-black" style={{ color: scoreColor(c.promedio) }}>{c.promedio.toFixed(1)}%</td>
-                                  </tr>
-                                ))}</tbody>
-                              </table>
-                            </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                          Todas las Competencias &mdash; {todasComp.length} competencias &middot; ranking global
+                        </p>
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[11px]">
+                              <thead>
+                                <tr style={{ background: '#f8fafc' }}>
+                                  <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
+                                  <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
+                                  {periodos.map(p => (
+                                    <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
+                                      {periodLabel(p)}
+                                    </th>
+                                  ))}
+                                  <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {[...todasComp].sort((a: any, b: any) => b.promedio - a.promedio).map((c: any, i: number) => {
+                                  const isTop    = i < Math.ceil(todasComp.length / 2)
+                                  const rowBg    = i % 2 === 0 ? 'transparent' : '#fafafa'
+                                  return (
+                                    <tr key={i} style={{ background: rowBg }} className="border-t border-slate-50 hover:bg-indigo-50/20 transition-colors">
+                                      <td className="py-2 px-3 font-black" style={{ color: isTop ? '#16a34a' : '#dc2626' }}>{i + 1}</td>
+                                      <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
+                                      {periodos.map(p => {
+                                        const v = c[p]
+                                        return (
+                                          <td key={p} className="py-2 px-2 text-center">
+                                            {v != null
+                                              ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                  style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                              : <span className="text-slate-200">—</span>}
+                                          </td>
+                                        )
+                                      })}
+                                      <td className="py-2 px-3 text-right">
+                                        <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-black"
+                                          style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
+                                          {c.promedio.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#fef2f2' }}>
-                              <span className="text-base">&#9888;</span>
-                              <span className="text-[11px] font-black text-red-700 uppercase tracking-[0.1em]">Competencias a Mejorar</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{peorComp.length} items</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-[11px]">
-                                <thead><tr style={{ background: '#f8fafc' }}>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400 w-8">#</th>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400">Competencia</th>
-                                  {periodos.map(p => <th key={p} className="text-center py-2 px-2 font-black text-slate-400 whitespace-nowrap">{periodLabel(p)}</th>)}
-                                  <th className="text-right py-2 px-3 font-black text-slate-400">Prom.</th>
-                                </tr></thead>
-                                <tbody>{[...peorComp].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any, i: number) => (
-                                  <tr key={i} className="border-t border-slate-50 hover:bg-red-50/30">
-                                    <td className="py-2 px-3 font-black text-red-400">{peorComp.length - i}</td>
-                                    <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
-                                    {periodos.map(p => { const v = c[p]; return <td key={p} className="py-2 px-2 text-center">{v != null ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span> : <span className="text-slate-300">-</span>}</td> })}
-                                    <td className="py-2 px-3 text-right font-black" style={{ color: scoreColor(c.promedio) }}>{c.promedio.toFixed(1)}%</td>
-                                  </tr>
-                                ))}</tbody>
-                              </table>
-                            </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Competencias por Carrera ── */}
+                    {porCarreraComp.length > 0 && (
+                      <div className="mb-8">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                          Competencias por Carrera &mdash; {porCarreraComp.length} carreras disponibles
+                        </p>
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                          {/* Selector de carrera */}
+                          <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3" style={{ background: '#f8fafc' }}>
+                            <GraduationCap size={14} className="text-slate-400 flex-shrink-0" />
+                            <select
+                              className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer flex-1 min-w-[200px]"
+                              value={cdFiltroCarrera === '__todas__' ? (porCarreraComp[0]?.carrera || '') : cdFiltroCarrera}
+                              onChange={e => setCdFiltroCarrera(e.target.value)}
+                            >
+                              {porCarreraComp.map((car: any) => (
+                                <option key={car.carrera} value={car.carrera}>
+                                  {car.carrera}  ·  {car.n} evals  ·  prom {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
+                                </option>
+                              ))}
+                            </select>
                           </div>
+                          {(() => {
+                            const selectedKey = cdFiltroCarrera === '__todas__' ? porCarreraComp[0]?.carrera : cdFiltroCarrera
+                            const selCar = porCarreraComp.find((c: any) => c.carrera === selectedKey) || porCarreraComp[0]
+                            if (!selCar) return null
+                            const compList: any[] = selCar.competencias || []
+                            if (compList.length === 0) return (
+                              <div className="py-10 text-center text-slate-400 text-xs">Sin datos de competencias para esta carrera</div>
+                            )
+                            return (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-[11px]">
+                                  <thead>
+                                    <tr style={{ background: '#f0fdf4' }}>
+                                      <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
+                                      <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
+                                      {periodos.map(p => (
+                                        <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
+                                          {periodLabel(p)}
+                                        </th>
+                                      ))}
+                                      <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {compList.map((c: any, i: number) => (
+                                      <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/20 transition-colors">
+                                        <td className="py-2 px-3 font-black text-slate-300">{i + 1}</td>
+                                        <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
+                                        {periodos.map(p => {
+                                          const v = c[p]
+                                          return (
+                                            <td key={p} className="py-2 px-2 text-center">
+                                              {v != null
+                                                ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                    style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                                : <span className="text-slate-200">—</span>}
+                                            </td>
+                                          )
+                                        })}
+                                        <td className="py-2 px-3 text-right">
+                                          <span className="inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-black"
+                                            style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
+                                            {c.promedio.toFixed(1)}%
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     )}
