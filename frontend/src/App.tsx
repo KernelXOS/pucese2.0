@@ -3576,6 +3576,33 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <LayoutDashboard size={11} style={{ flexShrink:0, opacity:0.7 }}/>
                   <span>Vista General</span>
                 </button>
+                {/* Period items MEIPA */}
+                {[
+                  { codigo:'202301', label:'I Período 2023' },
+                  { codigo:'202302', label:'II Período 2023' },
+                  { codigo:'202401', label:'I Período 2024' },
+                ].map(p => {
+                  const apiP  = periodos.find((x: any) => x.codigo === p.codigo)
+                  const loaded = apiP ? apiP.cargado : false
+                  const active = sistema === 'meipa' && periodoActivo === p.codigo
+                  return (
+                    <button key={p.codigo}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('meipa'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
+                      style={{
+                        padding:'6px 10px',
+                        color: active ? '#e0e7ff' : loaded ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)',
+                        background: active ? 'rgba(99,102,241,0.2)' : 'transparent',
+                        fontSize: 11.5, fontWeight: active ? 600 : 400,
+                        cursor: loaded ? 'pointer' : 'default',
+                      }}
+                    >
+                      <span style={{ width:6, height:6, borderRadius:'50%', flexShrink:0, background: active ? '#818cf8' : loaded ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)' }} />
+                      <span className="flex-1 truncate">{p.label}</span>
+                      {!loaded && <span style={{ fontSize:9, color:'rgba(255,255,255,0.18)', fontStyle:'italic' }}>sin datos</span>}
+                    </button>
+                  )
+                })}
               </div>
             )}
 
@@ -3622,6 +3649,33 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <LayoutDashboard size={11} style={{ flexShrink:0, opacity:0.7 }}/>
                   <span>Vista General</span>
                 </button>
+                {/* Period items 360 */}
+                {[
+                  { codigo:'202402', label:'II Período 2024' },
+                  { codigo:'202501', label:'I Período 2025' },
+                  { codigo:'202502', label:'II Período 2025' },
+                ].map(p => {
+                  const apiP  = periodos.find((x: any) => x.codigo === p.codigo)
+                  const loaded = apiP ? apiP.cargado : false
+                  const active = sistema === '360' && periodoActivo === p.codigo
+                  return (
+                    <button key={p.codigo}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('360'); setActiveTab('docencia'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
+                      style={{
+                        padding:'6px 10px',
+                        color: active ? '#cffafe' : loaded ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)',
+                        background: active ? 'rgba(6,182,212,0.18)' : 'transparent',
+                        fontSize: 11.5, fontWeight: active ? 600 : 400,
+                        cursor: loaded ? 'pointer' : 'default',
+                      }}
+                    >
+                      <span style={{ width:6, height:6, borderRadius:'50%', flexShrink:0, background: active ? '#22d3ee' : loaded ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)' }} />
+                      <span className="flex-1 truncate">{p.label}</span>
+                      {!loaded && <span style={{ fontSize:9, color:'rgba(255,255,255,0.18)', fontStyle:'italic' }}>sin datos</span>}
+                    </button>
+                  )
+                })}
                 {/* Model tabs (no ABP) */}
                 <div style={{ marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                   {TABS_360.filter(t => t.id !== 'abp').map(tab => {
@@ -3691,6 +3745,32 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <LayoutDashboard size={11} style={{ flexShrink:0, opacity:0.7 }}/>
                   <span>Vista General</span>
                 </button>
+                {[
+                  { codigo:'202402', label:'II Período 2024' },
+                  { codigo:'202501', label:'I Período 2025' },
+                  { codigo:'202502', label:'II Período 2025' },
+                ].map(p => {
+                  const apiP  = periodos.find((x: any) => x.codigo === p.codigo)
+                  const loaded = apiP ? apiP.cargado : false
+                  const active = sistema === 'salud' && periodoActivo === p.codigo
+                  return (
+                    <button key={p.codigo}
+                      onClick={() => { if (!loaded) return; handleSistemaChange('salud'); setPeriodoActivo(p.codigo); setActiveAnio(PERIODO_TO_ANIO[p.codigo]) }}
+                      className="w-full flex items-center gap-2 text-left rounded-lg transition-all"
+                      style={{
+                        padding:'6px 10px',
+                        color: active ? '#fee2e2' : loaded ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)',
+                        background: active ? 'rgba(220,38,38,0.18)' : 'transparent',
+                        fontSize: 11.5, fontWeight: active ? 600 : 400,
+                        cursor: loaded ? 'pointer' : 'default',
+                      }}
+                    >
+                      <span style={{ width:6, height:6, borderRadius:'50%', flexShrink:0, background: active ? '#f87171' : loaded ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)' }} />
+                      <span className="flex-1 truncate">{p.label}</span>
+                      {!loaded && <span style={{ fontSize:9, color:'rgba(255,255,255,0.18)', fontStyle:'italic' }}>sin datos</span>}
+                    </button>
+                  )
+                })}
                 {/* Sub-modelos Salud */}
                 <div style={{ marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:1 }}>
                   <button
