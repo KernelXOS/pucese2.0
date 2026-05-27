@@ -56,13 +56,41 @@ def _norm_periodo(p: str) -> str:
     return s
 
 
+def _all_codes_for_sem(periodo: str) -> list:
+    """
+    Given a canonical period code (e.g. '202302'), return ALL raw DB codes
+    that represent the same academic semester, including tecnologado and posgrado variants.
+    """
+    if not periodo or len(periodo) != 6 or not periodo.isdigit():
+        return [periodo]
+    year = periodo[:4]
+    suf  = int(periodo[4:])
+    if suf <= 1:  # Semester I
+        codes = [periodo]
+        codes += [f'{year}{s:02d}' for s in range(10, 21)]   # TEC-I (10-20)
+        codes += [f'{year}{s:02d}' for s in range(51, 58)]   # Posg-I (51-57)
+        codes += [f'{year}{s:02d}' for s in range(70, 74)]   # Posg-I (70-73)
+        return codes
+    else:  # Semester II
+        codes = [periodo]
+        codes += [f'{year}{s:02d}' for s in range(21, 31)]   # TEC-II (21-30)
+        codes += [f'{year}{s:02d}' for s in range(58, 66)]   # Posg-II (58-65)
+        codes += [f'{year}{s:02d}' for s in range(66, 70)]   # catch-all (66-69)
+        codes += [f'{year}{s:02d}' for s in range(74, 81)]   # Posg-II (74-80)
+        return codes
+
+
 def _base_q(db: Session, modelo: str = None, anio: int = None, sistema: str = None, periodo: str = None):
     q = db.query(Evaluacion)
     if modelo:
         q = q.filter(Evaluacion.modelo == modelo)
     if periodo:
-        # La BD guarda periodos como '202301', '202402', etc. — usar directo
-        q = q.filter(Evaluacion.periodo == str(periodo))
+        # Expand canonical code to all equivalent DB codes (covers tec/posgrado variants)
+        codes = _all_codes_for_sem(str(periodo))
+        if len(codes) == 1:
+            q = q.filter(Evaluacion.periodo == codes[0])
+        else:
+            q = q.filter(Evaluacion.periodo.in_(codes))
     elif anio:
         # Solo filtrar por año cuando no hay período específico
         q = q.filter(Evaluacion.anio == anio)
@@ -865,7 +893,11 @@ class KPIService:
         if sistema:
             q = q.filter(Evaluacion.sistema == sistema)
         if periodo:
-            q = q.filter(Evaluacion.periodo == periodo)
+            _codes = _all_codes_for_sem(str(periodo))
+            if len(_codes) == 1:
+                q = q.filter(Evaluacion.periodo == _codes[0])
+            else:
+                q = q.filter(Evaluacion.periodo.in_(_codes))
         elif anio:
             q = q.filter(Evaluacion.anio == anio)
 

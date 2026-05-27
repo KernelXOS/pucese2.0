@@ -34,6 +34,31 @@ def _codigo_to_periodo(c: str) -> str:
         return f'{year}-{sem}'
     return c
 
+
+def _periodo_sem_key(code: str):
+    """
+    Returns ('YYYY', 'I') or ('YYYY', 'II') for any raw period code.
+    Handles standard codes (202301, 202302), tec codes (202311-202330),
+    and posgrado codes (202371-202379) by suffix range.
+    """
+    if not code or len(code) < 4:
+        return (code, '')
+    # Handle YYYY-I / YYYY-II format
+    if '-' in code:
+        parts = code.split('-')
+        year = parts[0] if parts[0].isdigit() else parts[1]
+        sem  = next((p for p in parts if p in ('I', 'II')), '')
+        return (year, sem)
+    if len(code) == 6 and code.isdigit():
+        year = code[:4]
+        suf  = int(code[4:])
+        # Semester I: 0, 1, TEC-I (10-20), Posg-I (51-57, 70-73)
+        if suf == 0 or suf == 1 or (10 <= suf <= 20) or (51 <= suf <= 57) or (70 <= suf <= 73):
+            return (year, 'I')
+        # Semester II: 2, TEC-II (21-30), Posg-II (58-65, 74-79), catch-all (66-69, 80+)
+        return (year, 'II')
+    return (code, '')
+
 _etl_status: dict = {"running": False, "last_count": None, "last_error": None}
 
 
@@ -92,16 +117,19 @@ def get_periodos_disponibles(db: Session = Depends(get_db)):
     }
     rows = db.query(distinct(Evaluacion.periodo)).all()
     result = []
-    seen = set()
+    seen: set = set()
     for (p,) in rows:
         if not p:
             continue
-        codigo = _periodo_to_codigo(p)
-        if codigo in seen:
+        year, sem = _periodo_sem_key(p)
+        sem_key = (year, sem)
+        if not sem or sem_key in seen:
             continue
-        seen.add(codigo)
-        label = LABEL_MAP.get(p) or LABEL_MAP.get(_codigo_to_periodo(codigo)) or p
-        result.append({'codigo': codigo, 'label': label, 'cargado': True})
+        seen.add(sem_key)
+        # Canonical codigo: YYYY01 (I) or YYYY02 (II)
+        canonical = f'{year}01' if sem == 'I' else f'{year}02'
+        label = LABEL_MAP.get(f'{year}-{sem}') or p
+        result.append({'codigo': canonical, 'label': label, 'cargado': True})
     result.sort(key=lambda x: x['codigo'])
     return result
 
