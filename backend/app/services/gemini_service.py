@@ -149,10 +149,19 @@ PREGUNTA:
         context_text = self._build_context_text(data)
 
         # Calcular estadísticas adicionales para el informe
-        ranking = data.get('ranking_top', [])
-        criticos = data.get('criticos', [])
-        comp_carr = data.get('competencias_por_carrera', [])
-        tend = data.get('tendencias', [])
+        ranking   = data.get('ranking_top', []) or []
+        criticos  = data.get('criticos', []) or []
+        comp_carr = data.get('competencias_por_carrera', []) or []
+
+        # Normalizar tendencias (puede ser dict o lista)
+        tend_raw = data.get('tendencias', [])
+        if isinstance(tend_raw, dict):
+            tend = []
+            for v in tend_raw.values():
+                if isinstance(v, list):
+                    tend.extend(v)
+        else:
+            tend = tend_raw if isinstance(tend_raw, list) else []
 
         # Carrera con mejor y peor promedio
         mejor_carrera = comp_carr[0] if comp_carr else {}
