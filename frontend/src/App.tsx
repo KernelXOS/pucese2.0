@@ -5166,80 +5166,84 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     )}
 
-                    {/* ── Competencias por Carrera ── */}
+                    {/* ── Competencias por Carrera (19 secciones colapsables) ── */}
                     {porCarreraComp.length > 0 && (
                       <div className="mb-8">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
-                          Competencias por Carrera &mdash; {porCarreraComp.length} carreras disponibles
+                          Competencias por Carrera &mdash; {porCarreraComp.length} carreras
                         </p>
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                          {/* Selector de carrera */}
-                          <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3" style={{ background: '#f8fafc' }}>
-                            <GraduationCap size={14} className="text-slate-400 flex-shrink-0" />
-                            <select
-                              className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 outline-none cursor-pointer flex-1 min-w-[200px]"
-                              value={cdFiltroCarrera === '__todas__' ? (porCarreraComp[0]?.carrera || '') : cdFiltroCarrera}
-                              onChange={e => setCdFiltroCarrera(e.target.value)}
-                            >
-                              {porCarreraComp.map((car: any) => (
-                                <option key={car.carrera} value={car.carrera}>
-                                  {car.carrera}  ·  {car.n} evals  ·  prom {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          {(() => {
-                            const selectedKey = cdFiltroCarrera === '__todas__' ? porCarreraComp[0]?.carrera : cdFiltroCarrera
-                            const selCar = porCarreraComp.find((c: any) => c.carrera === selectedKey) || porCarreraComp[0]
-                            if (!selCar) return null
-                            const compList: any[] = selCar.competencias || []
-                            if (compList.length === 0) return (
-                              <div className="py-10 text-center text-slate-400 text-xs">Sin datos de competencias para esta carrera</div>
-                            )
-                            return (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-[11px]">
-                                  <thead>
-                                    <tr style={{ background: '#f0fdf4' }}>
-                                      <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
-                                      <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
-                                      {periodos.map(p => (
-                                        <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
-                                          {periodLabel(p)}
-                                        </th>
-                                      ))}
-                                      <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {compList.map((c: any, i: number) => (
-                                      <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/20 transition-colors">
-                                        <td className="py-2 px-3 font-black text-slate-300">{i + 1}</td>
-                                        <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
-                                        {periodos.map(p => {
-                                          const v = c[p]
-                                          return (
-                                            <td key={p} className="py-2 px-2 text-center">
-                                              {v != null
-                                                ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
-                                                    style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
-                                                : <span className="text-slate-200">—</span>}
-                                            </td>
-                                          )
-                                        })}
-                                        <td className="py-2 px-3 text-right">
-                                          <span className="inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-black"
-                                            style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
-                                            {c.promedio.toFixed(1)}%
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )
-                          })()}
+                        <div className="space-y-2">
+                          {[...porCarreraComp]
+                            .sort((a: any, b: any) => b.promedio - a.promedio)
+                            .map((car: any, ci: number) => {
+                              const compList: any[] = [...(car.competencias || [])].sort((a: any, b: any) => b.promedio - a.promedio)
+                              return (
+                                <details key={ci} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+                                  <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors list-none">
+                                    <div className="p-1.5 rounded-lg flex-shrink-0" style={{ background: '#dcfce7' }}>
+                                      <GraduationCap size={12} style={{ color: '#16a34a' }} />
+                                    </div>
+                                    <span className="font-black text-[13px] text-slate-800 flex-1">{car.carrera}</span>
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                      <span className="text-[10px] text-slate-400 font-semibold">{car.n} evals</span>
+                                      <span className="text-[10px] text-slate-400 font-semibold">{compList.length} competencias</span>
+                                      <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-black"
+                                        style={{ background: scoreBg(car.promedio), color: scoreColor(car.promedio) }}>
+                                        {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
+                                      </span>
+                                      <ChevronRight size={14} className="text-slate-300 group-open:rotate-90 transition-transform" />
+                                    </div>
+                                  </summary>
+                                  {compList.length === 0 ? (
+                                    <div className="px-4 py-6 text-center text-slate-400 text-xs border-t border-slate-100">
+                                      Sin datos de competencias para esta carrera
+                                    </div>
+                                  ) : (
+                                    <div className="border-t border-slate-100 overflow-x-auto">
+                                      <table className="w-full text-[11px]">
+                                        <thead>
+                                          <tr style={{ background: '#f8fafc' }}>
+                                            <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
+                                            <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
+                                            {periodos.map(p => (
+                                              <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
+                                                {periodLabel(p)}
+                                              </th>
+                                            ))}
+                                            <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {compList.map((c: any, i: number) => (
+                                            <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/60 transition-colors">
+                                              <td className="py-2 px-3 font-black text-slate-300">{i + 1}</td>
+                                              <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
+                                              {periodos.map(p => {
+                                                const v = c[p]
+                                                return (
+                                                  <td key={p} className="py-2 px-2 text-center">
+                                                    {v != null
+                                                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                          style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                                      : <span className="text-slate-200">—</span>}
+                                                  </td>
+                                                )
+                                              })}
+                                              <td className="py-2 px-3 text-right">
+                                                <span className="inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-black"
+                                                  style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
+                                                  {c.promedio.toFixed(1)}%
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </details>
+                              )
+                            })}
                         </div>
                       </div>
                     )}

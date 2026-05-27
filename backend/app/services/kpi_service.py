@@ -1059,15 +1059,16 @@ class KPIService:
         except Exception:
             BASE = '/app/data'
 
-        # Recoger todos los archivos detallados disponibles
-        patterns = [
-            os.path.join(BASE, 'eval_detalladas_2025_02', '*.xlsx'),
-            os.path.join(BASE, 'eval_detalladas_2025_01', '*.xlsx'),
-            os.path.join(BASE, 'eval_detalladas_2024_02', '*.xlsx'),
-        ]
+        # Recoger todos los archivos detallados disponibles — busca cualquier carpeta eval_det*
+        eval_dirs = glob.glob(os.path.join(BASE, 'eval_det*'))
+        # incluir subcarpeta posgrado si existe
+        posgrado_dir = os.path.join(BASE, 'posgrado')
+        if os.path.isdir(posgrado_dir):
+            eval_dirs.append(posgrado_dir)
         files = []
-        for pat in patterns:
-            files += glob.glob(pat)
+        for d in eval_dirs:
+            if os.path.isdir(d):
+                files += glob.glob(os.path.join(d, '*.xlsx'))
 
         if not files:
             return {}
