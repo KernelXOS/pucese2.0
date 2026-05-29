@@ -436,8 +436,12 @@ const CARD_SHADOW = { boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 
 function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-slate-200 overflow-hidden" style={{ borderRadius: 6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+    <div className="bg-white border border-slate-200 overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-0.5"
+      style={{ boxShadow:'0 1px 3px rgba(0,0,0,0.05), 0 10px 28px -16px rgba(15,23,42,0.25)' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 14px 36px -14px rgba(15,23,42,0.28), 0 4px 12px rgba(0,0,0,0.06)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05), 0 10px 28px -16px rgba(15,23,42,0.25)')}>
+      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2" style={{ background:'linear-gradient(180deg,#fafbfc 0%,#ffffff 100%)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex-shrink-0" />
         {sub && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">{sub} ·</span>}
         <h3 className="text-[13px] font-bold text-slate-700">{title}</h3>
       </div>
@@ -950,30 +954,39 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
       {/* ── Row 1: MEIPA vs 360 summary cards ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #6366f1', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #6366f1', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(99,102,241,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(99,102,241,0.35), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(99,102,241,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">MEIPA · 2023–2024</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-slate-900" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{meipa.promedio ?? '—'}</span>
+            <span className="font-black text-slate-900 transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{meipa.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #1e40af', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #1e40af', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(30,64,175,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(30,64,175,0.35), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(30,64,175,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(30,64,175,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">MECDI · 2024–2025</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-[#1e40af]" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
+            <span className="font-black text-[#1e40af] transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
         </div>
 
         {/* Best gender insight */}
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:`3px solid ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}`, boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:`3px solid ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}`, boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(0,0,0,0.12)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(244,63,94,0.28), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(0,0,0,0.12)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:`radial-gradient(circle, ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}22 0%, transparent 70%)` }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Mejor Género · Promedio global</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black" style={{ fontSize:24, letterSpacing:'-0.01em', color: bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8' }}>
+            <span className="font-black transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:24, letterSpacing:'-0.01em', color: bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8' }}>
               {bestGenero ?? '—'}
             </span>
           </div>
@@ -983,11 +996,14 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         </div>
 
         {/* Best seniority insight */}
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #15803d', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #15803d', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(21,128,61,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(21,128,61,0.32), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(21,128,61,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(21,128,61,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Mejor Antigüedad · Rango más alto</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-[#15803d]" style={{ fontSize:18, letterSpacing:'-0.01em', lineHeight:1.2 }}>{bestAnt ?? '—'}</span>
+            <span className="font-black text-[#15803d] transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:18, letterSpacing:'-0.01em', lineHeight:1.2 }}>{bestAnt ?? '—'}</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-3 pt-3 border-t border-slate-100">
             {bestAnt && porAnt[bestAnt] != null ? `${porAnt[bestAnt]}/100 pts` : 'Sin datos'}
@@ -3910,7 +3926,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
               {/* Update */}
               <button onClick={runETL} disabled={processing}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                 style={{ background:'linear-gradient(135deg,#1a7fc1,#0d5a8c)', boxShadow:'0 2px 8px rgba(26,127,193,0.3)' }}>
                 <RefreshCw size={12} className={processing ? 'animate-spin' : ''} />
                 {processing ? 'Actualizando…' : 'Actualizar'}
@@ -3929,7 +3945,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     sistema === 'overview' ? undefined : sistema === 'meipa' ? 'docencia' : sistema === 'salud' ? saludSubTab : activeTab
                   )}
                   disabled={exportingInforme}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60 active:scale-95"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)', boxShadow:'0 2px 8px rgba(0,86,179,0.3)' }}
                   title="Descargar Informe General PDF"
                 >
@@ -3940,8 +3956,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 <button
                   onClick={sistema === 'overview' ? exportComparativoPDF2 : exportVistaPDF}
                   disabled={sistema === 'overview' ? exportingComp : exportingVista}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60"
-                  style={{ background:'#059669' }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  style={{ background:'linear-gradient(135deg,#059669,#047857)', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}
                 >
                   {(sistema === 'overview' ? exportingComp : exportingVista)
                     ? <Loader2 size={13} className="animate-spin" />
@@ -3963,8 +3979,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <button
                   onClick={onLogout}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
-                  style={{ background:'#e53e3e' }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  style={{ background:'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow:'0 2px 8px rgba(229,62,62,0.3)' }}
                   title="Cerrar sesión">
                   <LogOut size={13} />
                   <span>Salir</span>
@@ -3988,11 +4004,12 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {/* ── Banner Informe General Institucional ──────────────────── */}
-              <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-xl border"
-                style={{ background:'linear-gradient(135deg,#0f172a 0%,#0056b3 100%)', borderColor:'#1e40af' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background:'rgba(255,255,255,0.12)' }}>
+              <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-2xl border relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
+                style={{ background:'linear-gradient(135deg,#0f172a 0%,#0056b3 100%)', borderColor:'#1e40af', boxShadow:'0 10px 30px -10px rgba(0,86,179,0.5)' }}>
+                <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background:'radial-gradient(circle at 80% 20%, rgba(147,197,253,0.25) 0%, transparent 50%)' }} />
+                <div className="flex items-center gap-3 relative">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm"
+                    style={{ background:'rgba(255,255,255,0.12)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.15)' }}>
                     <FileText size={20} style={{ color:'#93c5fd' }}/>
                   </div>
                   <div>
@@ -4005,8 +4022,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 <button
                   onClick={() => handleDescargarInforme(undefined, undefined)}
                   disabled={exportingInforme}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all disabled:opacity-60 active:scale-95"
-                  style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)' }}
+                  className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all duration-200 disabled:opacity-60 active:scale-95 hover:bg-white/30 hover:scale-[1.03]"
+                  style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}
                 >
                   {exportingInforme ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
                   <span>{exportingInforme ? 'Generando…' : 'Descargar PDF'}</span>
