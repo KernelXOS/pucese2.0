@@ -3325,12 +3325,14 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     setAiAnalysis('')
     if (s === '360') setActiveTab('docencia')
     setActiveView('dashboard')  // volver al dashboard principal al cambiar sistema
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
   }
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSearchTerm('')
     setAiAnalysis('')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
   }
 
   const runETL = async () => {
@@ -3475,9 +3477,27 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     )
 
   const [sidebarOpen, setSidebarOpen]     = useState(true)
+  const [isMobile, setIsMobile]           = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [expandedMEIPA, setExpandedMEIPA] = useState(true)
   const [expanded360, setExpanded360]     = useState(true)
   const [expandedSalud, setExpandedSalud] = useState(true)
+
+  // ── Responsive: detecta móvil y ajusta el sidebar ───────────────────────
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(prev => {
+        if (mobile !== prev) {
+          // al pasar a móvil cerrar drawer; al pasar a desktop abrir sidebar
+          setSidebarOpen(!mobile)
+        }
+        return mobile
+      })
+    }
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   // ── Módulo Análisis de Instrumentos ─────────────────────────────────────
   const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'>('dashboard')
@@ -3490,6 +3510,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
   const goToCompDetalle = async () => {
     setActiveView('competencias-detalle')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
     if (compDetalle) return
     setLoadingCompDetalle(true)
     try {
@@ -3529,10 +3550,28 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
       <SplashScreen visible={splashVisible} fading={splashFading} />
       <div className="flex h-screen overflow-hidden font-sans" style={{ background:'#f5f7fa' }}>
 
+        {/* ── Backdrop (solo móvil cuando el drawer está abierto) ──────────── */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 transition-opacity duration-300"
+            style={{ background:'rgba(15,30,56,0.55)', backdropFilter:'blur(2px)' }}
+          />
+        )}
+
         {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
         <aside
-          className="flex-shrink-0 flex flex-col h-full transition-all duration-300 z-30 relative"
-          style={{ width: SIDEBAR_W, background: 'linear-gradient(180deg, #0f1e38 0%, #122444 60%, #0d1c34 100%)', borderRight:'1px solid rgba(255,255,255,0.06)' }}
+          className="flex-shrink-0 flex flex-col h-full transition-all duration-300"
+          style={{
+            width: isMobile ? 268 : SIDEBAR_W,
+            background: 'linear-gradient(180deg, #0f1e38 0%, #122444 60%, #0d1c34 100%)',
+            borderRight:'1px solid rgba(255,255,255,0.06)',
+            position: isMobile ? 'fixed' : 'relative',
+            top: 0, left: 0,
+            zIndex: isMobile ? 50 : 30,
+            transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)',
+            boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
+          }}
         >
           {/* Logo */}
           <div
@@ -3864,12 +3903,20 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
           {/* Topbar */}
           <header
-            className="flex-shrink-0 flex items-center justify-between px-6 bg-white z-20"
+            className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 bg-white z-20"
             style={{ height: TOPBAR_H, borderBottom:'1px solid #e8edf2', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}
           >
-            <div className="flex items-center gap-3">
-              <div>
-                <span className="text-slate-800 font-black" style={{ fontSize: 14 }}>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* Hamburguesa — solo móvil */}
+              <button
+                onClick={() => setSidebarOpen(v => !v)}
+                className="md:hidden flex-shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Menú"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="min-w-0">
+                <span className="text-slate-800 font-black block truncate max-w-[150px] sm:max-w-none" style={{ fontSize: 14 }}>
                   {activeView === 'competencias-detalle'
                     ? 'Análisis Detallado de Instrumentos y Competencias'
                     : sistema === 'overview' ? 'Vista General'
@@ -3878,10 +3925,10 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     : `MECDI — ${currentTabCfg.label}`}
                 </span>
               </div>
-              {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin" />}
+              {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin flex-shrink-0" />}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
               {/* Selector de Período (v2) */}
               {periodos.length > 0 && (
                 <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
@@ -3902,7 +3949,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               )}
 
               {/* Year (legacy) */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                 <Calendar size={12} className="text-slate-400" />
                 <select
                   className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
@@ -3926,15 +3973,15 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
               {/* Update */}
               <button onClick={runETL} disabled={processing}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                className="flex items-center gap-2 px-2.5 sm:px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                 style={{ background:'linear-gradient(135deg,#1a7fc1,#0d5a8c)', boxShadow:'0 2px 8px rgba(26,127,193,0.3)' }}>
                 <RefreshCw size={12} className={processing ? 'animate-spin' : ''} />
-                {processing ? 'Actualizando…' : 'Actualizar'}
+                <span className="hidden sm:inline">{processing ? 'Actualizando…' : 'Actualizar'}</span>
               </button>
 
               {/* Topbar icons */}
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-                <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors relative">
+              <div className="flex items-center gap-1.5 sm:gap-2 sm:pl-2 sm:border-l border-slate-200">
+                <button className="hidden sm:block p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors relative">
                   <Bell size={16} />
                 </button>
 
@@ -3945,24 +3992,24 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     sistema === 'overview' ? undefined : sistema === 'meipa' ? 'docencia' : sistema === 'salud' ? saludSubTab : activeTab
                   )}
                   disabled={exportingInforme}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)', boxShadow:'0 2px 8px rgba(0,86,179,0.3)' }}
                   title="Descargar Informe General PDF"
                 >
                   {exportingInforme ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                  <span>{exportingInforme ? 'Generando…' : 'Informe PDF'}</span>
+                  <span className="hidden sm:inline">{exportingInforme ? 'Generando…' : 'Informe PDF'}</span>
                 </button>
 
                 <button
                   onClick={sistema === 'overview' ? exportComparativoPDF2 : exportVistaPDF}
                   disabled={sistema === 'overview' ? exportingComp : exportingVista}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   style={{ background:'linear-gradient(135deg,#059669,#047857)', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}
                 >
                   {(sistema === 'overview' ? exportingComp : exportingVista)
                     ? <Loader2 size={13} className="animate-spin" />
                     : <Download size={13} />}
-                  <span>
+                  <span className="hidden sm:inline">
                     {(sistema === 'overview' ? exportingComp : exportingVista) ? 'Exportando…' : 'Exportar'}
                   </span>
                 </button>
@@ -3979,18 +4026,18 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <button
                   onClick={onLogout}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   style={{ background:'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow:'0 2px 8px rgba(229,62,62,0.3)' }}
                   title="Cerrar sesión">
                   <LogOut size={13} />
-                  <span>Salir</span>
+                  <span className="hidden sm:inline">Salir</span>
                 </button>
               </div>
             </div>
           </header>
 
           {/* Scrollable content */}
-          <main className="flex-1 overflow-y-auto p-6" style={{ background:'#f5f7fa' }}>
+          <main className="flex-1 overflow-y-auto p-3 sm:p-6" style={{ background:'#f5f7fa' }}>
 
           {/* ── OVERVIEW / COMPARATIVO ─────────────────────────────────────── */}
           {activeView === 'dashboard' && sistema === 'overview' && (
