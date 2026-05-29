@@ -1642,5 +1642,107 @@ class KPIService:
         result.sort(key=lambda x: x['carrera'])
         return result
 
+    def get_prediccion_tendencias(self, db: Session, anio: int = None) -> dict:
+        """
+        Predicción híbrida: calcula la tendencia (regresión lineal) y proyecta
+        el siguiente período para cada carrera, usando los puntajes por período.
+        Los NÚMEROS son deterministas (Python) — la IA solo añade narrativa aparte.
+        """
+        PERIOD_CODES = ['202301', '202302', '202401', '202402', '202501', '202502']
+        PERIOD_LABELS = {
+            '202301': 'I-2023', '202302': 'II-2023',
+            '202401': 'I-2024', '202402': 'II-2024',
+            '202501': 'I-2025', '202502': 'II-2025',
+        }
+        NEXT_CODE  = '202601'
+        NEXT_LABEL = 'I-2026 (proyección)'
+
+        carreras = self.get_competencias_por_carrera(db, anio=anio)
+
+        def _linreg(xs, ys):
+            """Regresión lineal simple. Devuelve (pendiente, intercepto)."""
+            n = len(xs)
+            if n < 2:
+                return 0.0, (ys[0] if ys else 0.0)
+            mx = sum(xs) / n
+            my = sum(ys) / n
+            denom = sum((x - mx) ** 2 for x in xs)
+            if denom == 0:
+                return 0.0, my
+            slope = sum((xs[i] - mx) * (ys[i] - my) for i in range(n)) / denom
+            intercept = my - slope * mx
+            return slope, intercept
+
+        predicciones = []
+        for c in carreras:
+            pp = c.get('por_periodo', {}) or {}
+            # puntos ordenados por período disponible
+            pts = [(i, pp[code]) for i, code in enumerate(PERIOD_CODES)
+                   if code in pp and pp[code] is not None]
+            if len(pts) < 2:
+                continue  # no se puede proyectar con menos de 2 puntos
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            slope, intercept = _linreg(xs, ys)
+
+            next_idx = len(PERIOD_CODES)  # índice del período futuro
+            proyeccion = round(intercept + slope * next_idx, 2)
+            proyeccion = max(0.0, min(100.0, proyeccion))  # clamp 0-100
+
+            ultimo = ys[-1]
+            cambio_proy = round(proyeccion - ultimo, 2)
+
+            # clasificación según pendiente por período
+            if slope <= -1.5:
+                clasificacion = 'bajando'
+            elif slope >= 1.5:
+                clasificacion = 'subiendo'
+            else:
+                clasificacion = 'estable'
+
+            # nivel de riesgo: bajando + proyección baja
+            if clasificacion == 'bajando' and proyeccion < 70:
+                riesgo = 'alto'
+            elif clasificacion == 'bajando':
+                riesgo = 'medio'
+            else:
+                riesgo = 'bajo'
+
+            serie = [{'codigo': code, 'label': PERIOD_LABELS[code], 'valor': pp[code]}
+                     for code in PERIOD_CODES if code in pp and pp[code] is not None]
+
+            predicciones.append({
+                'carrera':       c['carrera'],
+                'n':             c.get('n', 0),
+                'promedio':      c.get('promedio'),
+                'serie':         serie,
+                'ultimo_valor':  ultimo,
+                'pendiente':     round(slope, 2),
+                'proyeccion':    proyeccion,
+                'proyeccion_codigo': NEXT_CODE,
+                'proyeccion_label':  NEXT_LABEL,
+                'cambio_proyectado': cambio_proy,
+                'clasificacion': clasificacion,
+                'riesgo':        riesgo,
+            })
+
+        # ordenar: mayor riesgo / más bajada primero
+        predicciones.sort(key=lambda x: (x['pendiente']))
+
+        en_riesgo = [p for p in predicciones if p['clasificacion'] == 'bajando']
+        en_mejora = [p for p in predicciones if p['clasificacion'] == 'subiendo']
+        estables  = [p for p in predicciones if p['clasificacion'] == 'estable']
+
+        return {
+            'predicciones':   predicciones,
+            'resumen': {
+                'total':       len(predicciones),
+                'en_riesgo':   len(en_riesgo),
+                'en_mejora':   len(en_mejora),
+                'estables':    len(estables),
+            },
+            'periodos_labels': PERIOD_LABELS,
+        }
+
 
 kpi_service = KPIService()
