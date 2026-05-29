@@ -1,10 +1,38 @@
 from google import genai
 from app.core.config import settings
 import json
+import time
 
 class GeminiService:
+    # Modelos en orden de preferencia: si el primero está saturado (503),
+    # se intenta con el siguiente.
+    MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+
     def __init__(self):
         self._client = None
+
+    def _generate(self, prompt: str, retries: int = 2) -> str:
+        """Genera contenido con reintentos y modelos de respaldo ante 503/UNAVAILABLE."""
+        client = self.client
+        if not client:
+            return ""
+        last_err = None
+        for model in self.MODELS:
+            for attempt in range(retries):
+                try:
+                    resp = client.models.generate_content(model=model, contents=prompt)
+                    if resp and getattr(resp, 'text', None):
+                        return resp.text
+                except Exception as e:
+                    last_err = e
+                    msg = str(e)
+                    # 503/UNAVAILABLE/overloaded → esperar y reintentar / cambiar de modelo
+                    if any(k in msg for k in ('503', 'UNAVAILABLE', 'overloaded', 'high demand')):
+                        time.sleep(1.5 * (attempt + 1))
+                        continue
+                    # otro error → cortar reintentos de este modelo
+                    break
+        raise last_err if last_err else RuntimeError("Sin respuesta del modelo")
 
     @property
     def client(self):
@@ -292,13 +320,12 @@ REGLAS:
 - Máximo 450 palabras.
 """
         try:
-            response = current_client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
-            return response.text
+            return self._generate(prompt)
         except Exception as e:
-            return f"Error generando alertas: {str(e)}"
+            msg = str(e)
+            if any(k in msg for k in ('503', 'UNAVAILABLE', 'overloaded', 'high demand')):
+                return "__IA_BUSY__"  # señal para que el frontend muestre 'reintentar'
+            return "__IA_ERROR__"
 
     def generate_executive_analysis(self, kpis: dict):
         current_client = self.client

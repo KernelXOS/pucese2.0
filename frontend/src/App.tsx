@@ -3525,16 +3525,19 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   // ── Módulo Predicción y Alertas ─────────────────────────────────────────
   const [prediccion, setPrediccion]             = useState<any>(null)
   const [loadingPrediccion, setLoadingPrediccion] = useState(false)
-  const goToPrediccion = async () => {
-    setActiveView('prediccion')
-    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
-    if (prediccion) return
+  const fetchPrediccion = async () => {
     setLoadingPrediccion(true)
     try {
       const res = await api.getPrediccionTendencias(undefined, true)
       setPrediccion(res.data)
     } catch { setPrediccion({ predicciones: [], resumen: {}, alertas_ia: '' }) }
     finally { setLoadingPrediccion(false) }
+  }
+  const goToPrediccion = async () => {
+    setActiveView('prediccion')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
+    if (prediccion) return
+    await fetchPrediccion()
   }
 
   const goToCompDetalle = async () => {
@@ -5359,18 +5362,41 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     </div>
 
                     {/* Alertas IA */}
-                    {alertasIA && (
-                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2" style={{ background:'linear-gradient(135deg,#faf5ff,#fff)' }}>
-                          <BrainCircuit size={16} style={{ color:'#9333ea' }} />
-                          <span className="text-[13px] font-black text-slate-700">Análisis y Alertas — Inteligencia Artificial</span>
-                          <span className="ml-auto text-[9px] font-bold text-purple-400 uppercase tracking-[0.15em]">Gemini</span>
-                        </div>
-                        <div className="p-5">
-                          <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{alertasIA}</p>
-                        </div>
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2" style={{ background:'linear-gradient(135deg,#faf5ff,#fff)' }}>
+                        <BrainCircuit size={16} style={{ color:'#9333ea' }} />
+                        <span className="text-[13px] font-black text-slate-700">Análisis y Alertas — Inteligencia Artificial</span>
+                        <span className="ml-auto text-[9px] font-bold text-purple-400 uppercase tracking-[0.15em]">Gemini</span>
                       </div>
-                    )}
+                      <div className="p-5">
+                        {alertasIA === '__IA_BUSY__' ? (
+                          <div className="flex flex-col items-center gap-3 py-6 text-center">
+                            <AlertCircle size={28} className="text-amber-400" />
+                            <p className="text-sm font-bold text-slate-600">El servidor de IA está saturado en este momento</p>
+                            <p className="text-xs text-slate-400 max-w-sm">Google reporta alta demanda temporal. Las proyecciones de arriba ya están calculadas; solo falta el texto de la IA.</p>
+                            <button onClick={fetchPrediccion} disabled={loadingPrediccion}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:opacity-60"
+                              style={{ background:'linear-gradient(135deg,#9333ea,#7e22ce)', boxShadow:'0 4px 14px rgba(147,51,234,0.35)' }}>
+                              <RefreshCw size={13} className={loadingPrediccion ? 'animate-spin' : ''} />
+                              {loadingPrediccion ? 'Reintentando…' : 'Reintentar análisis IA'}
+                            </button>
+                          </div>
+                        ) : alertasIA === '__IA_ERROR__' || !alertasIA ? (
+                          <div className="flex flex-col items-center gap-3 py-6 text-center">
+                            <BrainCircuit size={26} className="text-slate-300" />
+                            <p className="text-sm font-bold text-slate-500">Análisis IA no disponible</p>
+                            <p className="text-xs text-slate-400 max-w-sm">No se pudo generar el texto (verifica la API key de Gemini en el servidor). Las proyecciones de arriba se calculan sin IA.</p>
+                            <button onClick={fetchPrediccion} disabled={loadingPrediccion}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 transition-all hover:bg-slate-200 disabled:opacity-60">
+                              <RefreshCw size={13} className={loadingPrediccion ? 'animate-spin' : ''} />
+                              {loadingPrediccion ? 'Reintentando…' : 'Reintentar'}
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{alertasIA}</p>
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
