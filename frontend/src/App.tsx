@@ -48,11 +48,21 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="min-h-screen flex relative overflow-hidden" style={{ fontFamily: 'inherit' }}>
 
+      {/* ── Animaciones del login (scoped) ─────────────────────────────── */}
+      <style>{`
+        @keyframes loginFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes loginKenBurns { from { transform: scale(1); } to { transform: scale(1.08); } }
+        .login-fade-1 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) both; }
+        .login-fade-2 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.12s both; }
+        .login-fade-3 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.24s both; }
+        .login-kenburns { animation: loginKenBurns 22s ease-out both; }
+      `}</style>
+
       {/* ── FULL SCREEN background photo ───────────────────────────────── */}
       <img
         src={BG_IMAGE}
         alt="Campus PUCESE"
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover login-kenburns"
         style={{ objectPosition: 'center 20%' }}
       />
       {/* Dark overlay over entire screen */}
@@ -84,7 +94,11 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           {/* Stat pills */}
           <div className="flex gap-3 mt-6">
             {[['MEIPA', 'Evaluación interna'],['MECDI','Heteroevaluación'],['SIGA','Gestión académica']].map(([tag, desc]) => (
-              <div key={tag} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}>
+              <div key={tag}
+                className="transition-all duration-300 hover:-translate-y-1 cursor-default"
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(126,200,240,0.18)'; e.currentTarget.style.borderColor = 'rgba(126,200,240,0.4)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}>
                 <p style={{ fontSize: 13, fontWeight: 800, color: '#7ec8f0' }}>{tag}</p>
                 <p style={{ fontSize: 10, opacity: 0.6 }}>{desc}</p>
               </div>
@@ -124,13 +138,13 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           </div>
 
           {/* Heading */}
-          <div className="mb-8">
+          <div className="mb-8 login-fade-1">
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 6 }}>Acceso al sistema</p>
             <h2 style={{ color: '#fff', fontSize: 26, fontWeight: 900, lineHeight: 1.2, letterSpacing: '-0.02em' }}>Bienvenido<br />de vuelta</h2>
           </div>
 
           {/* Card */}
-          <div className="rounded-2xl overflow-hidden"
+          <div className="rounded-2xl overflow-hidden login-fade-2"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(20px)', boxShadow: '0 24px 56px rgba(0,0,0,0.5)' }}>
 
             {/* Top accent */}
@@ -199,7 +213,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60"
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]"
                   style={{
                     background: loading ? 'rgba(77,166,232,0.35)' : 'linear-gradient(135deg, #0056b3 0%, #1a7fc1 100%)',
                     boxShadow: loading ? 'none' : '0 6px 20px rgba(0,86,179,0.45)',
