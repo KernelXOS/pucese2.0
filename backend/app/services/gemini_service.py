@@ -1,38 +1,10 @@
 from google import genai
 from app.core.config import settings
 import json
-import time
 
 class GeminiService:
-    # Modelos en orden de preferencia: si el primero está saturado (503),
-    # se intenta con el siguiente.
-    MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
-
     def __init__(self):
         self._client = None
-
-    def _generate(self, prompt: str, retries: int = 2) -> str:
-        """Genera contenido con reintentos y modelos de respaldo ante 503/UNAVAILABLE."""
-        client = self.client
-        if not client:
-            return ""
-        last_err = None
-        for model in self.MODELS:
-            for attempt in range(retries):
-                try:
-                    resp = client.models.generate_content(model=model, contents=prompt)
-                    if resp and getattr(resp, 'text', None):
-                        return resp.text
-                except Exception as e:
-                    last_err = e
-                    msg = str(e)
-                    # 503/UNAVAILABLE/overloaded → esperar y reintentar / cambiar de modelo
-                    if any(k in msg for k in ('503', 'UNAVAILABLE', 'overloaded', 'high demand')):
-                        time.sleep(1.5 * (attempt + 1))
-                        continue
-                    # otro error → cortar reintentos de este modelo
-                    break
-        raise last_err if last_err else RuntimeError("Sin respuesta del modelo")
 
     @property
     def client(self):
@@ -259,73 +231,6 @@ NOTAS:
             return response.text
         except Exception as e:
             return f"Error generando informe: {str(e)}"
-
-    def generate_prediccion_alertas(self, prediccion: dict) -> str:
-        """Genera alertas y recomendaciones narrativas a partir de las
-        tendencias YA calculadas matemáticamente (no inventa cifras)."""
-        current_client = self.client
-        if not current_client:
-            return ""
-
-        preds = prediccion.get('predicciones', []) or []
-        if not preds:
-            return ""
-
-        # Construir contexto con las cifras ya calculadas
-        lines = ["=== TENDENCIAS Y PROYECCIONES CALCULADAS (datos exactos) ==="]
-        bajando = [p for p in preds if p['clasificacion'] == 'bajando']
-        subiendo = [p for p in preds if p['clasificacion'] == 'subiendo']
-
-        lines.append(f"\nCARRERAS EN DESCENSO ({len(bajando)}):")
-        for p in bajando[:15]:
-            serie = " → ".join(f"{s['label']}:{s['valor']}" for s in p['serie'])
-            lines.append(
-                f"  - {p['carrera']}: último {p['ultimo_valor']}/100, "
-                f"proyección {p['proyeccion_label']}={p['proyeccion']}/100 "
-                f"(cambio {p['cambio_proyectado']:+}), riesgo={p['riesgo']}. Serie: {serie}"
-            )
-        lines.append(f"\nCARRERAS EN MEJORA ({len(subiendo)}):")
-        for p in subiendo[:10]:
-            lines.append(
-                f"  - {p['carrera']}: último {p['ultimo_valor']}/100, "
-                f"proyección {p['proyeccion']}/100 (cambio {p['cambio_proyectado']:+})"
-            )
-
-        context_text = "\n".join(lines)
-
-        prompt = f"""Eres un analista de calidad educativa de la PUCESE (Pontificia Universidad Católica del Ecuador, Sede Esmeraldas).
-A continuación tienes las tendencias y proyecciones YA CALCULADAS matemáticamente del desempeño docente por carrera a lo largo de 6 períodos.
-
-{context_text}
-
-=== INSTRUCCIONES ===
-Genera un análisis predictivo en formato Markdown con estas secciones:
-
-## ⚠️ Alertas Prioritarias
-- 3 a 5 alertas para las autoridades sobre las carreras en mayor riesgo de descenso.
-- Usa las cifras exactas del contexto (NO inventes números).
-
-## 📉 Carreras en Riesgo — Diagnóstico
-- Para las 3-4 carreras que más bajan: explica el patrón observado en su serie y la magnitud de la caída proyectada.
-
-## ✅ Recomendaciones Accionables
-- 5-6 acciones concretas y priorizadas para revertir las tendencias negativas.
-
-## 📈 Buenas Prácticas
-- Menciona 1-2 carreras que mejoran y qué se podría replicar.
-
-REGLAS:
-- Usa SOLO las cifras del contexto; no inventes datos.
-- Tono profesional, constructivo, orientado a la acción.
-- Máximo 450 palabras.
-"""
-        try:
-            return self._generate(prompt)
-        except Exception as e:
-            msg = str(e)
-            if any(k in msg for k in ('503', 'UNAVAILABLE', 'overloaded', 'high demand')):
-                return "__IA_BUSY__"  # señal para que el frontend muestre 'reintentar'
-            return "__IA_ERROR__"
 
     def generate_executive_analysis(self, kpis: dict):
         current_client = self.client

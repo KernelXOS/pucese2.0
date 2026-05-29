@@ -155,10 +155,6 @@ export const api = {
   getCompetenciasPorCarrera: (anio?: number, sistema?: string, modelo?: string, periodo?: string) =>
     axios.get(`${EVAL}/competencias-por-carrera?${params({ anio, sistema, modelo, periodo })}`),
 
-  // ── Predicción de tendencias + alertas IA ────────────────────────────────────
-  getPrediccionTendencias: (anio?: number, conIa: boolean = true) =>
-    axios.get(`${EVAL}/prediccion-tendencias?${params({ anio, con_ia: conIa ? 'true' : 'false' })}`),
-
   /** Descarga el PDF del informe general (todo, o filtrado por sistema/modelo/periodo). */
   descargarInformeGeneral: async (opts: {
     sistema?: string; modelo?: string; periodo?: string; filename?: string
