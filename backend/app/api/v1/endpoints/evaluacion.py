@@ -289,6 +289,28 @@ def get_competencias_preguntas():
     return data
 
 
+@router.get("/prediccion-tendencias")
+def get_prediccion_tendencias(
+    db: Session = Depends(get_db),
+    anio: Optional[int] = None,
+    con_ia: bool = True,
+):
+    """Predicción híbrida: tendencias/proyecciones (Python) + alertas IA (Gemini)."""
+    data = kpi_service.get_prediccion_tendencias(db, anio=anio)
+    if not data or not data.get('predicciones'):
+        raise HTTPException(status_code=404, detail="No hay suficientes datos para proyectar tendencias")
+    # Capa IA (opcional): no rompe si Gemini falla
+    if con_ia:
+        try:
+            data['alertas_ia'] = gemini_service.generate_prediccion_alertas(data)
+        except Exception as e:
+            data['alertas_ia'] = ''
+            data['alertas_ia_error'] = str(e)
+    else:
+        data['alertas_ia'] = ''
+    return data
+
+
 @router.get("/reporte-general.pdf")
 def reporte_general_pdf(
     db:      Session      = Depends(get_db),

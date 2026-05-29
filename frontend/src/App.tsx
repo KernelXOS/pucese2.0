@@ -48,11 +48,21 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="min-h-screen flex relative overflow-hidden" style={{ fontFamily: 'inherit' }}>
 
+      {/* ── Animaciones del login (scoped) ─────────────────────────────── */}
+      <style>{`
+        @keyframes loginFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes loginKenBurns { from { transform: scale(1); } to { transform: scale(1.08); } }
+        .login-fade-1 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) both; }
+        .login-fade-2 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.12s both; }
+        .login-fade-3 { animation: loginFadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.24s both; }
+        .login-kenburns { animation: loginKenBurns 22s ease-out both; }
+      `}</style>
+
       {/* ── FULL SCREEN background photo ───────────────────────────────── */}
       <img
         src={BG_IMAGE}
         alt="Campus PUCESE"
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover login-kenburns"
         style={{ objectPosition: 'center 20%' }}
       />
       {/* Dark overlay over entire screen */}
@@ -84,7 +94,11 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           {/* Stat pills */}
           <div className="flex gap-3 mt-6">
             {[['MEIPA', 'Evaluación interna'],['MECDI','Heteroevaluación'],['SIGA','Gestión académica']].map(([tag, desc]) => (
-              <div key={tag} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}>
+              <div key={tag}
+                className="transition-all duration-300 hover:-translate-y-1 cursor-default"
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '6px 14px', backdropFilter: 'blur(8px)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(126,200,240,0.18)'; e.currentTarget.style.borderColor = 'rgba(126,200,240,0.4)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}>
                 <p style={{ fontSize: 13, fontWeight: 800, color: '#7ec8f0' }}>{tag}</p>
                 <p style={{ fontSize: 10, opacity: 0.6 }}>{desc}</p>
               </div>
@@ -124,13 +138,13 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
           </div>
 
           {/* Heading */}
-          <div className="mb-8">
+          <div className="mb-8 login-fade-1">
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 6 }}>Acceso al sistema</p>
             <h2 style={{ color: '#fff', fontSize: 26, fontWeight: 900, lineHeight: 1.2, letterSpacing: '-0.02em' }}>Bienvenido<br />de vuelta</h2>
           </div>
 
           {/* Card */}
-          <div className="rounded-2xl overflow-hidden"
+          <div className="rounded-2xl overflow-hidden login-fade-2"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(20px)', boxShadow: '0 24px 56px rgba(0,0,0,0.5)' }}>
 
             {/* Top accent */}
@@ -199,7 +213,7 @@ function LoginPage({ onLogin }: { onLogin: () => void }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60"
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]"
                   style={{
                     background: loading ? 'rgba(77,166,232,0.35)' : 'linear-gradient(135deg, #0056b3 0%, #1a7fc1 100%)',
                     boxShadow: loading ? 'none' : '0 6px 20px rgba(0,86,179,0.45)',
@@ -436,8 +450,12 @@ const CARD_SHADOW = { boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 
 function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-slate-200 overflow-hidden" style={{ borderRadius: 6, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+    <div className="bg-white border border-slate-200 overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-0.5"
+      style={{ boxShadow:'0 1px 3px rgba(0,0,0,0.05), 0 10px 28px -16px rgba(15,23,42,0.25)' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 14px 36px -14px rgba(15,23,42,0.28), 0 4px 12px rgba(0,0,0,0.06)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05), 0 10px 28px -16px rgba(15,23,42,0.25)')}>
+      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2" style={{ background:'linear-gradient(180deg,#fafbfc 0%,#ffffff 100%)' }}>
+        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex-shrink-0" />
         {sub && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">{sub} ·</span>}
         <h3 className="text-[13px] font-bold text-slate-700">{title}</h3>
       </div>
@@ -950,30 +968,39 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
 
       {/* ── Row 1: MEIPA vs 360 summary cards ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #6366f1', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #6366f1', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(99,102,241,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(99,102,241,0.35), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(99,102,241,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">MEIPA · 2023–2024</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-slate-900" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{meipa.promedio ?? '—'}</span>
+            <span className="font-black text-slate-900 transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{meipa.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #1e40af', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #1e40af', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(30,64,175,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(30,64,175,0.35), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(30,64,175,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(30,64,175,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">MECDI · 2024–2025</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-[#1e40af]" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
+            <span className="font-black text-[#1e40af] transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:28, letterSpacing:'-0.02em' }}>{tres60.promedio ?? '—'}</span>
             <span className="text-xs text-slate-400">/ 100</span>
           </div>
         </div>
 
         {/* Best gender insight */}
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:`3px solid ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}`, boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:`3px solid ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}`, boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(0,0,0,0.12)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(244,63,94,0.28), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(0,0,0,0.12)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:`radial-gradient(circle, ${bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8'}22 0%, transparent 70%)` }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Mejor Género · Promedio global</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black" style={{ fontSize:24, letterSpacing:'-0.01em', color: bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8' }}>
+            <span className="font-black transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:24, letterSpacing:'-0.01em', color: bestGenero ? GENDER_COLORS[bestGenero] : '#94a3b8' }}>
               {bestGenero ?? '—'}
             </span>
           </div>
@@ -983,11 +1010,14 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
         </div>
 
         {/* Best seniority insight */}
-        <div className="bg-white border border-slate-200 col-span-1"
-          style={{ borderRadius: 6, borderTop:'3px solid #15803d', boxShadow:'0 1px 3px rgba(0,0,0,0.06)', padding:'18px 20px' }}>
+        <div className="group bg-white border border-slate-200 col-span-1 rounded-2xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+          style={{ borderTop:'3px solid #15803d', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(21,128,61,0.18)', padding:'18px 20px' }}
+          onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 12px 32px -8px rgba(21,128,61,0.32), 0 4px 12px rgba(0,0,0,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06), 0 8px 24px -12px rgba(21,128,61,0.18)')}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background:'radial-gradient(circle, rgba(21,128,61,0.12) 0%, transparent 70%)' }} />
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">Mejor Antigüedad · Rango más alto</p>
           <div className="flex items-baseline gap-1.5 mb-1">
-            <span className="font-black text-[#15803d]" style={{ fontSize:18, letterSpacing:'-0.01em', lineHeight:1.2 }}>{bestAnt ?? '—'}</span>
+            <span className="font-black text-[#15803d] transition-transform duration-300 group-hover:scale-105 origin-left inline-block" style={{ fontSize:18, letterSpacing:'-0.01em', lineHeight:1.2 }}>{bestAnt ?? '—'}</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-3 pt-3 border-t border-slate-100">
             {bestAnt && porAnt[bestAnt] != null ? `${porAnt[bestAnt]}/100 pts` : 'Sin datos'}
@@ -3309,12 +3339,14 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     setAiAnalysis('')
     if (s === '360') setActiveTab('docencia')
     setActiveView('dashboard')  // volver al dashboard principal al cambiar sistema
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
   }
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSearchTerm('')
     setAiAnalysis('')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
   }
 
   const runETL = async () => {
@@ -3459,12 +3491,30 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     )
 
   const [sidebarOpen, setSidebarOpen]     = useState(true)
+  const [isMobile, setIsMobile]           = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [expandedMEIPA, setExpandedMEIPA] = useState(true)
   const [expanded360, setExpanded360]     = useState(true)
   const [expandedSalud, setExpandedSalud] = useState(true)
 
+  // ── Responsive: detecta móvil y ajusta el sidebar ───────────────────────
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(prev => {
+        if (mobile !== prev) {
+          // al pasar a móvil cerrar drawer; al pasar a desktop abrir sidebar
+          setSidebarOpen(!mobile)
+        }
+        return mobile
+      })
+    }
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── Módulo Análisis de Instrumentos ─────────────────────────────────────
-  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'>('dashboard')
+  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'|'prediccion'>('dashboard')
   const [compDetalle, setCompDetalle]           = useState<any>(null)
   const [loadingCompDetalle, setLoadingCompDetalle] = useState(false)
   const [cdFiltroCarrera, setCdFiltroCarrera]   = useState('__todas__')
@@ -3472,8 +3522,27 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   const [cdBusqueda, setCdBusqueda]             = useState('')
   const [cdOrden, setCdOrden]                   = useState<'promedio'|'nombre'>('promedio')
 
+  // ── Módulo Predicción y Alertas ─────────────────────────────────────────
+  const [prediccion, setPrediccion]             = useState<any>(null)
+  const [loadingPrediccion, setLoadingPrediccion] = useState(false)
+  const fetchPrediccion = async () => {
+    setLoadingPrediccion(true)
+    try {
+      const res = await api.getPrediccionTendencias(undefined, true)
+      setPrediccion(res.data)
+    } catch { setPrediccion({ predicciones: [], resumen: {}, alertas_ia: '' }) }
+    finally { setLoadingPrediccion(false) }
+  }
+  const goToPrediccion = async () => {
+    setActiveView('prediccion')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
+    if (prediccion) return
+    await fetchPrediccion()
+  }
+
   const goToCompDetalle = async () => {
     setActiveView('competencias-detalle')
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
     if (compDetalle) return
     setLoadingCompDetalle(true)
     try {
@@ -3513,10 +3582,28 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
       <SplashScreen visible={splashVisible} fading={splashFading} />
       <div className="flex h-screen overflow-hidden font-sans" style={{ background:'#f5f7fa' }}>
 
+        {/* ── Backdrop (solo móvil cuando el drawer está abierto) ──────────── */}
+        {isMobile && sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-40 transition-opacity duration-300"
+            style={{ background:'rgba(15,30,56,0.55)', backdropFilter:'blur(2px)' }}
+          />
+        )}
+
         {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
         <aside
-          className="flex-shrink-0 flex flex-col h-full transition-all duration-300 z-30 relative"
-          style={{ width: SIDEBAR_W, background: 'linear-gradient(180deg, #0f1e38 0%, #122444 60%, #0d1c34 100%)', borderRight:'1px solid rgba(255,255,255,0.06)' }}
+          className="flex-shrink-0 flex flex-col h-full transition-all duration-300"
+          style={{
+            width: isMobile ? 268 : SIDEBAR_W,
+            background: 'linear-gradient(180deg, #0f1e38 0%, #122444 60%, #0d1c34 100%)',
+            borderRight:'1px solid rgba(255,255,255,0.06)',
+            position: isMobile ? 'fixed' : 'relative',
+            top: 0, left: 0,
+            zIndex: isMobile ? 50 : 30,
+            transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)',
+            boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
+          }}
         >
           {/* Logo */}
           <div
@@ -3568,6 +3655,22 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             >
               <Microscope size={17} style={{ flexShrink:0, color: activeView === 'competencias-detalle' ? '#6ee7b7' : 'inherit' }} />
               {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Análisis Instrumentos</span>}
+            </button>
+
+            {/* ── Predicción y Alertas ── */}
+            <button
+              onClick={goToPrediccion}
+              className="w-full flex items-center gap-3 text-left transition-all rounded-xl"
+              style={{
+                padding: sidebarOpen ? '10px 12px' : '10px',
+                justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                color: activeView === 'prediccion' ? '#fff' : 'rgba(255,255,255,0.5)',
+                background: activeView === 'prediccion' ? 'linear-gradient(135deg,rgba(168,85,247,0.35),rgba(168,85,247,0.15))' : 'transparent',
+                borderLeft: activeView === 'prediccion' ? '2px solid #c084fc' : '2px solid transparent',
+              }}
+            >
+              <TrendingUp size={17} style={{ flexShrink:0, color: activeView === 'prediccion' ? '#d8b4fe' : 'inherit' }} />
+              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Predicción y Alertas</span>}
             </button>
 
             {sidebarOpen && <div style={{ height: 1, background:'rgba(255,255,255,0.06)', margin:'6px 4px' }} />}
@@ -3848,13 +3951,23 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
           {/* Topbar */}
           <header
-            className="flex-shrink-0 flex items-center justify-between px-6 bg-white z-20"
+            className="flex-shrink-0 flex items-center justify-between px-3 sm:px-6 bg-white z-20"
             style={{ height: TOPBAR_H, borderBottom:'1px solid #e8edf2', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}
           >
-            <div className="flex items-center gap-3">
-              <div>
-                <span className="text-slate-800 font-black" style={{ fontSize: 14 }}>
-                  {activeView === 'competencias-detalle'
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* Hamburguesa — solo móvil */}
+              <button
+                onClick={() => setSidebarOpen(v => !v)}
+                className="md:hidden flex-shrink-0 p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Menú"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="min-w-0">
+                <span className="text-slate-800 font-black block truncate max-w-[150px] sm:max-w-none" style={{ fontSize: 14 }}>
+                  {activeView === 'prediccion'
+                    ? 'Predicción de Tendencias y Alertas'
+                    : activeView === 'competencias-detalle'
                     ? 'Análisis Detallado de Instrumentos y Competencias'
                     : sistema === 'overview' ? 'Vista General'
                     : sistema === 'meipa' ? 'MEIPA — Evaluación Docente'
@@ -3862,10 +3975,10 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     : `MECDI — ${currentTabCfg.label}`}
                 </span>
               </div>
-              {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin" />}
+              {loading && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-[#1a7fc1] animate-spin flex-shrink-0" />}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
               {/* Selector de Período (v2) */}
               {periodos.length > 0 && (
                 <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
@@ -3886,7 +3999,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               )}
 
               {/* Year (legacy) */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                 <Calendar size={12} className="text-slate-400" />
                 <select
                   className="text-xs font-bold text-slate-600 bg-transparent outline-none cursor-pointer"
@@ -3910,15 +4023,15 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
 
               {/* Update */}
               <button onClick={runETL} disabled={processing}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all"
+                className="flex items-center gap-2 px-2.5 sm:px-4 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                 style={{ background:'linear-gradient(135deg,#1a7fc1,#0d5a8c)', boxShadow:'0 2px 8px rgba(26,127,193,0.3)' }}>
                 <RefreshCw size={12} className={processing ? 'animate-spin' : ''} />
-                {processing ? 'Actualizando…' : 'Actualizar'}
+                <span className="hidden sm:inline">{processing ? 'Actualizando…' : 'Actualizar'}</span>
               </button>
 
               {/* Topbar icons */}
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-                <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors relative">
+              <div className="flex items-center gap-1.5 sm:gap-2 sm:pl-2 sm:border-l border-slate-200">
+                <button className="hidden sm:block p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors relative">
                   <Bell size={16} />
                 </button>
 
@@ -3929,24 +4042,24 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     sistema === 'overview' ? undefined : sistema === 'meipa' ? 'docencia' : sistema === 'salud' ? saludSubTab : activeTab
                   )}
                   disabled={exportingInforme}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60 active:scale-95"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
                   style={{ background:'linear-gradient(135deg,#0056b3,#1a7fc1)', boxShadow:'0 2px 8px rgba(0,86,179,0.3)' }}
                   title="Descargar Informe General PDF"
                 >
                   {exportingInforme ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                  <span>{exportingInforme ? 'Generando…' : 'Informe PDF'}</span>
+                  <span className="hidden sm:inline">{exportingInforme ? 'Generando…' : 'Informe PDF'}</span>
                 </button>
 
                 <button
                   onClick={sistema === 'overview' ? exportComparativoPDF2 : exportVistaPDF}
                   disabled={sistema === 'overview' ? exportingComp : exportingVista}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-60"
-                  style={{ background:'#059669' }}
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 disabled:opacity-60 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  style={{ background:'linear-gradient(135deg,#059669,#047857)', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}
                 >
                   {(sistema === 'overview' ? exportingComp : exportingVista)
                     ? <Loader2 size={13} className="animate-spin" />
                     : <Download size={13} />}
-                  <span>
+                  <span className="hidden sm:inline">
                     {(sistema === 'overview' ? exportingComp : exportingVista) ? 'Exportando…' : 'Exportar'}
                   </span>
                 </button>
@@ -3963,18 +4076,18 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
                 <button
                   onClick={onLogout}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
-                  style={{ background:'#e53e3e' }}
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95"
+                  style={{ background:'linear-gradient(135deg,#ef4444,#dc2626)', boxShadow:'0 2px 8px rgba(229,62,62,0.3)' }}
                   title="Cerrar sesión">
                   <LogOut size={13} />
-                  <span>Salir</span>
+                  <span className="hidden sm:inline">Salir</span>
                 </button>
               </div>
             </div>
           </header>
 
           {/* Scrollable content */}
-          <main className="flex-1 overflow-y-auto p-6" style={{ background:'#f5f7fa' }}>
+          <main className="flex-1 overflow-y-auto p-3 sm:p-6" style={{ background:'#f5f7fa' }}>
 
           {/* ── OVERVIEW / COMPARATIVO ─────────────────────────────────────── */}
           {activeView === 'dashboard' && sistema === 'overview' && (
@@ -3988,11 +4101,12 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {/* ── Banner Informe General Institucional ──────────────────── */}
-              <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-xl border"
-                style={{ background:'linear-gradient(135deg,#0f172a 0%,#0056b3 100%)', borderColor:'#1e40af' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background:'rgba(255,255,255,0.12)' }}>
+              <div className="flex items-center justify-between gap-4 mb-6 px-5 py-4 rounded-2xl border relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
+                style={{ background:'linear-gradient(135deg,#0f172a 0%,#0056b3 100%)', borderColor:'#1e40af', boxShadow:'0 10px 30px -10px rgba(0,86,179,0.5)' }}>
+                <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background:'radial-gradient(circle at 80% 20%, rgba(147,197,253,0.25) 0%, transparent 50%)' }} />
+                <div className="flex items-center gap-3 relative">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 backdrop-blur-sm"
+                    style={{ background:'rgba(255,255,255,0.12)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.15)' }}>
                     <FileText size={20} style={{ color:'#93c5fd' }}/>
                   </div>
                   <div>
@@ -4005,8 +4119,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                 <button
                   onClick={() => handleDescargarInforme(undefined, undefined)}
                   disabled={exportingInforme}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all disabled:opacity-60 active:scale-95"
-                  style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)' }}
+                  className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black text-white flex-shrink-0 transition-all duration-200 disabled:opacity-60 active:scale-95 hover:bg-white/30 hover:scale-[1.03]"
+                  style={{ background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}
                 >
                   {exportingInforme ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
                   <span>{exportingInforme ? 'Generando…' : 'Descargar PDF'}</span>
@@ -4822,8 +4936,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             const peorComp: any[] = compPreguntas?.competencias_peor || []
             const topPreg: any[]  = compPreguntas?.preguntas_top     || []
             const peorPreg: any[] = compPreguntas?.preguntas_peor    || []
-            // Si también hay datos del fetch extra (todas_competencias), usarlos
-            const rawTodas: any[] = compDetalle?.todas_competencias || []
+            // todas_competencias — preferir compPreguntas (ya cargado al inicio)
+            const rawTodas: any[] = compPreguntas?.todas_competencias || compDetalle?.todas_competencias || []
             const todasComp: any[] = rawTodas.length > 0
               ? rawTodas
               : (() => {
@@ -4834,7 +4948,8 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   }
                   return merged.sort((a,b) => b.promedio - a.promedio)
                 })()
-            const porCarrera: any[]  = compDetalle?.por_carrera || []
+            // por_carrera — competencias desglosadas por carrera
+            const porCarreraComp: any[] = compPreguntas?.por_carrera || compDetalle?.por_carrera || []
 
             const periodLabel = (p: string) =>
               p === '202501' ? 'I-2025' : p === '202502' ? 'II-2025' :
@@ -4861,7 +4976,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               .filter((c: any) => !busq || c.carrera.toLowerCase().includes(busq) ||
                 (c.mejor_componente || '').toLowerCase().includes(busq) ||
                 (c.peor_componente  || '').toLowerCase().includes(busq))
-            const noData = carrerasData.length === 0 && todasComp.length === 0
+            const noData = todasComp.length === 0 && porCarreraComp.length === 0
             return (
               <div>
                 {/* Header */}
@@ -4937,72 +5052,55 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ) : (
                   <>
-                    {/* Tabla principal: todas las carreras con mejor/peor instrumento */}
-                    {carrerasData.length > 0 && (
+                    {/* ── Todas las Competencias (tabla completa) ── */}
+                    {todasComp.length > 0 && (
                       <div className="mb-8">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
-                          Mejor y Peor Instrumento por Carrera &mdash; {filtCarrerasData.length} carreras
+                          Todas las Competencias &mdash; {todasComp.length} competencias &middot; ranking global
                         </p>
                         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                           <div className="overflow-x-auto">
-                            <table className="w-full text-[12px]">
+                            <table className="w-full text-[11px]">
                               <thead>
                                 <tr style={{ background: '#f8fafc' }}>
-                                  <th className="text-left py-3 px-4 font-black text-slate-500 uppercase tracking-[0.07em]">#</th>
-                                  <th className="text-left py-3 px-4 font-black text-slate-500 uppercase tracking-[0.07em]">Carrera / Programa</th>
-                                  <th className="text-center py-3 px-3 font-black text-slate-500 uppercase tracking-[0.07em]">Promedio</th>
-                                  <th className="text-left py-3 px-4 font-black text-emerald-600 uppercase tracking-[0.07em]">Mejor Instrumento</th>
-                                  <th className="text-center py-3 px-3 font-black text-emerald-600 uppercase tracking-[0.07em]">Puntaje</th>
-                                  <th className="text-left py-3 px-4 font-black text-red-500 uppercase tracking-[0.07em]">Peor Instrumento</th>
-                                  <th className="text-center py-3 px-3 font-black text-red-500 uppercase tracking-[0.07em]">Puntaje</th>
-                                  <th className="text-center py-3 px-3 font-black text-slate-400 uppercase tracking-[0.07em]">Evals</th>
+                                  <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
+                                  <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
+                                  {periodos.map(p => (
+                                    <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
+                                      {periodLabel(p)}
+                                    </th>
+                                  ))}
+                                  <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {[...filtCarrerasData]
-                                  .sort((a: any, b: any) => cdOrden === 'promedio' ? b.promedio - a.promedio : a.carrera.localeCompare(b.carrera))
-                                  .map((car: any, i: number) => {
-                                    const mejorV = typeof car.mejor_val === 'number' ? car.mejor_val : null
-                                    const peorV  = typeof car.peor_val  === 'number' ? car.peor_val  : null
-                                    return (
-                                      <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/30 transition-colors">
-                                        <td className="py-3 px-4 font-black text-slate-300">{i + 1}</td>
-                                        <td className="py-3 px-4">
-                                          <div className="flex items-center gap-2">
-                                            <div className="p-1 rounded-lg flex-shrink-0" style={{ background: '#dcfce7' }}>
-                                              <GraduationCap size={11} style={{ color: '#16a34a' }} />
-                                            </div>
-                                            <span className="font-bold text-slate-800">{car.carrera}</span>
-                                          </div>
-                                        </td>
-                                        <td className="py-3 px-3 text-center">
-                                          <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-black"
-                                            style={{ background: scoreBg(car.promedio), color: scoreColor(car.promedio) }}>
-                                            {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
-                                          </span>
-                                        </td>
-                                        <td className="py-3 px-4 text-slate-700 font-medium max-w-[200px]">
-                                          <span className="truncate block" title={String(car.mejor_componente || '')}>{car.mejor_componente || '—'}</span>
-                                        </td>
-                                        <td className="py-3 px-3 text-center">
-                                          {mejorV != null
-                                            ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
-                                                style={{ background: '#f0fdf4', color: '#16a34a' }}>{mejorV.toFixed(1)}%</span>
-                                            : <span className="text-slate-300">—</span>}
-                                        </td>
-                                        <td className="py-3 px-4 text-slate-700 font-medium max-w-[200px]">
-                                          <span className="truncate block" title={String(car.peor_componente || '')}>{car.peor_componente || '—'}</span>
-                                        </td>
-                                        <td className="py-3 px-3 text-center">
-                                          {peorV != null
-                                            ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
-                                                style={{ background: '#fef2f2', color: '#dc2626' }}>{peorV.toFixed(1)}%</span>
-                                            : <span className="text-slate-300">—</span>}
-                                        </td>
-                                        <td className="py-3 px-3 text-center text-[11px] text-slate-400 font-semibold">{car.n}</td>
-                                      </tr>
-                                    )
-                                  })}
+                                {[...todasComp].sort((a: any, b: any) => b.promedio - a.promedio).map((c: any, i: number) => {
+                                  const isTop    = i < Math.ceil(todasComp.length / 2)
+                                  const rowBg    = i % 2 === 0 ? 'transparent' : '#fafafa'
+                                  return (
+                                    <tr key={i} style={{ background: rowBg }} className="border-t border-slate-50 hover:bg-indigo-50/20 transition-colors">
+                                      <td className="py-2 px-3 font-black" style={{ color: isTop ? '#16a34a' : '#dc2626' }}>{i + 1}</td>
+                                      <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
+                                      {periodos.map(p => {
+                                        const v = c[p]
+                                        return (
+                                          <td key={p} className="py-2 px-2 text-center">
+                                            {v != null
+                                              ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                  style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                              : <span className="text-slate-200">—</span>}
+                                          </td>
+                                        )
+                                      })}
+                                      <td className="py-2 px-3 text-right">
+                                        <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-black"
+                                          style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
+                                          {c.promedio.toFixed(1)}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -5010,147 +5108,295 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     )}
 
-                    {/* Cards: top 8 mejor y peor por carrera */}
-                    {filtCarrerasData.length > 0 && (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                          <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#f0fdf4' }}>
-                            <span className="text-base">&#127942;</span>
-                            <span className="text-[11px] font-black text-emerald-800 uppercase tracking-[0.1em]">Carreras Mejor Evaluadas</span>
-                          </div>
-                          <div className="p-3 space-y-2">
-                            {[...carrerasData].sort((a: any, b: any) => b.promedio - a.promedio).slice(0, 8).map((car: any, i: number) => (
-                              <div key={i} className="flex items-center gap-3 py-1.5">
-                                <span className="text-[11px] font-black text-emerald-600 w-5 flex-shrink-0">{i + 1}</span>
-                                <span className="text-[11px] text-slate-700 flex-1 min-w-0 truncate font-medium" title={car.carrera}>{car.carrera}</span>
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  <div className="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                    <div className="h-full rounded-full" style={{ width: `${car.promedio}%`, background: '#16a34a' }} />
-                                  </div>
-                                  <span className="text-[11px] font-black text-emerald-600 w-10 text-right">
-                                    {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                          <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#fef2f2' }}>
-                            <span className="text-base">&#9888;</span>
-                            <span className="text-[11px] font-black text-red-700 uppercase tracking-[0.1em]">Carreras que Necesitan Apoyo</span>
-                          </div>
-                          <div className="p-3 space-y-2">
-                            {[...carrerasData].sort((a: any, b: any) => a.promedio - b.promedio).slice(0, 8).map((car: any, i: number) => (
-                              <div key={i} className="flex items-center gap-3 py-1.5">
-                                <span className="text-[11px] font-black text-red-500 w-5 flex-shrink-0">{i + 1}</span>
-                                <span className="text-[11px] text-slate-700 flex-1 min-w-0 truncate font-medium" title={car.carrera}>{car.carrera}</span>
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  <div className="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                    <div className="h-full rounded-full" style={{ width: `${car.promedio}%`, background: scoreColor(car.promedio) }} />
-                                  </div>
-                                  <span className="text-[11px] font-black w-10 text-right" style={{ color: scoreColor(car.promedio) }}>
-                                    {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Grafico de barras por carrera */}
-                    {filtCarrerasData.length > 0 && (
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-8">
-                        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Grafico</span>
-                          <span className="text-[13px] font-black text-slate-700">Ranking de Carreras por Promedio</span>
-                        </div>
-                        <div className="p-4">
-                          <Plot
-                            data={[{
-                              type: 'bar' as const, orientation: 'h' as const,
-                              x: [...filtCarrerasData].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any) => c.promedio),
-                              y: [...filtCarrerasData].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any) => c.carrera),
-                              marker: { color: [...filtCarrerasData].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any) => scoreColor(c.promedio)), opacity: 0.85 },
-                              text: [...filtCarrerasData].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any) => `${typeof c.promedio === 'number' ? c.promedio.toFixed(1) : c.promedio}%`),
-                              textposition: 'outside' as const, textfont: { size: 10, family: 'Inter' },
-                              hovertemplate: '<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>',
-                            }]}
-                            layout={{
-                              autosize: true, height: Math.max(300, filtCarrerasData.length * 32),
-                              paper_bgcolor: 'white', plot_bgcolor: 'white',
-                              font: { family: 'Inter', size: 10, color: '#64748b' },
-                              margin: { t: 10, b: 40, l: 200, r: 60 },
-                              xaxis: { range: [0, 115], showgrid: true, gridcolor: '#f0f4f8', zeroline: false, ticksuffix: '%' },
-                              yaxis: { tickfont: { size: 10, color: '#334155' }, showgrid: false },
-                            }}
-                            config={{ displayModeBar: false, responsive: true }}
-                            style={{ width: '100%' }} useResizeHandler
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Competencias globales */}
-                    {(topComp.length > 0 || peorComp.length > 0) && (
+                    {/* ── Competencias por Carrera (19 secciones colapsables) ── */}
+                    {porCarreraComp.length > 0 && (
                       <div className="mb-8">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Competencias Globales Evaluadas</p>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#f0fdf4' }}>
-                              <span className="text-base">&#127942;</span>
-                              <span className="text-[11px] font-black text-emerald-800 uppercase tracking-[0.1em]">Mejores Competencias</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{topComp.length} items</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-[11px]">
-                                <thead><tr style={{ background: '#f8fafc' }}>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400 w-8">#</th>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400">Competencia</th>
-                                  {periodos.map(p => <th key={p} className="text-center py-2 px-2 font-black text-slate-400 whitespace-nowrap">{periodLabel(p)}</th>)}
-                                  <th className="text-right py-2 px-3 font-black text-slate-400">Prom.</th>
-                                </tr></thead>
-                                <tbody>{topComp.map((c: any, i: number) => (
-                                  <tr key={i} className="border-t border-slate-50 hover:bg-emerald-50/30">
-                                    <td className="py-2 px-3 font-black text-emerald-500">{i + 1}</td>
-                                    <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
-                                    {periodos.map(p => { const v = c[p]; return <td key={p} className="py-2 px-2 text-center">{v != null ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span> : <span className="text-slate-300">-</span>}</td> })}
-                                    <td className="py-2 px-3 text-right font-black" style={{ color: scoreColor(c.promedio) }}>{c.promedio.toFixed(1)}%</td>
-                                  </tr>
-                                ))}</tbody>
-                              </table>
-                            </div>
-                          </div>
-                          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background: '#fef2f2' }}>
-                              <span className="text-base">&#9888;</span>
-                              <span className="text-[11px] font-black text-red-700 uppercase tracking-[0.1em]">Competencias a Mejorar</span>
-                              <span className="ml-auto text-[10px] text-slate-400">{peorComp.length} items</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-[11px]">
-                                <thead><tr style={{ background: '#f8fafc' }}>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400 w-8">#</th>
-                                  <th className="text-left py-2 px-3 font-black text-slate-400">Competencia</th>
-                                  {periodos.map(p => <th key={p} className="text-center py-2 px-2 font-black text-slate-400 whitespace-nowrap">{periodLabel(p)}</th>)}
-                                  <th className="text-right py-2 px-3 font-black text-slate-400">Prom.</th>
-                                </tr></thead>
-                                <tbody>{[...peorComp].sort((a: any, b: any) => a.promedio - b.promedio).map((c: any, i: number) => (
-                                  <tr key={i} className="border-t border-slate-50 hover:bg-red-50/30">
-                                    <td className="py-2 px-3 font-black text-red-400">{peorComp.length - i}</td>
-                                    <td className="py-2 px-3 text-slate-700 font-medium">{c.competencia}</td>
-                                    {periodos.map(p => { const v = c[p]; return <td key={p} className="py-2 px-2 text-center">{v != null ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span> : <span className="text-slate-300">-</span>}</td> })}
-                                    <td className="py-2 px-3 text-right font-black" style={{ color: scoreColor(c.promedio) }}>{c.promedio.toFixed(1)}%</td>
-                                  </tr>
-                                ))}</tbody>
-                              </table>
-                            </div>
-                          </div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">
+                          Competencias por Carrera &mdash; {porCarreraComp.length} carreras
+                        </p>
+                        <div className="space-y-2">
+                          {[...porCarreraComp]
+                            .sort((a: any, b: any) => b.promedio - a.promedio)
+                            .map((car: any, ci: number) => {
+                              const compList: any[] = [...(car.competencias || [])].sort((a: any, b: any) => b.promedio - a.promedio)
+                              return (
+                                <details key={ci} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+                                  <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors list-none">
+                                    <div className="p-1.5 rounded-lg flex-shrink-0" style={{ background: '#dcfce7' }}>
+                                      <GraduationCap size={12} style={{ color: '#16a34a' }} />
+                                    </div>
+                                    <span className="font-black text-[13px] text-slate-800 flex-1">{car.carrera}</span>
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                      <span className="text-[10px] text-slate-400 font-semibold">{car.n} evals</span>
+                                      <span className="text-[10px] text-slate-400 font-semibold">{compList.length} competencias</span>
+                                      <span className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-black"
+                                        style={{ background: scoreBg(car.promedio), color: scoreColor(car.promedio) }}>
+                                        {typeof car.promedio === 'number' ? car.promedio.toFixed(1) : car.promedio}%
+                                      </span>
+                                      <ChevronRight size={14} className="text-slate-300 group-open:rotate-90 transition-transform" />
+                                    </div>
+                                  </summary>
+                                  {compList.length === 0 ? (
+                                    <div className="px-4 py-6 text-center text-slate-400 text-xs border-t border-slate-100">
+                                      Sin datos de competencias para esta carrera
+                                    </div>
+                                  ) : (
+                                    <div className="border-t border-slate-100 overflow-x-auto">
+                                      <table className="w-full text-[11px]">
+                                        <thead>
+                                          <tr style={{ background: '#f8fafc' }}>
+                                            <th className="text-left py-2.5 px-3 font-black text-slate-400 w-8">#</th>
+                                            <th className="text-left py-2.5 px-3 font-black text-slate-500">Competencia</th>
+                                            {periodos.map(p => (
+                                              <th key={p} className="text-center py-2.5 px-2 font-black text-indigo-400 whitespace-nowrap" style={{ fontSize: 10 }}>
+                                                {periodLabel(p)}
+                                              </th>
+                                            ))}
+                                            <th className="text-right py-2.5 px-3 font-black text-slate-500">Prom.</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {compList.map((c: any, i: number) => (
+                                            <tr key={i} className="border-t border-slate-50 hover:bg-slate-50/60 transition-colors">
+                                              <td className="py-2 px-3 font-black text-slate-300">{i + 1}</td>
+                                              <td className="py-2 px-3 text-slate-700 font-semibold">{c.competencia}</td>
+                                              {periodos.map(p => {
+                                                const v = c[p]
+                                                return (
+                                                  <td key={p} className="py-2 px-2 text-center">
+                                                    {v != null
+                                                      ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black"
+                                                          style={{ background: scoreBg(v), color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                                      : <span className="text-slate-200">—</span>}
+                                                  </td>
+                                                )
+                                              })}
+                                              <td className="py-2 px-3 text-right">
+                                                <span className="inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-black"
+                                                  style={{ background: scoreBg(c.promedio), color: scoreColor(c.promedio) }}>
+                                                  {c.promedio.toFixed(1)}%
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </details>
+                              )
+                            })}
                         </div>
                       </div>
                     )}
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ══ MÓDULO: Predicción de Tendencias y Alertas ══ */}
+          {activeView === 'prediccion' && (() => {
+            const preds: any[] = prediccion?.predicciones || []
+            const resumen = prediccion?.resumen || {}
+            const alertasIA: string = prediccion?.alertas_ia || ''
+            const enRiesgo = preds.filter(p => p.clasificacion === 'bajando')
+            const enMejora = preds.filter(p => p.clasificacion === 'subiendo')
+
+            const sColor = (v: number) => v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
+            const sBg    = (v: number) => v >= 85 ? '#f0fdf4' : v >= 70 ? '#fefce8' : '#fef2f2'
+
+            return (
+              <div>
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 rounded-xl" style={{ background:'linear-gradient(135deg,#581c87,#7e22ce)' }}>
+                    <TrendingUp size={22} style={{ color:'#d8b4fe' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-[17px] font-black text-slate-800 leading-tight">Predicción de Tendencias y Alertas</h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Proyección al próximo período (I-2026) basada en la evolución histórica · IA + análisis estadístico
+                    </p>
+                  </div>
+                  {loadingPrediccion && (
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-purple-500 animate-spin" />
+                      <span className="text-xs">Calculando proyecciones…</span>
+                    </div>
+                  )}
+                </div>
+
+                {loadingPrediccion ? (
+                  <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
+                    <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-purple-500 animate-spin" />
+                    <p className="font-bold text-sm">Analizando tendencias con IA…</p>
+                  </div>
+                ) : preds.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
+                    <AlertCircle size={36} className="opacity-40" />
+                    <p className="font-bold">No hay suficientes datos para proyectar</p>
+                    <p className="text-xs">Se necesitan al menos 2 períodos con datos por carrera</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Resumen */}
+                    <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+                      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5" style={{ borderTop:'3px solid #dc2626' }}>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em] mb-2">En Riesgo</p>
+                        <p className="font-black text-red-600" style={{ fontSize:30 }}>{resumen.en_riesgo ?? enRiesgo.length}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">carreras en descenso</p>
+                      </div>
+                      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5" style={{ borderTop:'3px solid #94a3b8' }}>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em] mb-2">Estables</p>
+                        <p className="font-black text-slate-600" style={{ fontSize:30 }}>{resumen.estables ?? 0}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">sin cambio relevante</p>
+                      </div>
+                      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5" style={{ borderTop:'3px solid #16a34a' }}>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.18em] mb-2">En Mejora</p>
+                        <p className="font-black text-green-600" style={{ fontSize:30 }}>{resumen.en_mejora ?? enMejora.length}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">carreras subiendo</p>
+                      </div>
+                    </div>
+
+                    {/* Gráfico: cambio proyectado por carrera */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-6 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-purple-400 to-fuchsia-500" />
+                        <span className="text-[13px] font-black text-slate-700">Cambio Proyectado al Próximo Período</span>
+                        <span className="ml-auto text-[10px] text-slate-400">verde = mejora · rojo = caída</span>
+                      </div>
+                      <div className="p-4">
+                        <Plot
+                          data={[{
+                            type: 'bar' as const, orientation: 'h' as const,
+                            x: [...preds].sort((a,b)=>a.cambio_proyectado-b.cambio_proyectado).map(p=>p.cambio_proyectado),
+                            y: [...preds].sort((a,b)=>a.cambio_proyectado-b.cambio_proyectado).map(p=>p.carrera),
+                            marker: { color: [...preds].sort((a,b)=>a.cambio_proyectado-b.cambio_proyectado).map(p=>p.cambio_proyectado < 0 ? '#dc2626' : '#16a34a'), opacity:0.85 },
+                            text: [...preds].sort((a,b)=>a.cambio_proyectado-b.cambio_proyectado).map(p=>`${p.cambio_proyectado>0?'+':''}${p.cambio_proyectado}`),
+                            textposition: 'outside' as const, textfont:{ size:10, family:'Inter' },
+                            hovertemplate: '<b>%{y}</b><br>Cambio proyectado: %{x:+.1f} pts<extra></extra>',
+                          }]}
+                          layout={{
+                            autosize:true, height: Math.max(300, preds.length*30),
+                            paper_bgcolor:'white', plot_bgcolor:'white',
+                            font:{ family:'Inter', size:10, color:'#64748b' },
+                            margin:{ t:10, b:40, l:200, r:50 },
+                            xaxis:{ zeroline:true, zerolinecolor:'#cbd5e1', showgrid:true, gridcolor:'#f0f4f8', ticksuffix:' pts' },
+                            yaxis:{ tickfont:{ size:10, color:'#334155' }, showgrid:false },
+                          }}
+                          config={{ displayModeBar:false, responsive:true }}
+                          style={{ width:'100%' }} useResizeHandler
+                        />
+                      </div>
+                    </div>
+
+                    {/* Cards: en riesgo / en mejora */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                      {/* En riesgo */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background:'#fef2f2' }}>
+                          <span className="text-base">&#9888;</span>
+                          <span className="text-[11px] font-black text-red-700 uppercase tracking-[0.1em]">Carreras en Riesgo</span>
+                          <span className="ml-auto text-[10px] text-slate-400">{enRiesgo.length}</span>
+                        </div>
+                        <div className="p-3 space-y-2 max-h-[420px] overflow-y-auto">
+                          {enRiesgo.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">Ninguna carrera en descenso 🎉</p>}
+                          {enRiesgo.map((p, i) => (
+                            <div key={i} className="rounded-xl border border-red-100 p-3" style={{ background:'#fffafa' }}>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <span className="font-bold text-slate-800 text-[12px] truncate" title={p.carrera}>{p.carrera}</span>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full flex-shrink-0"
+                                  style={{ background: p.riesgo==='alto' ? '#fee2e2' : '#fef3c7', color: p.riesgo==='alto' ? '#b91c1c' : '#b45309' }}>
+                                  riesgo {p.riesgo}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap text-[10px] mb-1.5">
+                                {p.serie.map((s: any, j: number) => (
+                                  <span key={j} className="px-1.5 py-0.5 rounded font-bold tabular-nums"
+                                    style={{ background:sBg(s.valor), color:sColor(s.valor) }}>{s.valor}</span>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px]">
+                                <span className="text-slate-500">Último <b className="text-slate-700">{p.ultimo_valor}</b></span>
+                                <ChevronRight size={12} className="text-slate-300" />
+                                <span className="text-red-600 font-black">{p.proyeccion} <span className="font-normal text-slate-400">proy.</span></span>
+                                <span className="ml-auto font-black text-red-600">{p.cambio_proyectado} pts</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* En mejora */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 flex items-center gap-2 border-b border-slate-100" style={{ background:'#f0fdf4' }}>
+                          <span className="text-base">&#128200;</span>
+                          <span className="text-[11px] font-black text-emerald-800 uppercase tracking-[0.1em]">Carreras en Mejora</span>
+                          <span className="ml-auto text-[10px] text-slate-400">{enMejora.length}</span>
+                        </div>
+                        <div className="p-3 space-y-2 max-h-[420px] overflow-y-auto">
+                          {enMejora.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">Sin carreras en mejora marcada</p>}
+                          {enMejora.map((p, i) => (
+                            <div key={i} className="rounded-xl border border-emerald-100 p-3" style={{ background:'#fafffb' }}>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <span className="font-bold text-slate-800 text-[12px] truncate" title={p.carrera}>{p.carrera}</span>
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full flex-shrink-0" style={{ background:'#dcfce7', color:'#16a34a' }}>
+                                  +{p.cambio_proyectado} pts
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap text-[10px] mb-1.5">
+                                {p.serie.map((s: any, j: number) => (
+                                  <span key={j} className="px-1.5 py-0.5 rounded font-bold tabular-nums"
+                                    style={{ background:sBg(s.valor), color:sColor(s.valor) }}>{s.valor}</span>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px]">
+                                <span className="text-slate-500">Último <b className="text-slate-700">{p.ultimo_valor}</b></span>
+                                <ChevronRight size={12} className="text-slate-300" />
+                                <span className="text-emerald-600 font-black">{p.proyeccion} <span className="font-normal text-slate-400">proy.</span></span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alertas IA */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2" style={{ background:'linear-gradient(135deg,#faf5ff,#fff)' }}>
+                        <BrainCircuit size={16} style={{ color:'#9333ea' }} />
+                        <span className="text-[13px] font-black text-slate-700">Análisis y Alertas — Inteligencia Artificial</span>
+                        <span className="ml-auto text-[9px] font-bold text-purple-400 uppercase tracking-[0.15em]">Gemini</span>
+                      </div>
+                      <div className="p-5">
+                        {alertasIA === '__IA_BUSY__' ? (
+                          <div className="flex flex-col items-center gap-3 py-6 text-center">
+                            <AlertCircle size={28} className="text-amber-400" />
+                            <p className="text-sm font-bold text-slate-600">El servidor de IA está saturado en este momento</p>
+                            <p className="text-xs text-slate-400 max-w-sm">Google reporta alta demanda temporal. Las proyecciones de arriba ya están calculadas; solo falta el texto de la IA.</p>
+                            <button onClick={fetchPrediccion} disabled={loadingPrediccion}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-95 disabled:opacity-60"
+                              style={{ background:'linear-gradient(135deg,#9333ea,#7e22ce)', boxShadow:'0 4px 14px rgba(147,51,234,0.35)' }}>
+                              <RefreshCw size={13} className={loadingPrediccion ? 'animate-spin' : ''} />
+                              {loadingPrediccion ? 'Reintentando…' : 'Reintentar análisis IA'}
+                            </button>
+                          </div>
+                        ) : alertasIA === '__IA_ERROR__' || !alertasIA ? (
+                          <div className="flex flex-col items-center gap-3 py-6 text-center">
+                            <BrainCircuit size={26} className="text-slate-300" />
+                            <p className="text-sm font-bold text-slate-500">Análisis IA no disponible</p>
+                            <p className="text-xs text-slate-400 max-w-sm">No se pudo generar el texto (verifica la API key de Gemini en el servidor). Las proyecciones de arriba se calculan sin IA.</p>
+                            <button onClick={fetchPrediccion} disabled={loadingPrediccion}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 transition-all hover:bg-slate-200 disabled:opacity-60">
+                              <RefreshCw size={13} className={loadingPrediccion ? 'animate-spin' : ''} />
+                              {loadingPrediccion ? 'Reintentando…' : 'Reintentar'}
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{alertasIA}</p>
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

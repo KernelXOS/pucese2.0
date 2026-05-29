@@ -3,8 +3,11 @@
 .env.local
 .env.production
 backend/.env
-backend/.env.prod          # Ignorar el .env.prod real (tiene keys secretas)
+# Ignorar el .env.prod real (tiene keys secretas)
+backend/.env.prod
+backend/.env.prod.*
 # backend/.env.prod.example se SÍ trackea (es la plantilla sin keys)
+!backend/.env.prod.example
 
 # ── Python ─────────────────────────────────────────────────────────────────
 __pycache__/

@@ -1059,31 +1059,80 @@ class KPIService:
         except Exception:
             BASE = '/app/data'
 
-        # Recoger todos los archivos detallados disponibles
-        patterns = [
-            os.path.join(BASE, 'eval_detalladas_2025_02', '*.xlsx'),
-            os.path.join(BASE, 'eval_detalladas_2025_01', '*.xlsx'),
-            os.path.join(BASE, 'eval_detalladas_2024_02', '*.xlsx'),
-        ]
+        # Recoger todos los archivos detallados disponibles — busca cualquier carpeta eval_det*
+        eval_dirs = glob.glob(os.path.join(BASE, 'eval_det*'))
+        # incluir subcarpeta posgrado si existe
+        posgrado_dir = os.path.join(BASE, 'posgrado')
+        if os.path.isdir(posgrado_dir):
+            eval_dirs.append(posgrado_dir)
         files = []
-        for pat in patterns:
-            files += glob.glob(pat)
+        for d in eval_dirs:
+            if os.path.isdir(d):
+                files += glob.glob(os.path.join(d, '*.xlsx'))
 
         if not files:
             return {}
 
-        dfs = []
+        # Primera pasada: leer todos los archivos y separar los que tienen competencia
+        # de los que no la tienen (para enriquecerlos después)
+        dfs_with    = []   # tienen columna 'competencia'
+        dfs_without = []   # no tienen 'competencia' pero tienen pregunta+calificacion
+
         for fpath in files:
             try:
                 df = pd.read_excel(fpath, dtype=str)
-                # normalise column names
                 df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
-                needed = {'pregunta', 'calificacion', 'competencia', 'periodo_evaluacion'}
-                if needed.issubset(set(df.columns)):
-                    extra_cols = [c for c in ['programa', 'carrera', 'modelo', 'cod_instrumento'] if c in df.columns]
-                    dfs.append(df[list(needed) + extra_cols])
+                base_needed = {'pregunta', 'calificacion', 'periodo_evaluacion'}
+                if not base_needed.issubset(set(df.columns)):
+                    continue
+                extra_cols = [c for c in ['programa', 'carrera', 'modelo', 'cod_instrumento', 'num_pregunta'] if c in df.columns]
+                if 'competencia' in df.columns:
+                    dfs_with.append(df[list(base_needed) + ['competencia'] + extra_cols])
+                else:
+                    dfs_without.append(df[list(base_needed) + extra_cols])
             except Exception:
                 continue
+
+        if not dfs_with and not dfs_without:
+            return {}
+
+        # Construir mapeo (cod_instrumento, num_pregunta) → competencia
+        # y (cod_instrumento, pregunta_text) → competencia
+        # usando los archivos que ya tienen la columna competencia
+        comp_map_num  = {}   # (cod, num) → competencia
+        comp_map_text = {}   # (cod, pregunta_lower) → competencia
+        if dfs_with:
+            ref_df = pd.concat(dfs_with, ignore_index=True)
+            for _, r in ref_df[['cod_instrumento','num_pregunta','pregunta','competencia']].dropna(
+                    subset=['competencia','pregunta']).iterrows():
+                cod  = str(r.get('cod_instrumento', '')).strip()
+                nump = str(r.get('num_pregunta',    '')).strip()
+                txt  = str(r.get('pregunta',         '')).strip().lower()[:80]
+                comp = str(r['competencia']).strip()
+                if comp and comp.lower() not in ('no definida', 'nan', ''):
+                    if cod and nump:
+                        comp_map_num[(cod, nump)] = comp
+                    if cod and txt:
+                        comp_map_text[(cod, txt)] = comp
+
+        # Segunda pasada: enriquecer archivos sin competencia
+        dfs_enriched = []
+        for df in dfs_without:
+            def _get_comp(row):
+                cod  = str(row.get('cod_instrumento', '')).strip()
+                nump = str(row.get('num_pregunta',    '')).strip()
+                txt  = str(row.get('pregunta',        '')).strip().lower()[:80]
+                return (comp_map_num.get((cod, nump))
+                        or comp_map_text.get((cod, txt))
+                        or None)
+            df = df.copy()
+            df['competencia'] = df.apply(_get_comp, axis=1)
+            df = df.dropna(subset=['competencia'])
+            if len(df) > 0:
+                dfs_enriched.append(df[['pregunta','calificacion','periodo_evaluacion','competencia']
+                                       + [c for c in ['programa','carrera','modelo','cod_instrumento'] if c in df.columns]])
+
+        dfs = dfs_with + dfs_enriched
 
         if not dfs:
             return {}
@@ -1153,28 +1202,67 @@ class KPIService:
         worst_comp  = _enrich_comp(comp_sorted.tail(6).sort_values('promedio'))
         todas_comp  = _enrich_comp(comp_sorted)   # ← todas sin límite
 
-        # ── Por carrera (si el Excel tiene columna programa/carrera) ──────────
+        # ── Por carrera — normalizar con FACULTAD_MAP a las 19 carreras oficiales ──
         por_carrera_data: list = []
         carrera_col = next((c for c in ['programa', 'carrera'] if c in all_df.columns), None)
         if carrera_col:
-            all_df['_carrera'] = all_df[carrera_col].apply(_norm_name)
-            carreras_uniq = [c for c in all_df['_carrera'].dropna().unique() if c and c != 'Nan']
-            for car in sorted(carreras_uniq):
-                df_car = all_df[all_df['_carrera'] == car]
+            try:
+                from app.services.etl_service import FACULTAD_MAP
+            except Exception:
+                FACULTAD_MAP = {}
+
+            CARRERAS_OFICIALES_CP = {
+                'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+                'Contabilidad y Auditoría', 'Administración de Empresas',
+                'Negocios Internacionales', 'Tecnologías de la Información',
+                'Ing. Recursos Naturales Renova', 'Agroindustria',
+                'Laboratorio Clínico', 'Enfermería', 'TC Enfermería',
+                'Fisioterapia', 'Medicina', 'Educación Básica',
+                'Edu. Básica Semi - Quinindé', 'Diseño Gráfico',
+                'TG Desarrollo de Software', 'TG Gestión Culinaria',
+            }
+
+            def _map_carrera(raw: str) -> str:
+                """Mapea nombre raw → carrera oficial usando FACULTAD_MAP."""
+                if not raw or not isinstance(raw, str):
+                    return ''
+                s = raw.strip()
+                # Búsqueda exacta primero
+                if s in FACULTAD_MAP:
+                    return FACULTAD_MAP[s]
+                # Búsqueda case-insensitive
+                s_lower = s.lower()
+                for k, v in FACULTAD_MAP.items():
+                    if k.lower() == s_lower:
+                        return v
+                # Búsqueda parcial: si alguna clave contiene el raw o viceversa
+                for k, v in FACULTAD_MAP.items():
+                    if s_lower in k.lower() or k.lower() in s_lower:
+                        return v
+                return ''
+
+            all_df['_carrera'] = all_df[carrera_col].apply(
+                lambda x: _map_carrera(str(x)) if isinstance(x, str) else ''
+            )
+            # Solo las 19 carreras oficiales
+            df_oficial = all_df[all_df['_carrera'].isin(CARRERAS_OFICIALES_CP)]
+            carreras_uniq = sorted(df_oficial['_carrera'].dropna().unique().tolist())
+
+            for car in carreras_uniq:
+                df_car = df_oficial[df_oficial['_carrera'] == car]
                 if len(df_car) < 3:
                     continue
-                # Competencias de esta carrera por período
                 cg = df_car.groupby('competencia')['pct'].agg(promedio='mean', n='count').reset_index()
                 cg['promedio'] = cg['promedio'].round(2)
                 cg = cg[cg['competencia'] != '']
                 cp = df_car.groupby(['competencia','periodo_evaluacion'])['pct'].mean().round(2).reset_index()
                 cp.columns = ['competencia','periodo','promedio']
-                def _ec(rows):
+                def _ec(rows, _cp=cp):
                     result = []
                     for _, r in rows.iterrows():
                         entry = {'competencia': r['competencia'], 'promedio': round(r['promedio'],2), 'n': int(r['n'])}
                         for p in periodos:
-                            val = cp[(cp['competencia']==r['competencia'])&(cp['periodo']==p)]['promedio']
+                            val = _cp[(_cp['competencia']==r['competencia'])&(_cp['periodo']==p)]['promedio']
                             entry[p] = round(float(val.values[0]),2) if len(val) else None
                         result.append(entry)
                     return result
@@ -1456,40 +1544,83 @@ class KPIService:
                     return FACULTAD_MAP[k]
             return raw.strip()  # fallback: keep as-is
 
+        # Canonical period codes → display labels
+        PERIOD_CODES = ['202301', '202302', '202401', '202402', '202501', '202502']
+        PERIOD_LABELS = {
+            '202301': 'I-2023', '202302': 'II-2023',
+            '202401': 'I-2024', '202402': 'II-2024',
+            '202501': 'I-2025', '202502': 'II-2025',
+        }
+
+        def _periodo_canonical(raw: str) -> str:
+            """Map any raw period code → canonical 6-digit code."""
+            if not raw:
+                return ''
+            raw = str(raw).strip()
+            if len(raw) == 6 and raw.isdigit():
+                suf = int(raw[4:])
+                year = raw[:4]
+                if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+                    return f'{year}01'
+                return f'{year}02'
+            if '-' in raw:
+                parts = raw.split('-')
+                year = parts[0] if parts[0].isdigit() else parts[1]
+                sem  = parts[1] if parts[0].isdigit() else parts[0]
+                if sem == 'I':  return f'{year}01'
+                if sem == 'II': return f'{year}02'
+            return raw
+
         q = _base_q(db, modelo=modelo, anio=anio, sistema=sistema, periodo=periodo)
         recs = q.filter(Evaluacion.facultad != None, Evaluacion.facultad != '').all()
 
-        # Accumulate component values per carrera (normalized)
-        buckets: dict = {}  # carrera_normalizada -> {col -> [vals]}
+        # Accumulate component values per (carrera, periodo)
+        # buckets[fac][per_code][col] = [vals]
+        from collections import defaultdict
+        buckets: dict = {}
         for r in recs:
             raw_fac = r.facultad or ''
             fac = _normalize_fac(raw_fac)
-            if not fac:  # empty string = excluded (non-academic unit)
+            if not fac:
                 continue
-            if fac not in CARRERAS_OFICIALES:  # excluir materias/asignaturas sueltas
+            if fac not in CARRERAS_OFICIALES:
                 continue
+            per = _periodo_canonical(r.periodo or '')
             if fac not in buckets:
-                buckets[fac] = {col: [] for col in COMP_COLS}
-                buckets[fac]['_n'] = 0
+                buckets[fac] = {'_total': {col: [] for col in COMP_COLS}, '_n': 0}
             buckets[fac]['_n'] += 1
+            if per and per in PERIOD_CODES:
+                if per not in buckets[fac]:
+                    buckets[fac][per] = {col: [] for col in COMP_COLS}
+                for col in COMP_COLS:
+                    val = getattr(r, col, None)
+                    if val is not None and val > 0:
+                        buckets[fac][per][col].append(float(val))
             for col in COMP_COLS:
                 val = getattr(r, col, None)
                 if val is not None and val > 0:
-                    buckets[fac][col].append(float(val))
+                    buckets[fac]['_total'][col].append(float(val))
+
+        def _avgs(data_dict):
+            return {col: round(sum(v)/len(v), 2) for col in COMP_COLS
+                    if (v := data_dict.get(col, [])) and len(v) > 0}
 
         result = []
         for fac, data in sorted(buckets.items()):
-            avgs = {}
-            for col in COMP_COLS:
-                vals = data[col]
-                if vals:
-                    avgs[col] = round(sum(vals) / len(vals), 2)
-
+            avgs = _avgs(data['_total'])
             if not avgs:
                 continue
 
-            best_col = max(avgs, key=lambda c: avgs[c])
+            best_col  = max(avgs, key=lambda c: avgs[c])
             worst_col = min(avgs, key=lambda c: avgs[c])
+
+            # Per-period promedio general (avg of all active components)
+            por_periodo = {}
+            for pcode in PERIOD_CODES:
+                if pcode in data:
+                    pavgs = _avgs(data[pcode])
+                    if pavgs:
+                        por_periodo[pcode] = round(sum(pavgs.values()) / len(pavgs), 2)
 
             result.append({
                 'carrera':            fac,
@@ -1499,16 +1630,182 @@ class KPIService:
                 'mejor_val':          round(avgs[best_col], 2),
                 'peor_componente':    COMP_LABELS[worst_col],
                 'peor_val':           round(avgs[worst_col], 2),
-                # legacy names kept for backward compatibility
                 'mejor_comp':         COMP_LABELS[best_col],
                 'mejor_puntaje':      round(avgs[best_col], 2),
                 'peor_comp':          COMP_LABELS[worst_col],
                 'peor_puntaje':       round(avgs[worst_col], 2),
                 'componentes':        {COMP_LABELS[c]: v for c, v in avgs.items()},
+                'por_periodo':        por_periodo,  # {'202301': 82.5, '202402': 79.3, ...}
+                'periodos_labels':    PERIOD_LABELS,
             })
 
         result.sort(key=lambda x: x['carrera'])
         return result
+
+    def get_prediccion_tendencias(self, db: Session, anio: int = None) -> dict:
+        """
+        Predicción híbrida: calcula la tendencia (regresión lineal) y proyecta
+        el siguiente período para cada carrera, usando los puntajes por período.
+        Los NÚMEROS son deterministas (Python) — la IA solo añade narrativa aparte.
+        """
+        PERIOD_CODES = ['202301', '202302', '202401', '202402', '202501', '202502']
+        PERIOD_LABELS = {
+            '202301': 'I-2023', '202302': 'II-2023',
+            '202401': 'I-2024', '202402': 'II-2024',
+            '202501': 'I-2025', '202502': 'II-2025',
+        }
+        NEXT_CODE  = '202601'
+        NEXT_LABEL = 'I-2026 (proyección)'
+
+        # 19 carreras oficiales PUCESE (mismo whitelist que el resto del dashboard)
+        CARRERAS_OFICIALES = {
+            'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+            'Contabilidad y Auditoría', 'Administración de Empresas',
+            'Negocios Internacionales', 'Tecnologías de la Información',
+            'Ing. Recursos Naturales Renova', 'Agroindustria',
+            'Laboratorio Clínico', 'Enfermería', 'TC Enfermería',
+            'Fisioterapia', 'Medicina', 'Educación Básica',
+            'Edu. Básica Semi - Quinindé', 'Diseño Gráfico',
+            'TG Desarrollo de Software', 'TG Gestión Culinaria',
+        }
+
+        def _canon_code(periodo) -> str:
+            """Normaliza el código crudo al período calendario (mismo criterio
+            que la tabla 'Análisis Temporal' del dashboard)."""
+            s = str(periodo).strip()
+            if len(s) < 5:
+                return None
+            y = s[:4]
+            try:
+                suf = int(s[4:])
+            except ValueError:
+                return None
+            # Semestre I: 0,1 (grado) · 10-20 (tec) · 70-73 (posgrado)
+            if suf in (0, 1) or (10 <= suf <= 20) or (70 <= suf <= 73):
+                return f'{y}01'
+            # Semestre II: 2 (grado) · 21-30 (tec) · 56,66 (MECDI) · 74-79 (posgrado)
+            return f'{y}02'
+
+        # ── Puntaje REAL (puntaje_100) por carrera × período calendario ──────
+        # Misma fuente que 'facultad_por_periodo' del comparativo.
+        rows = (
+            db.query(
+                Evaluacion.periodo,
+                Evaluacion.facultad,
+                func.avg(Evaluacion.puntaje_100),
+            )
+            .filter(
+                Evaluacion.periodo.isnot(None),
+                Evaluacion.facultad.isnot(None),
+                Evaluacion.facultad != '',
+                Evaluacion.puntaje_100.isnot(None),
+            )
+            .group_by(Evaluacion.periodo, Evaluacion.facultad)
+            .all()
+        )
+        # acumular avgs por (carrera, código calendario) y promediar sin ponderar
+        acc: dict = {}
+        for periodo, facultad, prom in rows:
+            if facultad not in CARRERAS_OFICIALES or prom is None:
+                continue
+            code = _canon_code(periodo)
+            if not code or code not in PERIOD_CODES:
+                continue
+            acc.setdefault(facultad, {}).setdefault(code, []).append(float(prom))
+
+        carreras = []
+        for fac, codes in acc.items():
+            por_periodo = {code: round(sum(v) / len(v), 2) for code, v in codes.items()}
+            if not por_periodo:
+                continue
+            prom_global = round(sum(por_periodo.values()) / len(por_periodo), 2)
+            carreras.append({'carrera': fac, 'n': 0, 'promedio': prom_global,
+                             'por_periodo': por_periodo})
+
+        def _linreg(xs, ys):
+            """Regresión lineal simple. Devuelve (pendiente, intercepto)."""
+            n = len(xs)
+            if n < 2:
+                return 0.0, (ys[0] if ys else 0.0)
+            mx = sum(xs) / n
+            my = sum(ys) / n
+            denom = sum((x - mx) ** 2 for x in xs)
+            if denom == 0:
+                return 0.0, my
+            slope = sum((xs[i] - mx) * (ys[i] - my) for i in range(n)) / denom
+            intercept = my - slope * mx
+            return slope, intercept
+
+        predicciones = []
+        for c in carreras:
+            pp = c.get('por_periodo', {}) or {}
+            # puntos ordenados por período disponible
+            pts = [(i, pp[code]) for i, code in enumerate(PERIOD_CODES)
+                   if code in pp and pp[code] is not None]
+            if len(pts) < 2:
+                continue  # no se puede proyectar con menos de 2 puntos
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            slope, intercept = _linreg(xs, ys)
+
+            next_idx = len(PERIOD_CODES)  # índice del período futuro
+            proyeccion = round(intercept + slope * next_idx, 2)
+            proyeccion = max(0.0, min(100.0, proyeccion))  # clamp 0-100
+
+            ultimo = ys[-1]
+            cambio_proy = round(proyeccion - ultimo, 2)
+
+            # clasificación según pendiente por período
+            if slope <= -1.5:
+                clasificacion = 'bajando'
+            elif slope >= 1.5:
+                clasificacion = 'subiendo'
+            else:
+                clasificacion = 'estable'
+
+            # nivel de riesgo: bajando + proyección baja
+            if clasificacion == 'bajando' and proyeccion < 70:
+                riesgo = 'alto'
+            elif clasificacion == 'bajando':
+                riesgo = 'medio'
+            else:
+                riesgo = 'bajo'
+
+            serie = [{'codigo': code, 'label': PERIOD_LABELS[code], 'valor': pp[code]}
+                     for code in PERIOD_CODES if code in pp and pp[code] is not None]
+
+            predicciones.append({
+                'carrera':       c['carrera'],
+                'n':             c.get('n', 0),
+                'promedio':      c.get('promedio'),
+                'serie':         serie,
+                'ultimo_valor':  ultimo,
+                'pendiente':     round(slope, 2),
+                'proyeccion':    proyeccion,
+                'proyeccion_codigo': NEXT_CODE,
+                'proyeccion_label':  NEXT_LABEL,
+                'cambio_proyectado': cambio_proy,
+                'clasificacion': clasificacion,
+                'riesgo':        riesgo,
+            })
+
+        # ordenar: mayor riesgo / más bajada primero
+        predicciones.sort(key=lambda x: (x['pendiente']))
+
+        en_riesgo = [p for p in predicciones if p['clasificacion'] == 'bajando']
+        en_mejora = [p for p in predicciones if p['clasificacion'] == 'subiendo']
+        estables  = [p for p in predicciones if p['clasificacion'] == 'estable']
+
+        return {
+            'predicciones':   predicciones,
+            'resumen': {
+                'total':       len(predicciones),
+                'en_riesgo':   len(en_riesgo),
+                'en_mejora':   len(en_mejora),
+                'estables':    len(estables),
+            },
+            'periodos_labels': PERIOD_LABELS,
+        }
 
 
 kpi_service = KPIService()
