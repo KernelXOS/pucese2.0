@@ -1657,7 +1657,70 @@ class KPIService:
         NEXT_CODE  = '202601'
         NEXT_LABEL = 'I-2026 (proyección)'
 
-        carreras = self.get_competencias_por_carrera(db, anio=anio)
+        # 19 carreras oficiales PUCESE (mismo whitelist que el resto del dashboard)
+        CARRERAS_OFICIALES = {
+            'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+            'Contabilidad y Auditoría', 'Administración de Empresas',
+            'Negocios Internacionales', 'Tecnologías de la Información',
+            'Ing. Recursos Naturales Renova', 'Agroindustria',
+            'Laboratorio Clínico', 'Enfermería', 'TC Enfermería',
+            'Fisioterapia', 'Medicina', 'Educación Básica',
+            'Edu. Básica Semi - Quinindé', 'Diseño Gráfico',
+            'TG Desarrollo de Software', 'TG Gestión Culinaria',
+        }
+
+        def _canon_code(periodo) -> str:
+            """Normaliza el código crudo al período calendario (mismo criterio
+            que la tabla 'Análisis Temporal' del dashboard)."""
+            s = str(periodo).strip()
+            if len(s) < 5:
+                return None
+            y = s[:4]
+            try:
+                suf = int(s[4:])
+            except ValueError:
+                return None
+            # Semestre I: 0,1 (grado) · 10-20 (tec) · 70-73 (posgrado)
+            if suf in (0, 1) or (10 <= suf <= 20) or (70 <= suf <= 73):
+                return f'{y}01'
+            # Semestre II: 2 (grado) · 21-30 (tec) · 56,66 (MECDI) · 74-79 (posgrado)
+            return f'{y}02'
+
+        # ── Puntaje REAL (puntaje_100) por carrera × período calendario ──────
+        # Misma fuente que 'facultad_por_periodo' del comparativo.
+        rows = (
+            db.query(
+                Evaluacion.periodo,
+                Evaluacion.facultad,
+                func.avg(Evaluacion.puntaje_100),
+            )
+            .filter(
+                Evaluacion.periodo.isnot(None),
+                Evaluacion.facultad.isnot(None),
+                Evaluacion.facultad != '',
+                Evaluacion.puntaje_100.isnot(None),
+            )
+            .group_by(Evaluacion.periodo, Evaluacion.facultad)
+            .all()
+        )
+        # acumular avgs por (carrera, código calendario) y promediar sin ponderar
+        acc: dict = {}
+        for periodo, facultad, prom in rows:
+            if facultad not in CARRERAS_OFICIALES or prom is None:
+                continue
+            code = _canon_code(periodo)
+            if not code or code not in PERIOD_CODES:
+                continue
+            acc.setdefault(facultad, {}).setdefault(code, []).append(float(prom))
+
+        carreras = []
+        for fac, codes in acc.items():
+            por_periodo = {code: round(sum(v) / len(v), 2) for code, v in codes.items()}
+            if not por_periodo:
+                continue
+            prom_global = round(sum(por_periodo.values()) / len(por_periodo), 2)
+            carreras.append({'carrera': fac, 'n': 0, 'promedio': prom_global,
+                             'por_periodo': por_periodo})
 
         def _linreg(xs, ys):
             """Regresión lineal simple. Devuelve (pendiente, intercepto)."""
