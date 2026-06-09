@@ -461,6 +461,7 @@ def _load_staff_lookup() -> dict:
         col_ded = fc(['tiempo de dedicacion', 'dedicacion', 'dedicación'])
         col_niv = fc(['nivel de instruccion', 'instruccion', 'instrucción'])
         col_grd = fc(['grado de instruccion', 'grado de'])
+        col_eda = fc(['edad'])
 
         for _, row in df.iterrows():
             ced = _clean_cedula(row.get(col_ced, '')) if col_ced else ''
@@ -482,6 +483,14 @@ def _load_staff_lookup() -> dict:
                 except:
                     pass
 
+            edad_s = None
+            if col_eda:
+                try:
+                    ed = row.get(col_eda)
+                    edad_s = int(float(ed)) if ed and str(ed).strip() not in ('nan', '') else None
+                except:
+                    pass
+
             ded_raw = _clean_nombre(row.get(col_ded)) if col_ded else ''
             niv_raw = _clean_nombre(row.get(col_niv)) if col_niv else ''
             grd_raw = _clean_nombre(row.get(col_grd)) if col_grd else ''
@@ -496,6 +505,7 @@ def _load_staff_lookup() -> dict:
             staff[ced] = {
                 'nombre_completo':  nombre,
                 'antiguedad_anos':  antig,
+                'edad':             edad_s,
                 'funcion':          (_clean_nombre(row.get(col_fun)) or '').upper() if col_fun else '',
                 'unidad_org':       _clean_nombre(row.get(col_uni)) if col_uni else '',
                 'genero':           _clean_nombre(row.get(col_gen)) if col_gen else '',
@@ -1531,6 +1541,7 @@ class ETLService:
                 'comp_hetero_dir': round(comp_vals.get('hetero_dir', 0), 2),
                 'comp_hetero_est': round(comp_vals.get('hetero_est', comp_vals.get('hetero_dec', 0)), 2),
                 'antiguedad_anos': s.get('antiguedad_anos'),
+                'edad':            s.get('edad'),
                 'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
                 'sexo':            s.get('genero', ''),
                 'archivo_fuente':  'eval_detalladas_2025 + CSV_202566',
@@ -1919,6 +1930,7 @@ class ETLService:
                 'comp_hetero_dir': round(comp_vals.get('hetero_dir', 0), 2),
                 'comp_hetero_est': round(comp_vals.get('hetero_est', comp_vals.get('hetero_dec', 0)), 2),
                 'sexo':            s.get('genero', ''),
+                'edad':            s.get('edad'),
                 'antiguedad_anos': s.get('antiguedad_anos'),
                 'funcion_docente': s.get('funcion', 'DOCENCIA') or 'DOCENCIA',
                 'tiempo_servicio': _map_tiempo_servicio(s.get('tiempo_dedicacion', '')),
