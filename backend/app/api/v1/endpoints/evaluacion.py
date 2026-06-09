@@ -305,9 +305,9 @@ def get_competencias_por_carrera(
 
 
 @router.get("/competencias-preguntas")
-def get_competencias_preguntas():
-    """Ranking de competencias y preguntas (mejor/peor) por periodo, leído de eval_detalladas."""
-    data = kpi_service.get_competencias_preguntas()
+def get_competencias_preguntas(db: Session = Depends(get_db)):
+    """Ranking de competencias y preguntas MECDI + componentes MEIPA por periodo."""
+    data = kpi_service.get_competencias_preguntas(db=db)
     if not data:
         raise HTTPException(status_code=404, detail="No hay datos de preguntas disponibles")
     return data

@@ -2436,8 +2436,16 @@ function DesempenoPorVariables({ data }: { data: any }) {
 // ── CompetenciasPreguntas ──────────────────────────────────────────────────────
 function CompetenciasPreguntas({ data }: { data: any }) {
   const periodos: string[] = data.periodos || []
-  const periodLabel = (p: string) =>
-    p === '202501' ? 'I-2025' : p === '202502' ? 'II-2025' : p === '202402' ? 'II-2024' : p === '202401' ? 'I-2024' : p
+  const meipaPeriodos: string[] = data.meipa_periodos || []
+  const meipaComps: any[]       = data.meipa_componentes || []
+
+  const periodLabel = (p: string) => {
+    const m: Record<string,string> = {
+      '202301':'I-2023','202302':'II-2023','202401':'I-2024',
+      '202402':'II-2024','202501':'I-2025','202502':'II-2025',
+    }
+    return m[p] || p
+  }
 
   const scoreColor = (v: number) =>
     v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
@@ -2566,6 +2574,71 @@ function CompetenciasPreguntas({ data }: { data: any }) {
           />
         </div>
       </div>
+
+      {/* ── MEIPA componentes desde BD ─────────────────────────────────────── */}
+      {meipaComps.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em]">Componentes MEIPA</span>
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1e40af' }}>2023 – 2024</span>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <span className="text-base">📋</span>
+              <span className="text-[12px] font-black text-slate-700 uppercase tracking-[0.12em]">Promedio por componente MEIPA</span>
+              <span className="ml-auto text-[10px] text-slate-400 font-semibold">{meipaComps.length} componentes</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr style={{ background: '#f8fafc' }}>
+                    <th className="text-left py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em] w-8">#</th>
+                    <th className="text-left py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em]">Componente</th>
+                    <th className="text-center py-2 px-3 font-black text-slate-400 uppercase tracking-[0.08em] whitespace-nowrap">Peso</th>
+                    {meipaPeriodos.map(p => (
+                      <th key={p} className="text-center py-2 px-3 font-black text-slate-500 uppercase tracking-[0.08em] whitespace-nowrap">{periodLabel(p)}</th>
+                    ))}
+                    <th className="text-right py-2 px-4 font-black text-slate-500 uppercase tracking-[0.08em] whitespace-nowrap">Promedio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {meipaComps.map((comp: any, i: number) => {
+                    const scoreColor = (v: number) => v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
+                    return (
+                      <tr key={i} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-4 font-black text-[#1e40af]">{i + 1}</td>
+                        <td className="py-2.5 px-4 text-slate-700 font-semibold">{comp.competencia}</td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="text-[9px] font-bold text-slate-400">{comp.peso}%</span>
+                        </td>
+                        {meipaPeriodos.map(p => {
+                          const v = comp[p]
+                          return (
+                            <td key={p} className="py-2.5 px-3 text-center">
+                              {v != null
+                                ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: scoreColor(v) + '18', color: scoreColor(v) }}>{v.toFixed(1)}%</span>
+                                : <span className="text-slate-300">—</span>
+                              }
+                            </td>
+                          )
+                        })}
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${Math.min((comp.promedio ?? 0), 100)}%`, background: scoreColor(comp.promedio ?? 0) }} />
+                            </div>
+                            <span className="text-[11px] font-black tabular-nums shrink-0" style={{ color: scoreColor(comp.promedio ?? 0) }}>{(comp.promedio ?? 0).toFixed(1)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

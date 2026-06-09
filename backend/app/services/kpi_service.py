@@ -1044,7 +1044,7 @@ class KPIService:
         }
 
 
-    def get_competencias_preguntas(self) -> dict:
+    def get_competencias_preguntas(self, db=None) -> dict:
         """
         Lee los archivos eval_detalladas para calcular el ranking de
         competencias y preguntas (mejor / peor puntuadas) por periodo.
@@ -1312,6 +1312,78 @@ class KPIService:
         worst_preg  = _enrich_preg(preg_sorted.tail(6).sort_values('promedio'))
         todas_preg  = _enrich_preg(preg_sorted)   # ← todas sin límite
 
+        # ── Sección MEIPA desde BD ────────────────────────────────────────
+        meipa_componentes: list = []
+        meipa_periodos: list    = []
+        if db is not None:
+            try:
+                _SEM_ORDER = {
+                    '202301': 0, '202302': 1, '202401': 2,
+                }
+                _SEM_LABEL_M = {
+                    '202301': 'I-2023', '202302': 'II-2023', '202401': 'I-2024',
+                }
+                _MEIPA_COMP_DEF = [
+                    ('comp_hetero_est', 'Heteroeval. Estudiantil', 40),
+                    ('comp_pares',      'Eval. de Pares',          20),
+                    ('comp_hetero_dir', 'Heteroeval. Directivo',   20),
+                    ('comp_auto',       'Autoevaluación',          20),
+                ]
+
+                # Períodos MEIPA disponibles en la BD
+                raw_periods = [
+                    r[0] for r in
+                    db.query(func.distinct(Evaluacion.periodo))
+                       .filter(Evaluacion.sistema == 'meipa',
+                               Evaluacion.periodo.isnot(None))
+                       .all()
+                    if r[0]
+                ]
+
+                # Normalizar a canónicos (solo los 3 MEIPA)
+                from collections import defaultdict
+                canon_map: dict = defaultdict(list)
+                for rp in raw_periods:
+                    c = str(rp).strip()
+                    if len(c) == 6 and c.isdigit():
+                        year = c[:4]
+                        suf  = int(c[4:])
+                        if suf in (0,1) or (10 <= suf <= 20) or (70 <= suf <= 73):
+                            canon = f'{year}01'
+                        else:
+                            canon = f'{year}02'
+                        if canon in _SEM_ORDER:
+                            canon_map[canon].append(rp)
+
+                meipa_periodos = sorted(canon_map.keys(), key=lambda x: _SEM_ORDER.get(x, 99))
+
+                for col_key, label, peso in _MEIPA_COMP_DEF:
+                    col_attr = getattr(Evaluacion, col_key, None)
+                    if col_attr is None:
+                        continue
+                    entry: dict = {
+                        'competencia': label,
+                        'peso':        peso,
+                        'key':         col_key,
+                    }
+                    vals = []
+                    for canon in meipa_periodos:
+                        rps = canon_map[canon]
+                        avg = (db.query(func.avg(col_attr))
+                               .filter(Evaluacion.sistema == 'meipa',
+                                       Evaluacion.periodo.in_(rps),
+                                       col_attr.isnot(None))
+                               .scalar())
+                        v = round(float(avg), 2) if avg else None
+                        entry[canon] = v
+                        if v is not None:
+                            vals.append(v)
+                    entry['promedio'] = round(sum(vals) / len(vals), 2) if vals else None
+                    if entry['promedio']:
+                        meipa_componentes.append(entry)
+            except Exception as e:
+                print(f'[kpi] MEIPA comp section error: {e}')
+
         return {
             'periodos':            periodos,
             'competencias_top':    top_comp,
@@ -1321,6 +1393,9 @@ class KPIService:
             'preguntas_peor':      worst_preg,
             'todas_preguntas':     todas_preg,
             'por_carrera':         por_carrera_data,
+            # ── MEIPA ──────────────────────────────────────────────────────
+            'meipa_periodos':      meipa_periodos,
+            'meipa_componentes':   meipa_componentes,
         }
 
 
