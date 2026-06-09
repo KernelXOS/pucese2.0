@@ -1894,7 +1894,7 @@ class KPIService:
             _mg[key] = _mg.get(key, 0) + cnt
         por_genero = _mg
 
-        # Por carrera — sólo carreras oficiales PUCESE
+        # Por carrera — usa Evaluacion.facultad + FACULTAD_MAP (igual que el ranking)
         CARRERAS_OFICIALES_C = {
             'Pedagogía Idiomas Nac. Ext.',
             'Psicología',
@@ -1916,14 +1916,30 @@ class KPIService:
             'Medicina',
             'TG Desarrollo de Software',
         }
-        carrera_rows = (
-            q.with_entities(Evaluacion.carrera, Evaluacion.sexo, func.count(Evaluacion.id))
-            .filter(Evaluacion.carrera.isnot(None), Evaluacion.carrera != '')
-            .group_by(Evaluacion.carrera, Evaluacion.sexo).all()
+        try:
+            from app.services.etl_service import FACULTAD_MAP as _FM
+        except Exception:
+            _FM = {}
+        _FM_SORTED = sorted(_FM.keys(), key=len, reverse=True)
+
+        def _norm_carrera(raw: str) -> str:
+            if not raw:
+                return ''
+            ru = raw.strip().upper()
+            for k in _FM_SORTED:
+                if ru == k.upper() or ru.startswith(k.upper()):
+                    return _FM[k]
+            return raw.strip()
+
+        fac_rows = (
+            q.with_entities(Evaluacion.facultad, Evaluacion.sexo, func.count(Evaluacion.id))
+            .filter(Evaluacion.facultad.isnot(None), Evaluacion.facultad != '')
+            .group_by(Evaluacion.facultad, Evaluacion.sexo).all()
         )
         carreras_dict: dict = {}
-        for carrera, sexo, cnt in carrera_rows:
-            if carrera not in CARRERAS_OFICIALES_C:
+        for raw_fac, sexo, cnt in fac_rows:
+            carrera = _norm_carrera(raw_fac)
+            if not carrera or carrera not in CARRERAS_OFICIALES_C:
                 continue
             if carrera not in carreras_dict:
                 carreras_dict[carrera] = {'carrera': carrera, 'total': 0, 'Hombre': 0, 'Mujer': 0}
