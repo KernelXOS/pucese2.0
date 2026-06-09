@@ -5530,6 +5530,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     )}
                   </>
                 )}
+
+                {/* ── Módulo MEIPA: Heteroevaluación y Competencias ── */}
+                {compPreguntas && <CompetenciasPreguntas data={compPreguntas} />}
               </div>
             )
           })()}
