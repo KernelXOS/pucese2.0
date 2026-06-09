@@ -572,10 +572,10 @@ const excel3DGrouped = (gl:string[], s:any[], o?:any) => flatBarGrouped(gl, s, o
 
 /** Premium 2-D trend line — clean spline with tight y-range, no fill-to-zero */
 function trendLine2D(
-  traces: { x:any[]; y:number[]; color:string; name:string; dash?:string }[],
+  traces: { x:any[]; y:(number|null)[]; color:string; name:string; dash?:string }[],
   opts: { minY?:number; maxY?:number } = {}
 ): { data:any[]; layout:any } {
-  const allY = traces.flatMap(t=>t.y)
+  const allY = traces.flatMap(t=>t.y).filter((v): v is number => v != null)
   const minY = opts.minY ?? Math.max(0, Math.floor(Math.min(...allY)) - 3)
   const maxY = opts.maxY ?? Math.ceil(Math.max(...allY)) + 5
   return {
@@ -584,7 +584,7 @@ function trendLine2D(
       x:t.x, y:t.y, name:t.name,
       line:{color:t.color, width:3, shape:'spline', smoothing:0.7, dash:t.dash??'solid'},
       marker:{size:8, color:'white', symbol:'circle', line:{color:t.color, width:2.5}},
-      text:t.y.map(v=>v.toFixed(1)),
+      text:t.y.map(v => v != null ? v.toFixed(1) : ''),
       textposition:'top center',
       textfont:{family:'Inter',size:9,color:t.color},
       hovertemplate:`<b>${t.name}</b><br>%{x}: %{y:.2f}/100<extra></extra>`,
