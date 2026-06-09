@@ -5564,7 +5564,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     </p>
                   </div>
                   {loadingCaracterizacion && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-amber-500 animate-spin" />}
-                  <button onClick={fetchCaracterizacion} disabled={loadingCaracterizacion}
+                  <button onClick={() => fetchCaracterizacion()} disabled={loadingCaracterizacion}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all">
                     <RefreshCw size={11} className={loadingCaracterizacion ? 'animate-spin' : ''} /> Actualizar
                   </button>
@@ -5660,7 +5660,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
                     <Users size={32} className="text-slate-300 mx-auto mb-3" />
                     <p className="text-sm font-bold text-slate-500">Sin datos disponibles</p>
-                    <button onClick={fetchCaracterizacion} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-amber-500 hover:bg-amber-600">Cargar datos</button>
+                    <button onClick={() => fetchCaracterizacion()} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-amber-500 hover:bg-amber-600">Cargar datos</button>
                   </div>
                 ) : (
                   <>
@@ -5864,7 +5864,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     </p>
                   </div>
                   {loadingReporteComp && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin" />}
-                  <button onClick={fetchReporteComp} disabled={loadingReporteComp}
+                  <button onClick={() => fetchReporteComp()} disabled={loadingReporteComp}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all">
                     <RefreshCw size={11} className={loadingReporteComp ? 'animate-spin' : ''} /> Actualizar
                   </button>
@@ -5874,7 +5874,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
                     <Award size={32} className="text-slate-300 mx-auto mb-3" />
                     <p className="text-sm font-bold text-slate-500">Sin datos disponibles</p>
-                    <button onClick={fetchReporteComp} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-teal-500 hover:bg-teal-600">Cargar datos</button>
+                    <button onClick={() => fetchReporteComp()} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-teal-500 hover:bg-teal-600">Cargar datos</button>
                   </div>
                 ) : (
                   <>
@@ -5904,12 +5904,12 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 {(mod.componentes || []).map((comp: any) => {
                                   const color = COMP_COLOR_MAP[comp.key] || '#0056b3'
-                                  const pct = Math.min(100, comp.promedio)
+                                  const pct = Math.min(100, comp.promedio ?? 0)
                                   return (
                                     <div key={comp.key} className="rounded-xl p-3 border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
                                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">{comp.label}</p>
                                       <div className="flex items-baseline gap-1">
-                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{comp.promedio.toFixed(1)}</span>
+                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{(comp.promedio ?? 0).toFixed(1)}</span>
                                         <span className="text-[9px] text-slate-400">/100</span>
                                       </div>
                                       <p className="text-[8px] text-slate-400 mt-0.5">Peso: {comp.peso}% · {comp.n} reg.</p>
