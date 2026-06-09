@@ -2441,8 +2441,20 @@ function CompetenciasPreguntas({ data, showMecdiTables = false }: { data: any; s
   const meipaPeriodos: string[] = data.meipa_periodos || []
   const meipaComps: any[]       = data.meipa_componentes || []
 
-  // MEIPA Hetero (nuevo archivo consolidado)
-  const mhPeriodos: string[] = data.meipa_hetero_periodos  || []
+  // MEIPA Hetero (nuevo archivo consolidado) — MEIPA solo hasta I-2024
+  const _mhPeriodosRaw: string[] = data.meipa_hetero_periodos || []
+  // Excluir II-2024 y cualquier período posterior (MEIPA terminó en I-2024)
+  const mhPeriodos: string[] = _mhPeriodosRaw.filter((p: string) => {
+    const lbl = p.replace(/\s*[Pp]eríodo\s*/g, ' ').trim()
+    if (/2025|2026/.test(lbl)) return false
+    if (/^II.*(2024)/.test(lbl)) return false
+    return true
+  })
+  // Recalcular promedio solo con los períodos válidos
+  const mhPromedioFiltrado = (row: any): number => {
+    const vals = mhPeriodos.map(p => row[p]).filter((v: any) => v != null) as number[]
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+  }
   const mhTop: any[]         = data.meipa_hetero_top        || []
   const mhPeor: any[]        = data.meipa_hetero_peor       || []
   const mhTodas: any[]       = data.meipa_hetero_todas      || [...mhTop, ...mhPeor].sort((a:any,b:any)=>b.promedio-a.promedio)
@@ -2660,7 +2672,8 @@ function CompetenciasPreguntas({ data, showMecdiTables = false }: { data: any; s
                     </tr>
                   </thead>
                   <tbody>
-                    {[...mhTodas].sort((a:any,b:any)=>b.promedio-a.promedio).map((row: any, i: number) => {
+                    {[...mhTodas].sort((a:any,b:any)=>mhPromedioFiltrado(b)-mhPromedioFiltrado(a)).map((row: any, i: number) => {
+                      const prom = mhPromedioFiltrado(row)
                       const isTop = i < Math.ceil(mhTodas.length / 2)
                       return (
                         <tr key={i} className="border-t border-slate-50 hover:bg-slate-50 transition-colors">
@@ -2681,9 +2694,9 @@ function CompetenciasPreguntas({ data, showMecdiTables = false }: { data: any; s
                           <td className="py-2.5 px-4">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${Math.min(row.promedio,100)}%`, background: scoreColor(row.promedio) }} />
+                                <div className="h-full rounded-full" style={{ width: `${Math.min(prom,100)}%`, background: scoreColor(prom) }} />
                               </div>
-                              <span className="text-[11px] font-black tabular-nums shrink-0" style={{ color: scoreColor(row.promedio) }}>{row.promedio.toFixed(1)}%</span>
+                              <span className="text-[11px] font-black tabular-nums shrink-0" style={{ color: scoreColor(prom) }}>{prom.toFixed(1)}%</span>
                             </div>
                           </td>
                         </tr>
