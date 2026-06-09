@@ -640,7 +640,7 @@ class ETLService:
         # por lo que no puede procesarse con el mismo INSTR_MAP. Los datos de 202402 vienen
         # de _source_360_mecdi_2024 + _source_hetero_xlsx (202456 / 202466).
         records += self._source_pucetec_hetero(staff)
-        records += self._source_meipa_pucese_data(staff)
+        records += self._source_meipa_pucese_data(staff, existing=records)
 
         # ── Deduplicación: ante mismo (cedula, periodo, modelo, sistema)
         # quedarse con el registro más completo (más componentes llenos)
@@ -2047,7 +2047,7 @@ class ETLService:
         return recs
 
     # ── MEIPA componentes completos (PUCESE DATA) ─────────────────────────────
-    def _source_meipa_pucese_data(self, staff: dict) -> list:
+    def _source_meipa_pucese_data(self, staff: dict, existing: list = None) -> list:
         """
         Lee los archivos de PUCESE DATA (pucese_data/) que contienen los
         4 componentes MEIPA completos para grado (202301, 202302, 202401):
@@ -2055,11 +2055,17 @@ class ETLService:
           - *_Eval.xlsx   → sheets: autoevaluacion(20%), pares(20%), coordinador(20%)
         Calificación 1-5 → normalizada a 0-100.
         Genera registros sistema='meipa', modelo='docencia'.
+        No sobreescribe registros ya cargados por fuentes oficiales (consolidado).
         """
         if not os.path.isdir(PUCESE_DATA_DIR):
             return []
 
-        print(f"[ETL] MEIPA PUCESE DATA: procesando {PUCESE_DATA_DIR} ...")
+        # No sobreescribir registros ya cubiertos por CONSOLIDADO u otras fuentes oficiales
+        covered: set = set()
+        if existing:
+            covered = {(r['cedula'], r['periodo']) for r in existing if r.get('sistema') == 'meipa'}
+
+        print(f"[ETL] MEIPA PUCESE DATA: procesando {PUCESE_DATA_DIR} ({len(covered)} ya cubiertos) ...")
 
         # ── 1. Het.Estudiantil desde hetero.xlsx ─────────────────────────
         het_scores: dict = {}   # (ced, periodo) → {'puntaje':float, 'nombre':str, demo:{}}
@@ -2102,6 +2108,9 @@ class ETLService:
                             continue
                         ps = grp['peso'].sum()
                         puntaje = float((grp['punt_q'] * grp['peso']).sum() / ps) if ps > 0 else 0.0
+                        # Normalize: hetero.xlsx uses calificación 1-5 → convert to 0-100
+                        if puntaje <= 5.0:
+                            puntaje = puntaje / 5.0 * 100.0
                         puntaje = min(round(puntaje, 2), 100.0)
                         # Demo data (first row for this docente/periodo)
                         mask = (df_h['_ced'] == ced) & (df_h['_per'] == per)
@@ -2173,7 +2182,12 @@ class ETLService:
         # ── 3. Construir registros MEIPA completos ────────────────────────
         all_keys = set(het_scores.keys()) | set(comp_scores.keys())
         recs = []
+        skipped = 0
         for (ced, per) in all_keys:
+            # Skip if already covered by an official source (CONSOLIDADO etc.)
+            if (ced, _clean_periodo(per)) in covered:
+                skipped += 1
+                continue
             het_info   = het_scores.get((ced, per), {})
             comps      = comp_scores.get((ced, per), {})
             het_puntaje= het_info.get('puntaje', 0.0)
@@ -2239,8 +2253,8 @@ class ETLService:
                 'archivo_fuente':  'pucese_data/meipa_completo',
             })
 
-        print(f"[ETL] MEIPA PUCESE DATA: {len(recs)} registros completos "
-              f"({len(het_scores)} het, {len(comp_scores)} comp).")
+        print(f"[ETL] MEIPA PUCESE DATA: {len(recs)} registros nuevos "
+              f"({len(het_scores)} het, {len(comp_scores)} comp, {skipped} ya cubiertos).")
         return recs
 
 
