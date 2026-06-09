@@ -5945,7 +5945,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                                 <table className="w-full text-[10px]">
                                   <thead><tr className="border-b border-slate-100">
                                     <th className="text-left pb-1.5 text-slate-400 font-bold uppercase tracking-wider">Período</th>
-                                    <th className="text-right pb-1.5 text-slate-400 font-bold uppercase tracking-wider">Total</th>
                                     <th className="text-right pb-1.5 text-[#1e40af] font-bold uppercase tracking-wider">Hombres</th>
                                     <th className="text-right pb-1.5 text-[#9f1239] font-bold uppercase tracking-wider">Mujeres</th>
                                   </tr></thead>
@@ -5953,7 +5952,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                                     {porPeriodo.map((p: any, i: number) => (
                                       <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
                                         <td className="py-1.5 font-semibold text-slate-700">{p.label || p.periodo}</td>
-                                        <td className="py-1.5 text-right font-black text-slate-800">{(p.total||0).toLocaleString()}</td>
                                         <td className="py-1.5 text-right font-semibold" style={{ color: '#1e40af' }}>{(p.Hombre||0).toLocaleString()}</td>
                                         <td className="py-1.5 text-right font-semibold" style={{ color: '#9f1239' }}>{(p.Mujer||0).toLocaleString()}</td>
                                       </tr>
