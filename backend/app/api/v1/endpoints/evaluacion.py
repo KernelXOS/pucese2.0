@@ -233,6 +233,30 @@ def get_analytics(
     return kpi_service.get_analytics(db, sistema=sistema, modelo=modelo, anio=anio, periodo=periodo)
 
 
+@router.get("/caracterizacion")
+def get_caracterizacion(
+    db: Session = Depends(get_db),
+    sistema: Optional[str] = None,
+    anio: Optional[int] = None,
+    periodo: Optional[str] = None,
+    modelo: Optional[str] = None,
+):
+    """Characterization: counts by period, gender, career, age, seniority."""
+    return kpi_service.get_caracterizacion(db, sistema=sistema, anio=anio, periodo=periodo, modelo=modelo)
+
+
+@router.get("/reporte-competencias")
+def get_reporte_competencias(
+    db: Session = Depends(get_db),
+    sistema: Optional[str] = None,
+    anio: Optional[int] = None,
+    periodo: Optional[str] = None,
+    modelo: Optional[str] = None,
+):
+    """Competency report: averages by model, career, and period trend."""
+    return kpi_service.get_reporte_competencias(db, sistema=sistema, anio=anio, periodo=periodo, modelo=modelo)
+
+
 @router.get("/comparativo")
 def get_comparativo(
     db: Session = Depends(get_db),
