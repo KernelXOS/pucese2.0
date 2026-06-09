@@ -3521,10 +3521,14 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   // ── Módulo Caracterización del Cuerpo Docente ─────────────────────────
   const [caracterizacion, setCaracterizacion]           = useState<any>(null)
   const [loadingCaracterizacion, setLoadingCaracterizacion] = useState(false)
-  const fetchCaracterizacion = async () => {
+  const [sistemaCaract, setSistemaCaract] = useState<string>('')
+  const [modeloCaract,  setModeloCaract]  = useState<string>('')
+  const fetchCaracterizacion = async (sistOverride?: string, modOverride?: string) => {
     setLoadingCaracterizacion(true)
     try {
-      const res = await api.getCaracterizacion()
+      const sis = sistOverride !== undefined ? sistOverride : sistemaCaract
+      const mod = modOverride  !== undefined ? modOverride  : modeloCaract
+      const res = await api.getCaracterizacion(sis || undefined, undefined, undefined, mod || undefined)
       setCaracterizacion(res.data)
     } catch { setCaracterizacion(null) }
     finally { setLoadingCaracterizacion(false) }
@@ -5550,7 +5554,11 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h2 className="text-[17px] font-black text-slate-800 leading-tight">Caracterización del Cuerpo Docente</h2>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Volumen de evaluaciones por período, género, carrera, edad y antigüedad</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {sistemaCaract === 'meipa' ? 'Sistema MEIPA 2023-2024' : sistemaCaract === '360' ? 'Sistema MECDI 2024-2025' : 'Todos los sistemas'}
+                      {modeloCaract ? ` · Modelo ${modeloCaract.charAt(0).toUpperCase()+modeloCaract.slice(1)}` : ''}
+                      {' — volumen de evaluaciones por período, género, carrera, edad y antigüedad'}
+                    </p>
                   </div>
                   {loadingCaracterizacion && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-amber-500 animate-spin" />}
                   <button onClick={fetchCaracterizacion} disabled={loadingCaracterizacion}
@@ -5558,6 +5566,92 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     <RefreshCw size={11} className={loadingCaracterizacion ? 'animate-spin' : ''} /> Actualizar
                   </button>
                 </div>
+
+                {/* ── Filtros Sistema / Modelo ── */}
+                {(() => {
+                  const SISTEMAS = [
+                    { val: '',      label: 'Todos los sistemas' },
+                    { val: 'meipa', label: 'MEIPA  2023-2024'   },
+                    { val: '360',   label: 'MECDI  2024-2025'   },
+                  ]
+                  const MODELOS = [
+                    { val: '',              label: 'Todos los modelos' },
+                    { val: 'docencia',      label: 'Docencia'          },
+                    { val: 'posgrado',      label: 'Posgrado'          },
+                    { val: 'tecnologado',   label: 'Tecnologado'       },
+                    { val: 'vinculacion',   label: 'Vinculación'       },
+                    { val: 'gestion',       label: 'Gestión'           },
+                    { val: 'investigacion', label: 'Investigación'     },
+                    { val: 'abp',           label: 'ABP'               },
+                    { val: 'administrativo',label: 'Administrativo'    },
+                    { val: 'servicios',     label: 'Servicios'         },
+                  ]
+                  const selStyle = (active: boolean) => ({
+                    appearance: 'none' as const,
+                    WebkitAppearance: 'none' as const,
+                    padding: '6px 28px 6px 12px',
+                    borderRadius: 8,
+                    border: active ? '1.5px solid #f59e0b' : '1.5px solid #e2e8f0',
+                    background: active ? 'linear-gradient(135deg,#fef3c7,#fde68a)' : '#f8fafc',
+                    color: active ? '#92400e' : '#475569',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+                    minWidth: 160,
+                  })
+                  return (
+                    <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Filtrar:</span>
+                      <div className="relative">
+                        <select
+                          value={sistemaCaract}
+                          style={selStyle(!!sistemaCaract)}
+                          onChange={e => {
+                            const v = e.target.value
+                            setSistemaCaract(v)
+                            setCaracterizacion(null)
+                            fetchCaracterizacion(v, modeloCaract)
+                          }}
+                        >
+                          {SISTEMAS.map(s => <option key={s.val} value={s.val}>{s.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="relative">
+                        <select
+                          value={modeloCaract}
+                          style={selStyle(!!modeloCaract)}
+                          onChange={e => {
+                            const v = e.target.value
+                            setModeloCaract(v)
+                            setCaracterizacion(null)
+                            fetchCaracterizacion(sistemaCaract, v)
+                          }}
+                        >
+                          {MODELOS.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+                        </select>
+                      </div>
+                      {(sistemaCaract || modeloCaract) && (
+                        <button
+                          onClick={() => {
+                            setSistemaCaract('')
+                            setModeloCaract('')
+                            setCaracterizacion(null)
+                            fetchCaracterizacion('', '')
+                          }}
+                          className="text-[10px] font-bold text-amber-700 hover:text-amber-900 underline"
+                        >
+                          Limpiar filtros
+                        </button>
+                      )}
+                      {(sistemaCaract || modeloCaract) && (
+                        <span className="ml-auto text-[9px] text-slate-400 font-semibold">
+                          {sistemaCaract === 'meipa' ? '🎓 MEIPA' : sistemaCaract === '360' ? '🔄 MECDI' : ''}
+                          {modeloCaract ? `  ·  ${modeloCaract.charAt(0).toUpperCase()+modeloCaract.slice(1)}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {!data && !loadingCaracterizacion ? (
                   <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
@@ -5570,7 +5664,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     {/* KPI Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                       {[
-                        { title: 'Total Evaluaciones', value: totalEv.toLocaleString(), label: 'registros', footer: 'Todos los períodos', accent: '#f59e0b' },
+                        { title: 'Total Evaluaciones', value: totalEv.toLocaleString(), label: 'registros', footer: sistemaCaract === 'meipa' ? 'MEIPA 2023-2024' : sistemaCaract === '360' ? 'MECDI 2024-2025' : 'Todos los sistemas', accent: '#f59e0b' },
                         { title: 'Docentes Únicos', value: totalDoc.toLocaleString(), label: 'docentes', footer: 'Identificados', accent: '#1e40af' },
                         { title: 'Docentes Hombres', value: hombresTotal.toLocaleString(), label: `${Math.round(hombresTotal/genTotal*100)}%`, footer: 'Del total', accent: '#1e40af' },
                         { title: 'Docentes Mujeres', value: mujeresTotal.toLocaleString(), label: `${Math.round(mujeresTotal/genTotal*100)}%`, footer: 'Del total', accent: '#9f1239' },
