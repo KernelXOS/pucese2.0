@@ -2540,50 +2540,6 @@ function CompetenciasPreguntas({ data }: { data: any }) {
         </div>
       </div>
 
-      {/* ── Competencias ───────────────────────────────────────────────────── */}
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Competencias evaluadas</p>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TableSection
-            title="Mejores competencias"
-            icon="🏆"
-            rows={data.competencias_top || []}
-            nameKey="competencia"
-            accent="#16a34a"
-          />
-          <TableSection
-            title="Competencias a mejorar"
-            icon="⚠️"
-            rows={data.competencias_peor || []}
-            nameKey="competencia"
-            accent="#dc2626"
-            flip
-          />
-        </div>
-      </div>
-
-      {/* ── Preguntas ──────────────────────────────────────────────────────── */}
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Preguntas individuales</p>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TableSection
-            title="Preguntas mejor puntuadas"
-            icon="⭐"
-            rows={data.preguntas_top || []}
-            nameKey="pregunta"
-            accent="#16a34a"
-          />
-          <TableSection
-            title="Preguntas críticas"
-            icon="📉"
-            rows={data.preguntas_peor || []}
-            nameKey="pregunta"
-            accent="#dc2626"
-            flip
-          />
-        </div>
-      </div>
-
       {/* ── MEIPA componentes desde BD ─────────────────────────────────────── */}
       {meipaComps.length > 0 && (
         <div>
