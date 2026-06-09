@@ -3774,7 +3774,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   // ── Módulo Análisis de Instrumentos ─────────────────────────────────────
-  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'|'prediccion'|'caracterizacion'|'reporte-competencias'>('dashboard')
+  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'|'prediccion'|'caracterizacion'>('dashboard')
   const [compDetalle, setCompDetalle]           = useState<any>(null)
   const [loadingCompDetalle, setLoadingCompDetalle] = useState(false)
 
@@ -3802,24 +3802,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     fetchCaracterizacion(sistemaCaract, modeloCaract)
   }
 
-  // ── Módulo Reporte de Competencias ────────────────────────────────────
-  const [reporteComp, setReporteComp]           = useState<any>(null)
-  const [loadingReporteComp, setLoadingReporteComp] = useState(false)
-  const fetchReporteComp = async () => {
-    setLoadingReporteComp(true)
-    try {
-      const res = await api.getReporteCompetencias()
-      setReporteComp(res.data)
-    } catch { setReporteComp(null) }
-    finally { setLoadingReporteComp(false) }
-  }
-  const goToReporteComp = async () => {
-    setReporteComp(null)
-    setActiveView('reporte-competencias')
-    setSistema('overview' as any)
-    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
-    fetchReporteComp()
-  }
   const [cdFiltroCarrera, setCdFiltroCarrera]   = useState('__todas__')
   const [cdFiltroPeriodo, setCdFiltroPeriodo]   = useState('__todos__')
   const [cdBusqueda, setCdBusqueda]             = useState('')
@@ -3990,22 +3972,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             >
               <Users size={17} style={{ flexShrink:0, color: activeView === 'caracterizacion' ? '#fde68a' : 'inherit' }} />
               {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Caracterización Docente</span>}
-            </button>
-
-            {/* ── Reporte de Competencias ── */}
-            <button
-              onClick={goToReporteComp}
-              className="w-full flex items-center gap-3 text-left transition-all rounded-xl"
-              style={{
-                padding: sidebarOpen ? '10px 12px' : '10px',
-                justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                color: activeView === 'reporte-competencias' ? '#fff' : 'rgba(255,255,255,0.5)',
-                background: activeView === 'reporte-competencias' ? 'linear-gradient(135deg,rgba(20,184,166,0.35),rgba(20,184,166,0.15))' : 'transparent',
-                borderLeft: activeView === 'reporte-competencias' ? '2px solid #2dd4bf' : '2px solid transparent',
-              }}
-            >
-              <Award size={17} style={{ flexShrink:0, color: activeView === 'reporte-competencias' ? '#99f6e4' : 'inherit' }} />
-              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Reporte Competencias</span>}
             </button>
 
             {sidebarOpen && <div style={{ height: 1, background:'rgba(255,255,255,0.06)', margin:'6px 4px' }} />}
@@ -4306,8 +4272,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     ? 'Análisis Detallado de Instrumentos y Competencias'
                     : activeView === 'caracterizacion'
                     ? 'Caracterización del Cuerpo Docente'
-                    : activeView === 'reporte-competencias'
-                    ? 'Reporte de Competencias'
                     : sistema === 'overview' ? 'Vista General'
                     : sistema === 'meipa' ? 'MEIPA — Evaluación Docente'
                     : sistema === 'salud' ? 'Salud — Docencia ABP'
@@ -6069,253 +6033,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                           })}
                         </div>
                       </ChartCard>
-                    )}
-                  </>
-                )}
-              </div>
-            )
-          })()}
-
-          {/* ══ MÓDULO: Reporte de Competencias ══ */}
-          {activeView === 'reporte-competencias' && (() => {
-            const data = reporteComp
-            const porModelo: any[]   = data?.por_modelo        || []
-            const porCarrera: any[]  = data?.por_carrera       || []
-            const porPeriodo: any[]  = data?.por_periodo        || []
-            const tendMeipa: any[]   = data?.tend_meipa          || []
-            const tendMecdi: any[]   = data?.tend_mecdi          || []
-
-            const COMP_COLOR_MAP: Record<string, string> = {
-              // MECDI
-              het_estudiantil: '#0056b3', eval_pares: '#7c3aed',
-              aula_virtual: '#0891b2',    autoevaluacion: '#059669',
-              // MEIPA
-              comp_hetero_est: '#1d4ed8', comp_pares: '#6d28d9',
-              comp_hetero_dir: '#b45309', comp_auto:  '#047857',
-            }
-            const scoreColor = (v: number) => v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
-            const scoreBg    = (v: number) => v >= 85 ? '#f0fdf4' : v >= 70 ? '#fefce8' : '#fef2f2'
-
-            // Etiquetas cortas por clave
-            const COMP_LABELS_SHORT: Record<string, string> = {
-              het_estudiantil: 'Het. Estudiantil', eval_pares: 'Eval. Pares',
-              aula_virtual: 'Aula Virtual',        autoevaluacion: 'Autoevaluación',
-              comp_hetero_est: 'Het. Estudiantil', comp_pares: 'Eval. Pares',
-              comp_hetero_dir: 'Het. Directivos',  comp_auto: 'Autoevaluación',
-            }
-
-            // Gráfico MEIPA (I/II 2023 · I 2024)
-            const meipaPeriods = tendMeipa.map((t: any) => t.periodo)
-            const meipaTraces  = (['comp_hetero_est','comp_pares','comp_hetero_dir','comp_auto'] as const)
-              .map(key => ({
-                x: meipaPeriods,
-                y: tendMeipa.map((t: any) => t[key] ?? null),
-                color: COMP_COLOR_MAP[key],
-                name: COMP_LABELS_SHORT[key],
-              })).filter(tr => tr.y.some((v: any) => v !== null))
-            const chartMeipa = meipaTraces.length > 0 ? trendLine2D(meipaTraces) : null
-
-            // Gráfico MECDI (II 2024 · I/II 2025)
-            const mecdiPeriods = tendMecdi.map((t: any) => t.periodo)
-            const mecdiTraces  = (['het_estudiantil','eval_pares','aula_virtual','autoevaluacion'] as const)
-              .map(key => ({
-                x: mecdiPeriods,
-                y: tendMecdi.map((t: any) => t[key] ?? null),
-                color: COMP_COLOR_MAP[key],
-                name: COMP_LABELS_SHORT[key],
-              })).filter(tr => tr.y.some((v: any) => v !== null))
-            const chartMecdi = mecdiTraces.length > 0 ? trendLine2D(mecdiTraces) : null
-
-            return (
-              <div>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="p-3 rounded-xl" style={{ background: 'linear-gradient(135deg,#0f4c75,#1b6ca8)' }}>
-                    <Award size={22} style={{ color: '#99f6e4' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-[17px] font-black text-slate-800 leading-tight">Reporte de Competencias Docentes</h2>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {loadingReporteComp ? 'Cargando datos...' : `Desempeño por componente — ${porModelo.length} modelos · ${porCarrera.length} carreras · ${porPeriodo.length} períodos`}
-                    </p>
-                  </div>
-                  {loadingReporteComp && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin" />}
-                  <button onClick={() => fetchReporteComp()} disabled={loadingReporteComp}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all">
-                    <RefreshCw size={11} className={loadingReporteComp ? 'animate-spin' : ''} /> Actualizar
-                  </button>
-                </div>
-
-                {!data && !loadingReporteComp ? (
-                  <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                    <Award size={32} className="text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-slate-500">Sin datos disponibles</p>
-                    <button onClick={() => fetchReporteComp()} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-teal-500 hover:bg-teal-600">Cargar datos</button>
-                  </div>
-                ) : (
-                  <>
-                    {/* Tendencias por sistema */}
-                    {(chartMeipa || chartMecdi) && (
-                      <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {chartMeipa && (
-                          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#1d4ed8' }} />
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MEIPA</span>
-                              <span className="text-[10px] text-slate-400 ml-1">2023 – 2024</span>
-                            </div>
-                            <div className="px-2 pt-1">
-                              <Plot data={chartMeipa.data} layout={{ ...chartMeipa.layout, margin: { t: 10, b: 60, l: 40, r: 10 } }} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '260px' }} />
-                            </div>
-                          </div>
-                        )}
-                        {chartMecdi && (
-                          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#0056b3' }} />
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MECDI</span>
-                              <span className="text-[10px] text-slate-400 ml-1">2024 – 2025</span>
-                            </div>
-                            <div className="px-2 pt-1">
-                              <Plot data={chartMecdi.data} layout={{ ...chartMecdi.layout, margin: { t: 10, b: 60, l: 40, r: 10 } }} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '260px' }} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Por modelo */}
-                    {porModelo.length > 0 && (
-                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                        <div className="px-5 py-3.5 border-b border-slate-100">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Componentes ·</span>
-                          <span className="ml-1 text-[13px] font-bold text-slate-700">Promedio Global por Modelo de Evaluación</span>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {porModelo.map((mod: any, mi: number) => (
-                            <div key={mi} className="p-5">
-                              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                <span className="text-[11px] font-black text-slate-700">{mod.label}</span>
-                                <span className="text-[9px] text-slate-400 font-semibold">{mod.n} evaluaciones</span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                {(mod.componentes || []).map((comp: any) => {
-                                  const color = COMP_COLOR_MAP[comp.key] || '#0056b3'
-                                  const pct = Math.min(100, comp.promedio ?? 0)
-                                  return (
-                                    <div key={comp.key} className="rounded-xl p-3 border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
-                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">{comp.label}</p>
-                                      <div className="flex items-baseline gap-1">
-                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{(comp.promedio ?? 0).toFixed(1)}</span>
-                                        <span className="text-[9px] text-slate-400">/100</span>
-                                      </div>
-                                      <p className="text-[8px] text-slate-400 mt-0.5">Peso: {comp.peso}% · {comp.n} reg.</p>
-                                      <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Por carrera: mejor y peor */}
-                    {porCarrera.length > 0 && (
-                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
-                          <GraduationCap size={14} className="text-teal-500" />
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Competencias ·</span>
-                          <span className="text-[13px] font-bold text-slate-700">Mejor y Peor Componente por Carrera</span>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-[10px]">
-                            <thead>
-                              <tr className="border-b border-slate-100 bg-slate-50">
-                                <th className="text-left py-2.5 px-4 font-black text-slate-400 uppercase tracking-wider">Carrera</th>
-                                <th className="text-left py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">Modelo</th>
-                                <th className="text-right py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">Global</th>
-                                <th className="text-left py-2.5 px-3 font-black text-[#16a34a] uppercase tracking-wider">✓ Mejor</th>
-                                <th className="text-right py-2.5 px-3 font-black text-[#16a34a] uppercase tracking-wider">Val.</th>
-                                <th className="text-left py-2.5 px-3 font-black text-[#dc2626] uppercase tracking-wider">✗ Peor</th>
-                                <th className="text-right py-2.5 px-3 font-black text-[#dc2626] uppercase tracking-wider">Val.</th>
-                                <th className="text-right py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">N</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {porCarrera.map((c: any, i: number) => (
-                                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                                  <td className="py-2 px-4 font-semibold text-slate-700 max-w-[180px]"><span className="block truncate">{c.carrera}</span></td>
-                                  <td className="py-2 px-3">
-                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1e40af' }}>{c.modelo}</span>
-                                  </td>
-                                  <td className="py-2 px-3 text-right">
-                                    <span className="font-black text-[12px]" style={{ color: scoreColor(c.promedio), background: scoreBg(c.promedio), padding: '2px 6px', borderRadius: 4 }}>{c.promedio?.toFixed(1)}</span>
-                                  </td>
-                                  <td className="py-2 px-3 font-semibold text-[#16a34a] max-w-[140px]"><span className="block truncate">{c.mejor_componente}</span></td>
-                                  <td className="py-2 px-3 text-right font-black text-[#16a34a]">{c.mejor_valor?.toFixed(1)}</td>
-                                  <td className="py-2 px-3 font-semibold text-[#dc2626] max-w-[140px]"><span className="block truncate">{c.peor_componente}</span></td>
-                                  <td className="py-2 px-3 text-right font-black text-[#dc2626]">{c.peor_valor?.toFixed(1)}</td>
-                                  <td className="py-2 px-3 text-right text-slate-500">{c.n}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Por período: componentes por semestre canónico */}
-                    {porPeriodo.length > 0 && (
-                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
-                          <Calendar size={14} className="text-violet-500" />
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Componentes ·</span>
-                          <span className="text-[13px] font-bold text-slate-700">Promedio de Competencias por Período</span>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {porPeriodo.map((per: any, pi: number) => (
-                            <div key={pi} className="p-5">
-                              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black"
-                                  style={{ background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', color: '#5b21b6' }}>
-                                  <Calendar size={10} /> {per.periodo}
-                                </span>
-                                {per.sistema && (
-                                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full"
-                                    style={per.sistema === 'MEIPA'
-                                      ? { background: '#eff6ff', color: '#1e40af' }
-                                      : { background: '#f0fdf4', color: '#166534' }}>
-                                    {per.sistema}
-                                  </span>
-                                )}
-                                <span className="text-[9px] text-slate-400 font-semibold">{per.n} evaluaciones</span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                {(per.componentes || []).map((comp: any) => {
-                                  const color = COMP_COLOR_MAP[comp.key] || '#0056b3'
-                                  const pct = Math.min(100, comp.promedio ?? 0)
-                                  return (
-                                    <div key={comp.key} className="rounded-xl p-3 border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
-                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">{comp.label}</p>
-                                      <div className="flex items-baseline gap-1">
-                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{(comp.promedio ?? 0).toFixed(1)}</span>
-                                        <span className="text-[9px] text-slate-400">/100</span>
-                                      </div>
-                                      <p className="text-[8px] text-slate-400 mt-0.5">Peso: {comp.peso}% · {comp.n} reg.</p>
-                                      <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     )}
                   </>
                 )}
