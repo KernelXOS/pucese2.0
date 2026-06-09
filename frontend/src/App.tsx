@@ -3537,7 +3537,9 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     setActiveView('caracterizacion')
     setSistema('overview' as any)
     if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
-    if (!caracterizacion) fetchCaracterizacion()
+    // Siempre recarga al entrar al módulo para garantizar datos frescos
+    setCaracterizacion(null)
+    fetchCaracterizacion(sistemaCaract, modeloCaract)
   }
 
   // ── Módulo Reporte de Competencias ────────────────────────────────────
