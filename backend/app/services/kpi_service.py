@@ -2007,7 +2007,6 @@ class KPIService:
 
     # ══════════════════════════════════════════════════════════════════════
     # MÓDULO 2 — REPORTE DE COMPETENCIAS
-    # Promedio de cada componente por modelo, carrera y tendencia temporal.
     # ══════════════════════════════════════════════════════════════════════
     def get_reporte_competencias(
         self,
@@ -2017,73 +2016,87 @@ class KPIService:
         periodo: str = None,
         modelo: str = None,
     ) -> dict:
+        EMPTY = {'por_modelo': [], 'por_carrera': [], 'tend_competencias': []}
         q = _base_q(db, modelo, anio, sistema, periodo)
+        if q.count() == 0:
+            return EMPTY
 
-        if sistema == 'meipa':
-            cfg_map = MEIPA_MODEL_CONFIG
-            modelos_activos = list(MEIPA_MODEL_CONFIG.keys())
-        else:
-            cfg_map = MODEL_CONFIG
-            modelos_activos = list(MODEL_CONFIG.keys()) if not modelo else [modelo]
+        # Todos los componentes posibles en ambos sistemas
+        ALL_COMPS = [
+            ('het_estudiantil',  'Heteroeval. Estudiantil',  50),
+            ('eval_pares',       'Eval. de Pares',            20),
+            ('aula_virtual',     'Entorno Virtual / TIC',     10),
+            ('autoevaluacion',   'Autoevaluación',            20),
+            ('comp_hetero_est',  'Heteroeval. Estudiantil',   40),
+            ('comp_auto',        'Autoevaluación',            20),
+            ('comp_hetero_dir',  'Heteroeval. Directivo',     20),
+            ('comp_pares',       'Eval. de Pares',            20),
+        ]
+        COMP_LABELS = {c[0]: c[1] for c in ALL_COMPS}
 
-        resultados_modelos = []
-        for mod in modelos_activos:
-            cfg = cfg_map.get(mod)
-            if not cfg:
-                continue
-            qm = q
-            if sistema:
-                qm = qm.filter(Evaluacion.sistema == sistema)
-            if not modelo:
-                qm = qm.filter(Evaluacion.modelo == mod)
-            n_total = qm.count()
-            if n_total == 0:
-                continue
-            comps_resultado = []
-            for col_key, peso in cfg['components']:
+        def _comp_avgs_for(qry):
+            result = []
+            for col_key, label, peso in ALL_COMPS:
                 col_attr = getattr(Evaluacion, col_key, None)
                 if col_attr is None:
                     continue
-                # avg() ignora NULLs de forma nativa en SQL; no filtrar por > 0
-                # para no descartar registros donde el componente es NULL en un sistema
-                avg_val = qm.with_entities(func.avg(col_attr)).scalar()
-                if avg_val is None:
+                avg_val = qry.with_entities(func.avg(col_attr)).scalar()
+                if not avg_val or float(avg_val) <= 0:
                     continue
-                avg_val = round(float(avg_val), 2)
-                if avg_val <= 0:
-                    continue
-                n_val = qm.with_entities(
+                n_v = qry.with_entities(
                     func.count(Evaluacion.id)
                 ).filter(col_attr.isnot(None)).scalar() or 0
-                comps_resultado.append({
-                    'key':      col_key,
-                    'label':    col_key.replace('_', ' ').title(),
-                    'peso':     peso,
-                    'promedio': avg_val,
-                    'n':        n_val,
+                result.append({
+                    'key': col_key, 'label': label, 'peso': peso,
+                    'promedio': round(float(avg_val), 2), 'n': n_v,
                 })
-            if not comps_resultado:
+            return result
+
+        MODEL_LABELS = {
+            'docencia': 'Docencia', 'posgrado': 'Posgrado', 'abp': 'Salud / ABP',
+            'tecnologado': 'Tecnologado', 'vinculacion': 'Vinculación',
+            'gestion': 'Gestión', 'investigacion': 'Investigación',
+            'administrativo': 'Administrativo', 'servicios': 'Servicios',
+        }
+
+        # ── Por modelo: detecta modelos con datos reales ──────────────────
+        real_models = [
+            r[0] for r in
+            q.with_entities(func.distinct(Evaluacion.modelo))
+             .filter(Evaluacion.modelo.isnot(None), Evaluacion.modelo != '')
+             .all()
+            if r[0]
+        ]
+        resultados_modelos = []
+        for mod in sorted(real_models):
+            qm = q.filter(Evaluacion.modelo == mod)
+            n_mod = qm.count()
+            if n_mod == 0:
+                continue
+            comps = _comp_avgs_for(qm)
+            if not comps:
                 continue
             resultados_modelos.append({
                 'modelo':      mod,
-                'label':       cfg['label'],
-                'n':           n_total,
-                'componentes': comps_resultado,
+                'label':       MODEL_LABELS.get(mod, mod.title()),
+                'n':           n_mod,
+                'componentes': comps,
             })
 
-        # Por carrera: mejor y peor componente
-        COMP_LABELS = {
-            'het_estudiantil':  'Het. Estudiantil',
-            'eval_pares':       'Eval. Pares',
-            'aula_virtual':     'Aula Virtual / TIC',
-            'autoevaluacion':   'Autoevaluación',
-            'comp_auto':        'Autoevaluación',
-            'comp_pares':       'Coevaluación Pares',
-            'comp_hetero_dir':  'Het. Directivo',
-            'comp_hetero_est':  'Het. Estudiantil',
-        }
-        # por_carrera: usa facultad + FACULTAD_MAP + whitelist (igual que ranking)
-        _CARR_OFIC_RC = {
+        # Fallback: una sola entrada global si no detectamos modelos con datos
+        if not resultados_modelos:
+            comps_global = _comp_avgs_for(q)
+            if comps_global:
+                sis_lbl = ('MEIPA 2023-2024' if sistema == 'meipa'
+                           else 'MECDI 2024-2025' if sistema == '360'
+                           else 'Vista Global')
+                resultados_modelos = [{
+                    'modelo': 'global', 'label': sis_lbl,
+                    'n': q.count(), 'componentes': comps_global,
+                }]
+
+        # ── Por carrera: mejor y peor componente ─────────────────────────
+        _CARR_OFIC = {
             'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
             'Agroindustria', 'Negocios Internacionales', 'Contabilidad y Auditoría',
             'Laboratorio Clínico', 'Administración de Empresas', 'TC Enfermería',
@@ -2106,9 +2119,9 @@ class KPIService:
                     return _FM2[k]
             return raw.strip()
 
-        carrera_comp_rows = (
+        cc_rows = (
             q.with_entities(
-                Evaluacion.facultad, Evaluacion.modelo,
+                Evaluacion.facultad,
                 func.avg(Evaluacion.het_estudiantil),
                 func.avg(Evaluacion.eval_pares),
                 func.avg(Evaluacion.aula_virtual),
@@ -2121,39 +2134,55 @@ class KPIService:
                 func.count(Evaluacion.id),
             )
             .filter(Evaluacion.facultad.isnot(None), Evaluacion.facultad != '')
-            .group_by(Evaluacion.facultad, Evaluacion.modelo)
-            .order_by(func.avg(Evaluacion.puntaje_100).desc()).all()
+            .group_by(Evaluacion.facultad)
+            .order_by(func.avg(Evaluacion.puntaje_100).desc())
+            .all()
         )
-        por_carrera = []
-        for row in carrera_comp_rows:
-            raw_fac, mod_r = row[0], row[1]
-            carrera = _nc2(raw_fac)
-            if not carrera or carrera not in _CARR_OFIC_RC:
+        # Merge rows with same normalized carrera (weighted average)
+        bkts: dict = {}
+        for row in cc_rows:
+            carrera = _nc2(row[0])
+            if not carrera or carrera not in _CARR_OFIC:
                 continue
             vals = {
-                'het_estudiantil': row[2], 'eval_pares': row[3],
-                'aula_virtual': row[4],    'autoevaluacion': row[5],
-                'comp_auto': row[6],       'comp_pares': row[7],
-                'comp_hetero_dir': row[8], 'comp_hetero_est': row[9],
+                'het_estudiantil': row[1], 'eval_pares': row[2],
+                'aula_virtual':    row[3], 'autoevaluacion': row[4],
+                'comp_auto':       row[5], 'comp_pares':     row[6],
+                'comp_hetero_dir': row[7], 'comp_hetero_est': row[8],
             }
-            prom_global = round(float(row[10] or 0), 2)
-            n = int(row[11] or 0)
-            comp_vals = {k: round(float(v), 2) for k, v in vals.items() if v is not None and float(v) > 0}
-            if not comp_vals:
-                continue
-            mejor_k = max(comp_vals, key=lambda k: comp_vals[k])
-            peor_k  = min(comp_vals, key=lambda k: comp_vals[k])
-            por_carrera.append({
-                'carrera': carrera, 'modelo': mod_r,
-                'promedio': prom_global, 'n': n,
-                'componentes': comp_vals,
-                'mejor_componente': COMP_LABELS.get(mejor_k, mejor_k),
-                'mejor_valor':      comp_vals[mejor_k],
-                'peor_componente':  COMP_LABELS.get(peor_k, peor_k),
-                'peor_valor':       comp_vals[peor_k],
-            })
+            prom = float(row[9] or 0)
+            n    = int(row[10] or 0)
+            if carrera not in bkts:
+                bkts[carrera] = {'ps': 0, 'ns': 0, 'cs': {}, 'cc': {}}
+            bkts[carrera]['ps'] += prom * n
+            bkts[carrera]['ns'] += n
+            for k, v in vals.items():
+                if v is not None and float(v) > 0:
+                    bkts[carrera]['cs'][k] = bkts[carrera]['cs'].get(k, 0) + float(v) * n
+                    bkts[carrera]['cc'][k] = bkts[carrera]['cc'].get(k, 0) + n
 
-        # Tendencia de competencias por período
+        por_carrera = []
+        for carrera, b in bkts.items():
+            nt = b['ns']
+            if nt == 0:
+                continue
+            prom_g = round(b['ps'] / nt, 2)
+            cv = {k: round(b['cs'][k] / b['cc'][k], 2) for k in b['cs'] if b['cc'][k] > 0}
+            if not cv:
+                continue
+            mj = max(cv, key=lambda k: cv[k])
+            pj = min(cv, key=lambda k: cv[k])
+            por_carrera.append({
+                'carrera': carrera, 'promedio': prom_g, 'n': nt,
+                'componentes': cv,
+                'mejor_componente': COMP_LABELS.get(mj, mj),
+                'mejor_valor':      cv[mj],
+                'peor_componente':  COMP_LABELS.get(pj, pj),
+                'peor_valor':       cv[pj],
+            })
+        por_carrera.sort(key=lambda x: x['promedio'], reverse=True)
+
+        # ── Tendencia por período ─────────────────────────────────────────
         tend_rows = (
             q.with_entities(
                 Evaluacion.periodo,
@@ -2166,7 +2195,8 @@ class KPIService:
             )
             .filter(Evaluacion.periodo.isnot(None))
             .group_by(Evaluacion.periodo)
-            .order_by(Evaluacion.periodo).all()
+            .order_by(Evaluacion.periodo)
+            .all()
         )
         tend_competencias = []
         for row in tend_rows:
