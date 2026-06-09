@@ -5826,31 +5826,50 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             const data = reporteComp
             const porModelo: any[]   = data?.por_modelo        || []
             const porCarrera: any[]  = data?.por_carrera       || []
-            const tendComp: any[]    = data?.tend_competencias  || []
             const porPeriodo: any[]  = data?.por_periodo        || []
+            const tendMeipa: any[]   = data?.tend_meipa          || []
+            const tendMecdi: any[]   = data?.tend_mecdi          || []
 
             const COMP_COLOR_MAP: Record<string, string> = {
+              // MECDI
               het_estudiantil: '#0056b3', eval_pares: '#7c3aed',
               aula_virtual: '#0891b2',    autoevaluacion: '#059669',
-              comp_auto: '#059669',       comp_pares: '#7c3aed',
-              comp_hetero_dir: '#dc2626', comp_hetero_est: '#0056b3',
+              // MEIPA
+              comp_hetero_est: '#1d4ed8', comp_pares: '#6d28d9',
+              comp_hetero_dir: '#b45309', comp_auto:  '#047857',
             }
             const scoreColor = (v: number) => v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
             const scoreBg    = (v: number) => v >= 85 ? '#f0fdf4' : v >= 70 ? '#fefce8' : '#fef2f2'
 
+            // Etiquetas cortas por clave
             const COMP_LABELS_SHORT: Record<string, string> = {
               het_estudiantil: 'Het. Estudiantil', eval_pares: 'Eval. Pares',
               aula_virtual: 'Aula Virtual',        autoevaluacion: 'Autoevaluación',
+              comp_hetero_est: 'Het. Estudiantil', comp_pares: 'Eval. Pares',
+              comp_hetero_dir: 'Het. Directivos',  comp_auto: 'Autoevaluación',
             }
-            const tendKeys = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion']
-            const tendPeriods = tendComp.map((t: any) => t.periodo)
-            const tendTraces = tendKeys.map(key => ({
-              x: tendPeriods,
-              y: tendComp.map((t: any) => t[key] ?? null),
-              color: COMP_COLOR_MAP[key] || '#94a3b8',
-              name: COMP_LABELS_SHORT[key] || key,
-            })).filter(tr => tr.y.some((v: any) => v !== null))
-            const chartTend = tendTraces.length > 0 ? trendLine2D(tendTraces) : null
+
+            // Gráfico MEIPA (I/II 2023 · I 2024)
+            const meipaPeriods = tendMeipa.map((t: any) => t.periodo)
+            const meipaTraces  = (['comp_hetero_est','comp_pares','comp_hetero_dir','comp_auto'] as const)
+              .map(key => ({
+                x: meipaPeriods,
+                y: tendMeipa.map((t: any) => t[key] ?? null),
+                color: COMP_COLOR_MAP[key],
+                name: COMP_LABELS_SHORT[key],
+              })).filter(tr => tr.y.some((v: any) => v !== null))
+            const chartMeipa = meipaTraces.length > 0 ? trendLine2D(meipaTraces) : null
+
+            // Gráfico MECDI (II 2024 · I/II 2025)
+            const mecdiPeriods = tendMecdi.map((t: any) => t.periodo)
+            const mecdiTraces  = (['het_estudiantil','eval_pares','aula_virtual','autoevaluacion'] as const)
+              .map(key => ({
+                x: mecdiPeriods,
+                y: tendMecdi.map((t: any) => t[key] ?? null),
+                color: COMP_COLOR_MAP[key],
+                name: COMP_LABELS_SHORT[key],
+              })).filter(tr => tr.y.some((v: any) => v !== null))
+            const chartMecdi = mecdiTraces.length > 0 ? trendLine2D(mecdiTraces) : null
 
             return (
               <div>
@@ -5879,12 +5898,33 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 ) : (
                   <>
-                    {/* Tendencia de competencias */}
-                    {chartTend && (
-                      <div className="mb-6">
-                        <ChartCard title="Evolución de Competencias por Período" sub="Tendencia temporal">
-                          <Plot data={chartTend.data} layout={chartTend.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '280px' }} />
-                        </ChartCard>
+                    {/* Tendencias por sistema */}
+                    {(chartMeipa || chartMecdi) && (
+                      <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {chartMeipa && (
+                          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#1d4ed8' }} />
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MEIPA</span>
+                              <span className="text-[10px] text-slate-400 ml-1">2023 – 2024</span>
+                            </div>
+                            <div className="px-2 pt-1">
+                              <Plot data={chartMeipa.data} layout={{ ...chartMeipa.layout, margin: { t: 10, b: 60, l: 40, r: 10 } }} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '260px' }} />
+                            </div>
+                          </div>
+                        )}
+                        {chartMecdi && (
+                          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#0056b3' }} />
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MECDI</span>
+                              <span className="text-[10px] text-slate-400 ml-1">2024 – 2025</span>
+                            </div>
+                            <div className="px-2 pt-1">
+                              <Plot data={chartMecdi.data} layout={{ ...chartMecdi.layout, margin: { t: 10, b: 60, l: 40, r: 10 } }} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '260px' }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

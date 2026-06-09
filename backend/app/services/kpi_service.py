@@ -2208,52 +2208,56 @@ class KPIService:
             ('2025','I'): 'I Período 2025', ('2025','II'): 'II Período 2025',
         }
 
-        # ── Tendencia por período (agregada por semestre canónico) ────────
-        tend_rows = (
-            q.with_entities(
-                Evaluacion.periodo,
-                func.avg(Evaluacion.het_estudiantil),
-                func.avg(Evaluacion.eval_pares),
-                func.avg(Evaluacion.aula_virtual),
-                func.avg(Evaluacion.autoevaluacion),
-                func.avg(Evaluacion.comp_auto),
-                func.count(Evaluacion.id),
+        # ── Helper: agrega filas crudas de período → semestres canónicos ──
+        def _build_tend(qry, col_keys: list) -> list:
+            rows = (
+                qry.with_entities(
+                    Evaluacion.periodo,
+                    *[func.avg(getattr(Evaluacion, ck)) for ck in col_keys],
+                    func.count(Evaluacion.id),
+                )
+                .filter(Evaluacion.periodo.isnot(None))
+                .group_by(Evaluacion.periodo)
+                .order_by(Evaluacion.periodo)
+                .all()
             )
-            .filter(Evaluacion.periodo.isnot(None))
-            .group_by(Evaluacion.periodo)
-            .order_by(Evaluacion.periodo)
-            .all()
-        )
+            buckets: dict = {}
+            for row in rows:
+                sk    = _to_sem_key(row[0])
+                n_row = int(row[-1] or 0)
+                if not sk[0] or not sk[1]:
+                    continue
+                if sk not in buckets:
+                    buckets[sk] = {ck: [0.0, 0] for ck in col_keys}
+                    buckets[sk]['_n'] = 0
+                buckets[sk]['_n'] += n_row
+                for i, ck in enumerate(col_keys):
+                    val = row[i + 1]
+                    if val is not None:
+                        buckets[sk][ck][0] += float(val) * n_row
+                        buckets[sk][ck][1] += n_row
+            result = []
+            for sk in sorted(buckets.keys(), key=lambda x: _SEM_SORT.get(x, 99)):
+                b     = buckets[sk]
+                entry = {'periodo': _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'), 'n': b['_n']}
+                for ck in col_keys:
+                    s, cnt   = b[ck]
+                    entry[ck] = round(s / cnt, 2) if cnt > 0 else None
+                result.append(entry)
+            return result
 
-        # Aggregate raw period rows → canonical semesters
-        _COMP_KEYS = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion', 'comp_auto']
-        sem_buckets: dict = {}
-        for row in tend_rows:
-            sk = _to_sem_key(row[0])
-            if not sk[0] or not sk[1]:
-                continue
-            n_row = int(row[6] or 0)
-            if sk not in sem_buckets:
-                sem_buckets[sk] = {ck: [0.0, 0] for ck in _COMP_KEYS}
-                sem_buckets[sk]['_n'] = 0
-            sem_buckets[sk]['_n'] += n_row
-            for i, ck in enumerate(_COMP_KEYS):
-                val = row[i + 1]
-                if val is not None:
-                    sem_buckets[sk][ck][0] += float(val) * n_row
-                    sem_buckets[sk][ck][1] += n_row
+        # Columnas específicas por sistema
+        _MEIPA_KEYS = ['comp_hetero_est', 'comp_pares', 'comp_hetero_dir', 'comp_auto']
+        _MECDI_KEYS = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion']
 
-        tend_competencias = []
-        for sk in sorted(sem_buckets.keys(), key=lambda x: _SEM_SORT.get(x, 99)):
-            b = sem_buckets[sk]
-            entry = {
-                'periodo': _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'),
-                'n':       b['_n'],
-            }
-            for ck in _COMP_KEYS:
-                s, cnt = b[ck]
-                entry[ck] = round(s / cnt, 2) if cnt > 0 else None
-            tend_competencias.append(entry)
+        q_meipa = q.filter(Evaluacion.sistema == 'meipa')
+        q_mecdi = q.filter(Evaluacion.sistema == '360')
+
+        tend_meipa = _build_tend(q_meipa, _MEIPA_KEYS) if q_meipa.count() > 0 else []
+        tend_mecdi = _build_tend(q_mecdi, _MECDI_KEYS) if q_mecdi.count() > 0 else []
+
+        # Compatibilidad: tend_competencias combinado (puntaje_100 para ambos sistemas)
+        tend_competencias = tend_mecdi if tend_mecdi else tend_meipa
 
         # ── Por período: misma estructura que por_modelo pero por semestre ─
         # Map canonical semesters → list of raw period codes in this query
@@ -2284,7 +2288,9 @@ class KPIService:
         return {
             'por_modelo':        resultados_modelos,
             'por_carrera':       por_carrera,
-            'tend_competencias': tend_competencias,
+            'tend_competencias': tend_competencias,   # compat
+            'tend_meipa':        tend_meipa,
+            'tend_mecdi':        tend_mecdi,
             'por_periodo':       por_periodo,
         }
 
