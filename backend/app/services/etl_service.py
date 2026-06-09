@@ -28,7 +28,7 @@ _DATA_CANDIDATES = [
 
 BASE = next((p for p in _DATA_CANDIDATES if os.path.isdir(p)), _DATA_CANDIDATES[0])
 EVAL_DIR        = os.path.join(BASE, 'eval_detalladas_2025_02')
-EVAL_DIR_202501 = os.path.join(BASE, 'eval_detalladas_202501')
+EVAL_DIR_202501 = os.path.join(BASE, 'eval_detalladas_2025_01')
 EVAL_DIR_202402 = os.path.join(BASE, 'eval_det_202402')
 POSGRADO_DIR    = os.path.join(BASE, 'posgrado')
 PUCESE_DATA_DIR = os.path.join(BASE, 'pucese_data')
