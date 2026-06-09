@@ -5938,7 +5938,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                         <div className="divide-y divide-slate-100">
                           {porModelo.map((mod: any, mi: number) => (
                             <div key={mi} className="p-5">
-                              <div className="flex items-center gap-2 mb-3">
+                              <div className="flex items-center gap-2 mb-3 flex-wrap">
                                 <span className="text-[11px] font-black text-slate-700">{mod.label}</span>
                                 <span className="text-[9px] text-slate-400 font-semibold">{mod.n} evaluaciones</span>
                               </div>
@@ -6023,11 +6023,19 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                         <div className="divide-y divide-slate-100">
                           {porPeriodo.map((per: any, pi: number) => (
                             <div key={pi} className="p-5">
-                              <div className="flex items-center gap-2 mb-3">
+                              <div className="flex items-center gap-2 mb-3 flex-wrap">
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black"
                                   style={{ background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', color: '#5b21b6' }}>
                                   <Calendar size={10} /> {per.periodo}
                                 </span>
+                                {per.sistema && (
+                                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full"
+                                    style={per.sistema === 'MEIPA'
+                                      ? { background: '#eff6ff', color: '#1e40af' }
+                                      : { background: '#f0fdf4', color: '#166534' }}>
+                                    {per.sistema}
+                                  </span>
+                                )}
                                 <span className="text-[9px] text-slate-400 font-semibold">{per.n} evaluaciones</span>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

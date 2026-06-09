@@ -2021,22 +2021,28 @@ class KPIService:
         if q.count() == 0:
             return EMPTY
 
-        # Todos los componentes posibles en ambos sistemas
-        ALL_COMPS = [
-            ('het_estudiantil',  'Heteroeval. Estudiantil',  50),
-            ('eval_pares',       'Eval. de Pares',            20),
-            ('aula_virtual',     'Entorno Virtual / TIC',     10),
-            ('autoevaluacion',   'Autoevaluación',            20),
-            ('comp_hetero_est',  'Heteroeval. Estudiantil',   40),
-            ('comp_auto',        'Autoevaluación',            20),
-            ('comp_hetero_dir',  'Heteroeval. Directivo',     20),
-            ('comp_pares',       'Eval. de Pares',            20),
+        # Componentes por sistema (separados para evitar mezcla)
+        _MEIPA_COMPS = [
+            ('comp_hetero_est', 'Heteroeval. Estudiantil', 40),
+            ('comp_pares',      'Eval. de Pares',           20),
+            ('comp_hetero_dir', 'Heteroeval. Directivo',    20),
+            ('comp_auto',       'Autoevaluación',           20),
         ]
-        COMP_LABELS = {c[0]: c[1] for c in ALL_COMPS}
+        _MECDI_COMPS = [
+            ('het_estudiantil', 'Heteroeval. Estudiantil',  50),
+            ('eval_pares',      'Eval. de Pares',            20),
+            ('aula_virtual',    'Entorno Virtual / TIC',     10),
+            ('autoevaluacion',  'Autoevaluación',            20),
+        ]
+        ALL_COMPS    = _MEIPA_COMPS + _MECDI_COMPS
+        COMP_LABELS  = {c[0]: c[1] for c in ALL_COMPS}
 
-        def _comp_avgs_for(qry):
+        def _comp_avgs_for(qry, comp_list=None):
+            """Calcula promedios de componentes. Si comp_list=None usa ALL_COMPS."""
+            if comp_list is None:
+                comp_list = ALL_COMPS
             result = []
-            for col_key, label, peso in ALL_COMPS:
+            for col_key, label, peso in comp_list:
                 col_attr = getattr(Evaluacion, col_key, None)
                 if col_attr is None:
                     continue
@@ -2059,7 +2065,7 @@ class KPIService:
             'administrativo': 'Administrativo', 'servicios': 'Servicios',
         }
 
-        # ── Por modelo: detecta modelos con datos reales ──────────────────
+        # ── Por modelo: separado por sistema para evitar mezcla de columnas ──
         real_models = [
             r[0] for r in
             q.with_entities(func.distinct(Evaluacion.modelo))
@@ -2067,33 +2073,45 @@ class KPIService:
              .all()
             if r[0]
         ]
+        # Orden fijo: primero MEIPA (histórico), luego MECDI (vigente)
+        _SIS_CFG = [
+            ('meipa', 'MEIPA 2023–2024', _MEIPA_COMPS),
+            ('360',   'MECDI 2024–2025', _MECDI_COMPS),
+        ]
         resultados_modelos = []
         for mod in sorted(real_models):
-            qm = q.filter(Evaluacion.modelo == mod)
-            n_mod = qm.count()
-            if n_mod == 0:
-                continue
-            comps = _comp_avgs_for(qm)
-            if not comps:
-                continue
-            resultados_modelos.append({
-                'modelo':      mod,
-                'label':       MODEL_LABELS.get(mod, mod.title()),
-                'n':           n_mod,
-                'componentes': comps,
-            })
+            for sis_code, sis_sfx, comp_list in _SIS_CFG:
+                # Si hay filtro de sistema activo, saltar el sistema que no aplica
+                if sistema and sistema != sis_code:
+                    continue
+                qm = q.filter(Evaluacion.modelo == mod,
+                              Evaluacion.sistema == sis_code)
+                n_mod = qm.count()
+                if n_mod == 0:
+                    continue
+                comps = _comp_avgs_for(qm, comp_list)
+                if not comps:
+                    continue
+                resultados_modelos.append({
+                    'modelo':   mod,
+                    'label':    f"{MODEL_LABELS.get(mod, mod.title())} · {sis_sfx}",
+                    'sistema':  sis_code,
+                    'n':        n_mod,
+                    'componentes': comps,
+                })
 
         # Fallback: una sola entrada global si no detectamos modelos con datos
         if not resultados_modelos:
-            comps_global = _comp_avgs_for(q)
-            if comps_global:
-                sis_lbl = ('MEIPA 2023-2024' if sistema == 'meipa'
-                           else 'MECDI 2024-2025' if sistema == '360'
-                           else 'Vista Global')
-                resultados_modelos = [{
-                    'modelo': 'global', 'label': sis_lbl,
-                    'n': q.count(), 'componentes': comps_global,
-                }]
+            for sis_code, sis_sfx, comp_list in _SIS_CFG:
+                if sistema and sistema != sis_code:
+                    continue
+                qg = q.filter(Evaluacion.sistema == sis_code)
+                comps_global = _comp_avgs_for(qg, comp_list)
+                if comps_global:
+                    resultados_modelos.append({
+                        'modelo': 'global', 'label': sis_sfx, 'sistema': sis_code,
+                        'n': qg.count(), 'componentes': comps_global,
+                    })
 
         # ── Por carrera: mejor y peor componente ─────────────────────────
         _CARR_OFIC = {
@@ -2209,7 +2227,8 @@ class KPIService:
         }
 
         # ── Helper: agrega filas crudas de período → semestres canónicos ──
-        def _build_tend(qry, col_keys: list) -> list:
+        def _build_tend(qry, col_keys: list,
+                        min_sem=None, max_sem=None) -> list:
             rows = (
                 qry.with_entities(
                     Evaluacion.periodo,
@@ -2227,6 +2246,12 @@ class KPIService:
                 n_row = int(row[-1] or 0)
                 if not sk[0] or not sk[1]:
                     continue
+                # Filtro de rango de semestres
+                order = _SEM_SORT.get(sk, 99)
+                if min_sem is not None and order < _SEM_SORT.get(min_sem, 0):
+                    continue
+                if max_sem is not None and order > _SEM_SORT.get(max_sem, 99):
+                    continue
                 if sk not in buckets:
                     buckets[sk] = {ck: [0.0, 0] for ck in col_keys}
                     buckets[sk]['_n'] = 0
@@ -2241,22 +2266,28 @@ class KPIService:
                 b     = buckets[sk]
                 entry = {'periodo': _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'), 'n': b['_n']}
                 for ck in col_keys:
-                    s, cnt   = b[ck]
+                    s, cnt    = b[ck]
                     entry[ck] = round(s / cnt, 2) if cnt > 0 else None
                 result.append(entry)
             return result
 
         # Columnas específicas por sistema
-        _MEIPA_KEYS = ['comp_hetero_est', 'comp_pares', 'comp_hetero_dir', 'comp_auto']
-        _MECDI_KEYS = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion']
+        _MEIPA_KEYS = [c[0] for c in _MEIPA_COMPS]
+        _MECDI_KEYS = [c[0] for c in _MECDI_COMPS]
+
+        # MEIPA: sólo hasta I Período 2024; MECDI: sólo desde II Período 2024
+        _MEIPA_END   = ('2024', 'I')
+        _MECDI_START = ('2024', 'II')
 
         q_meipa = q.filter(Evaluacion.sistema == 'meipa')
         q_mecdi = q.filter(Evaluacion.sistema == '360')
 
-        tend_meipa = _build_tend(q_meipa, _MEIPA_KEYS) if q_meipa.count() > 0 else []
-        tend_mecdi = _build_tend(q_mecdi, _MECDI_KEYS) if q_mecdi.count() > 0 else []
+        tend_meipa = (_build_tend(q_meipa, _MEIPA_KEYS, max_sem=_MEIPA_END)
+                      if q_meipa.count() > 0 else [])
+        tend_mecdi = (_build_tend(q_mecdi, _MECDI_KEYS, min_sem=_MECDI_START)
+                      if q_mecdi.count() > 0 else [])
 
-        # Compatibilidad: tend_competencias combinado (puntaje_100 para ambos sistemas)
+        # Compatibilidad: tend_competencias combinado
         tend_competencias = tend_mecdi if tend_mecdi else tend_meipa
 
         # ── Por período: misma estructura que por_modelo pero por semestre ─
@@ -2269,18 +2300,36 @@ class KPIService:
             if sk[0] and sk[1]:
                 sem_raw_map.setdefault(sk, []).append(rp)
 
+        # Umbral: II Período 2024 en adelante = MECDI
+        _MECDI_MIN_ORDER = _SEM_SORT.get(('2024', 'II'), 3)
+
         por_periodo = []
         for sk in sorted(sem_raw_map.keys(), key=lambda x: _SEM_SORT.get(x, 99)):
-            rps = sem_raw_map[sk]
-            qp  = q.filter(Evaluacion.periodo.in_(rps))
+            rps      = sem_raw_map[sk]
+            sk_order = _SEM_SORT.get(sk, 99)
+            is_mecdi = sk_order >= _MECDI_MIN_ORDER
+
+            # Filtra también por sistema para no mezclar columnas
+            if is_mecdi:
+                qp        = q.filter(Evaluacion.periodo.in_(rps),
+                                     Evaluacion.sistema == '360')
+                comp_list = _MECDI_COMPS
+                sis_label = 'MECDI'
+            else:
+                qp        = q.filter(Evaluacion.periodo.in_(rps),
+                                     Evaluacion.sistema == 'meipa')
+                comp_list = _MEIPA_COMPS
+                sis_label = 'MEIPA'
+
             n_qp = qp.count()
             if n_qp == 0:
                 continue
-            comps = _comp_avgs_for(qp)
+            comps = _comp_avgs_for(qp, comp_list)
             if not comps:
                 continue
             por_periodo.append({
                 'periodo':     _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'),
+                'sistema':     sis_label,
                 'n':           n_qp,
                 'componentes': comps,
             })
