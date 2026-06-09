@@ -3554,10 +3554,11 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
     finally { setLoadingReporteComp(false) }
   }
   const goToReporteComp = async () => {
+    setReporteComp(null)
     setActiveView('reporte-competencias')
     setSistema('overview' as any)
     if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
-    if (!reporteComp) fetchReporteComp()
+    fetchReporteComp()
   }
   const [cdFiltroCarrera, setCdFiltroCarrera]   = useState('__todas__')
   const [cdFiltroPeriodo, setCdFiltroPeriodo]   = useState('__todos__')
@@ -5859,7 +5860,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <div className="flex-1 min-w-0">
                     <h2 className="text-[17px] font-black text-slate-800 leading-tight">Reporte de Competencias Docentes</h2>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Desempeño por componente — {porModelo.length} modelos · {porCarrera.length} carreras
+                      {loadingReporteComp ? 'Cargando datos...' : `Desempeño por componente — ${porModelo.length} modelos · ${porCarrera.length} carreras`}
                     </p>
                   </div>
                   {loadingReporteComp && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin" />}

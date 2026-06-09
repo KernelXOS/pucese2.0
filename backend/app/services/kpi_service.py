@@ -2044,16 +2044,23 @@ class KPIService:
                 col_attr = getattr(Evaluacion, col_key, None)
                 if col_attr is None:
                     continue
-                avg_val = qm.with_entities(func.avg(col_attr)).filter(col_attr > 0).scalar()
-                n_val   = qm.with_entities(func.count(Evaluacion.id)).filter(col_attr > 0).scalar() or 0
-                if avg_val is None or n_val == 0:
+                # avg() ignora NULLs de forma nativa en SQL; no filtrar por > 0
+                # para no descartar registros donde el componente es NULL en un sistema
+                avg_val = qm.with_entities(func.avg(col_attr)).scalar()
+                if avg_val is None:
                     continue
+                avg_val = round(float(avg_val), 2)
+                if avg_val <= 0:
+                    continue
+                n_val = qm.with_entities(
+                    func.count(Evaluacion.id)
+                ).filter(col_attr.isnot(None)).scalar() or 0
                 comps_resultado.append({
-                    'key':     col_key,
-                    'label':   col_key.replace('_', ' ').title(),
-                    'peso':    peso,
-                    'promedio': round(float(avg_val), 2),
-                    'n':       n_val,
+                    'key':      col_key,
+                    'label':    col_key.replace('_', ' ').title(),
+                    'peso':     peso,
+                    'promedio': avg_val,
+                    'n':        n_val,
                 })
             if not comps_resultado:
                 continue
@@ -2075,9 +2082,33 @@ class KPIService:
             'comp_hetero_dir':  'Het. Directivo',
             'comp_hetero_est':  'Het. Estudiantil',
         }
+        # por_carrera: usa facultad + FACULTAD_MAP + whitelist (igual que ranking)
+        _CARR_OFIC_RC = {
+            'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+            'Agroindustria', 'Negocios Internacionales', 'Contabilidad y Auditoría',
+            'Laboratorio Clínico', 'Administración de Empresas', 'TC Enfermería',
+            'Edu. Básica Semi - Quinindé', 'Fisioterapia', 'Enfermería',
+            'Ing. Recursos Naturales Renova', 'Tecnologías de la Información',
+            'Educación Básica', 'Diseño Gráfico', 'TG Gestión Culinaria',
+            'Medicina', 'TG Desarrollo de Software',
+        }
+        try:
+            from app.services.etl_service import FACULTAD_MAP as _FM2
+        except Exception:
+            _FM2 = {}
+        _FM2S = sorted(_FM2.keys(), key=len, reverse=True)
+
+        def _nc2(raw: str) -> str:
+            if not raw: return ''
+            ru = raw.strip().upper()
+            for k in _FM2S:
+                if ru == k.upper() or ru.startswith(k.upper()):
+                    return _FM2[k]
+            return raw.strip()
+
         carrera_comp_rows = (
             q.with_entities(
-                Evaluacion.carrera, Evaluacion.modelo,
+                Evaluacion.facultad, Evaluacion.modelo,
                 func.avg(Evaluacion.het_estudiantil),
                 func.avg(Evaluacion.eval_pares),
                 func.avg(Evaluacion.aula_virtual),
@@ -2089,13 +2120,16 @@ class KPIService:
                 func.avg(Evaluacion.puntaje_100),
                 func.count(Evaluacion.id),
             )
-            .filter(Evaluacion.carrera.isnot(None), Evaluacion.carrera != '')
-            .group_by(Evaluacion.carrera, Evaluacion.modelo)
+            .filter(Evaluacion.facultad.isnot(None), Evaluacion.facultad != '')
+            .group_by(Evaluacion.facultad, Evaluacion.modelo)
             .order_by(func.avg(Evaluacion.puntaje_100).desc()).all()
         )
         por_carrera = []
         for row in carrera_comp_rows:
-            carrera, mod_r = row[0], row[1]
+            raw_fac, mod_r = row[0], row[1]
+            carrera = _nc2(raw_fac)
+            if not carrera or carrera not in _CARR_OFIC_RC:
+                continue
             vals = {
                 'het_estudiantil': row[2], 'eval_pares': row[3],
                 'aula_virtual': row[4],    'autoevaluacion': row[5],
