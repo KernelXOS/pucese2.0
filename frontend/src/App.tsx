@@ -5824,9 +5824,10 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
           {/* ══ MÓDULO: Reporte de Competencias ══ */}
           {activeView === 'reporte-competencias' && (() => {
             const data = reporteComp
-            const porModelo: any[]   = data?.por_modelo      || []
-            const porCarrera: any[]  = data?.por_carrera     || []
-            const tendComp: any[]    = data?.tend_competencias || []
+            const porModelo: any[]   = data?.por_modelo        || []
+            const porCarrera: any[]  = data?.por_carrera       || []
+            const tendComp: any[]    = data?.tend_competencias  || []
+            const porPeriodo: any[]  = data?.por_periodo        || []
 
             const COMP_COLOR_MAP: Record<string, string> = {
               het_estudiantil: '#0056b3', eval_pares: '#7c3aed',
@@ -5860,7 +5861,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                   <div className="flex-1 min-w-0">
                     <h2 className="text-[17px] font-black text-slate-800 leading-tight">Reporte de Competencias Docentes</h2>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {loadingReporteComp ? 'Cargando datos...' : `Desempeño por componente — ${porModelo.length} modelos · ${porCarrera.length} carreras`}
+                      {loadingReporteComp ? 'Cargando datos...' : `Desempeño por componente — ${porModelo.length} modelos · ${porCarrera.length} carreras · ${porPeriodo.length} períodos`}
                     </p>
                   </div>
                   {loadingReporteComp && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin" />}
@@ -5967,6 +5968,49 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Por período: componentes por semestre canónico */}
+                    {porPeriodo.length > 0 && (
+                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
+                          <Calendar size={14} className="text-violet-500" />
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Componentes ·</span>
+                          <span className="text-[13px] font-bold text-slate-700">Promedio de Competencias por Período</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {porPeriodo.map((per: any, pi: number) => (
+                            <div key={pi} className="p-5">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black"
+                                  style={{ background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', color: '#5b21b6' }}>
+                                  <Calendar size={10} /> {per.periodo}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-semibold">{per.n} evaluaciones</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {(per.componentes || []).map((comp: any) => {
+                                  const color = COMP_COLOR_MAP[comp.key] || '#0056b3'
+                                  const pct = Math.min(100, comp.promedio ?? 0)
+                                  return (
+                                    <div key={comp.key} className="rounded-xl p-3 border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
+                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">{comp.label}</p>
+                                      <div className="flex items-baseline gap-1">
+                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{(comp.promedio ?? 0).toFixed(1)}</span>
+                                        <span className="text-[9px] text-slate-400">/100</span>
+                                      </div>
+                                      <p className="text-[8px] text-slate-400 mt-0.5">Peso: {comp.peso}% · {comp.n} reg.</p>
+                                      <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

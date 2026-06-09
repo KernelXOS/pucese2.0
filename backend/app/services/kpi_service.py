@@ -2182,7 +2182,33 @@ class KPIService:
             })
         por_carrera.sort(key=lambda x: x['promedio'], reverse=True)
 
-        # ── Tendencia por período ─────────────────────────────────────────
+        # ── Helpers: normalizar código de período → semestre canónico ────
+        def _to_sem_key(code: str):
+            """('2024','II') from any raw period code e.g. 202402, 202421, 202430"""
+            if not code:
+                return ('', '')
+            c = str(code).strip()
+            if '-' in c:
+                parts = c.split('-')
+                year = parts[0] if parts[0].isdigit() else (parts[1] if len(parts) > 1 else '')
+                sem  = next((p for p in parts if p in ('I', 'II')), '')
+                return (year, sem)
+            if len(c) == 6 and c.isdigit():
+                year = c[:4]
+                suf  = int(c[4:])
+                if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+                    return (year, 'I')
+                return (year, 'II')
+            return (c, '')
+
+        _SEM_SORT  = {('2023','I'):0,('2023','II'):1,('2024','I'):2,('2024','II'):3,('2025','I'):4,('2025','II'):5}
+        _SEM_LABEL = {
+            ('2023','I'): 'I Período 2023', ('2023','II'): 'II Período 2023',
+            ('2024','I'): 'I Período 2024', ('2024','II'): 'II Período 2024',
+            ('2025','I'): 'I Período 2025', ('2025','II'): 'II Período 2025',
+        }
+
+        # ── Tendencia por período (agregada por semestre canónico) ────────
         tend_rows = (
             q.with_entities(
                 Evaluacion.periodo,
@@ -2198,22 +2224,68 @@ class KPIService:
             .order_by(Evaluacion.periodo)
             .all()
         )
-        tend_competencias = []
+
+        # Aggregate raw period rows → canonical semesters
+        _COMP_KEYS = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion', 'comp_auto']
+        sem_buckets: dict = {}
         for row in tend_rows:
-            tend_competencias.append({
-                'periodo':         row[0],
-                'het_estudiantil': round(float(row[1]), 2) if row[1] else None,
-                'eval_pares':      round(float(row[2]), 2) if row[2] else None,
-                'aula_virtual':    round(float(row[3]), 2) if row[3] else None,
-                'autoevaluacion':  round(float(row[4]), 2) if row[4] else None,
-                'comp_auto':       round(float(row[5]), 2) if row[5] else None,
-                'n':               int(row[6] or 0),
+            sk = _to_sem_key(row[0])
+            if not sk[0] or not sk[1]:
+                continue
+            n_row = int(row[6] or 0)
+            if sk not in sem_buckets:
+                sem_buckets[sk] = {ck: [0.0, 0] for ck in _COMP_KEYS}
+                sem_buckets[sk]['_n'] = 0
+            sem_buckets[sk]['_n'] += n_row
+            for i, ck in enumerate(_COMP_KEYS):
+                val = row[i + 1]
+                if val is not None:
+                    sem_buckets[sk][ck][0] += float(val) * n_row
+                    sem_buckets[sk][ck][1] += n_row
+
+        tend_competencias = []
+        for sk in sorted(sem_buckets.keys(), key=lambda x: _SEM_SORT.get(x, 99)):
+            b = sem_buckets[sk]
+            entry = {
+                'periodo': _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'),
+                'n':       b['_n'],
+            }
+            for ck in _COMP_KEYS:
+                s, cnt = b[ck]
+                entry[ck] = round(s / cnt, 2) if cnt > 0 else None
+            tend_competencias.append(entry)
+
+        # ── Por período: misma estructura que por_modelo pero por semestre ─
+        # Map canonical semesters → list of raw period codes in this query
+        sem_raw_map: dict = {}
+        raw_ps = [r[0] for r in q.with_entities(func.distinct(Evaluacion.periodo))
+                  .filter(Evaluacion.periodo.isnot(None)).all() if r[0]]
+        for rp in raw_ps:
+            sk = _to_sem_key(rp)
+            if sk[0] and sk[1]:
+                sem_raw_map.setdefault(sk, []).append(rp)
+
+        por_periodo = []
+        for sk in sorted(sem_raw_map.keys(), key=lambda x: _SEM_SORT.get(x, 99)):
+            rps = sem_raw_map[sk]
+            qp  = q.filter(Evaluacion.periodo.in_(rps))
+            n_qp = qp.count()
+            if n_qp == 0:
+                continue
+            comps = _comp_avgs_for(qp)
+            if not comps:
+                continue
+            por_periodo.append({
+                'periodo':     _SEM_LABEL.get(sk, f'{sk[1]} {sk[0]}'),
+                'n':           n_qp,
+                'componentes': comps,
             })
 
         return {
             'por_modelo':        resultados_modelos,
             'por_carrera':       por_carrera,
             'tend_competencias': tend_competencias,
+            'por_periodo':       por_periodo,
         }
 
 
