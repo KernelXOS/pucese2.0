@@ -68,6 +68,7 @@ def _all_codes_for_sem(periodo: str) -> list:
     if suf <= 1:  # Semester I
         codes = [periodo]
         codes += [f'{year}{s:02d}' for s in range(10, 21)]   # TEC-I (10-20)
+        codes += [f'{year}61']                                  # MEIPA I (202361, 202461, etc.)
         codes += [f'{year}{s:02d}' for s in range(70, 74)]   # Posg-I real (70-73)
         return codes
     else:  # Semester II
@@ -1842,7 +1843,7 @@ class KPIService:
             if len(raw) == 6 and raw.isdigit():
                 suf = int(raw[4:])
                 year = raw[:4]
-                if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+                if suf == 0 or suf == 1 or (10 <= suf <= 20) or suf == 61 or (70 <= suf <= 73):
                     return f'{year}01'
                 return f'{year}02'
             if '-' in raw:
@@ -2147,7 +2148,7 @@ class KPIService:
             if len(code) == 6 and code.isdigit():
                 yr = code[:4]
                 suf = int(code[4:])
-                sem = 'I' if (suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73)) else 'II'
+                sem = 'I' if (suf == 0 or suf == 1 or (10 <= suf <= 20) or suf == 61 or (70 <= suf <= 73)) else 'II'
                 return (yr, sem)
             return (code, '')
 
@@ -2496,7 +2497,7 @@ class KPIService:
             if len(c) == 6 and c.isdigit():
                 year = c[:4]
                 suf  = int(c[4:])
-                if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+                if suf == 0 or suf == 1 or (10 <= suf <= 20) or suf == 61 or (70 <= suf <= 73):
                     return (year, 'I')
                 return (year, 'II')
             return (c, '')

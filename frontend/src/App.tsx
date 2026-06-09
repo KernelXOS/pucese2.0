@@ -1269,6 +1269,8 @@ function ComparativoPanel({ comparativo }: { comparativo: any }) {
           if (suf >= 21 && suf <= 30)   return `TEC-II-${y}`
           // suf=56 (202456,202556) y suf=66 (202466,202566) = evaluaciones MECDI G·II
           if (suf === 56 || suf === 66)  return `II-${y}`
+          // suf=61 (202361,202461) = MEIPA I semestre
+          if (suf === 61) return `I-${y}`
           // Posgrado real: sufijos 70-79 (202371,202376,202471,202476,202477,202571,202572,202576)
           if (suf >= 70 && suf <= 73)   return `Posg-I-${y}`
           if (suf >= 74 && suf <= 79)   return `Posg-II-${y}`
@@ -3402,6 +3404,8 @@ function normPeriodo(p: string | number): string {
   if (suf >= 21 && suf <= 30)  return `TEC-II-${y}`
   // suf=56 (202456,202556) y suf=66 (202466,202566) = evaluaciones MECDI G·II
   if (suf === 56 || suf === 66) return `II-${y}`
+  // suf=61 (202361,202461) = MEIPA I semestre
+  if (suf === 61) return `I-${y}`
   // Posgrado real: sufijos 70-79 (202371,202376,202471,202476,202477,202571,202572,202576)
   if (suf >= 70 && suf <= 73)  return `Posg-I-${y}`
   if (suf >= 74 && suf <= 79)  return `Posg-II-${y}`

@@ -52,8 +52,8 @@ def _periodo_sem_key(code: str):
     if len(code) == 6 and code.isdigit():
         year = code[:4]
         suf  = int(code[4:])
-        # Semester I: 0, 1, TEC-I (10-20), Posg-I (70-73)
-        if suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73):
+        # Semester I: 0, 1, TEC-I (10-20), MEIPA-I (61), Posg-I (70-73)
+        if suf == 0 or suf == 1 or (10 <= suf <= 20) or suf == 61 or (70 <= suf <= 73):
             return (year, 'I')
         # Semester II: 2, TEC-II (21-30), MECDI G·II (56,66), Posg-II (74-79), others
         return (year, 'II')
