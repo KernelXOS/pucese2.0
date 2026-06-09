@@ -1894,7 +1894,28 @@ class KPIService:
             _mg[key] = _mg.get(key, 0) + cnt
         por_genero = _mg
 
-        # Por carrera
+        # Por carrera — sólo carreras oficiales PUCESE
+        CARRERAS_OFICIALES_C = {
+            'Pedagogía Idiomas Nac. Ext.',
+            'Psicología',
+            'Derecho',
+            'Agroindustria',
+            'Negocios Internacionales',
+            'Contabilidad y Auditoría',
+            'Laboratorio Clínico',
+            'Administración de Empresas',
+            'TC Enfermería',
+            'Edu. Básica Semi - Quinindé',
+            'Fisioterapia',
+            'Enfermería',
+            'Ing. Recursos Naturales Renova',
+            'Tecnologías de la Información',
+            'Educación Básica',
+            'Diseño Gráfico',
+            'TG Gestión Culinaria',
+            'Medicina',
+            'TG Desarrollo de Software',
+        }
         carrera_rows = (
             q.with_entities(Evaluacion.carrera, Evaluacion.sexo, func.count(Evaluacion.id))
             .filter(Evaluacion.carrera.isnot(None), Evaluacion.carrera != '')
@@ -1902,6 +1923,8 @@ class KPIService:
         )
         carreras_dict: dict = {}
         for carrera, sexo, cnt in carrera_rows:
+            if carrera not in CARRERAS_OFICIALES_C:
+                continue
             if carrera not in carreras_dict:
                 carreras_dict[carrera] = {'carrera': carrera, 'total': 0, 'Hombre': 0, 'Mujer': 0}
             gkey = _GENERO_NORM.get(str(sexo or '').lower().strip(), 'Otro') if sexo else 'Otro'
