@@ -1384,6 +1384,9 @@ class KPIService:
             except Exception as e:
                 print(f'[kpi] MEIPA comp section error: {e}')
 
+        # ── MEIPA Heteroevaluación detallada (nuevo archivo) ─────────────
+        meipa_hetero = self._read_meipa_hetero()
+
         return {
             'periodos':            periodos,
             'competencias_top':    top_comp,
@@ -1393,9 +1396,213 @@ class KPIService:
             'preguntas_peor':      worst_preg,
             'todas_preguntas':     todas_preg,
             'por_carrera':         por_carrera_data,
-            # ── MEIPA ──────────────────────────────────────────────────────
+            # ── MEIPA componentes desde BD ──────────────────────────────
             'meipa_periodos':      meipa_periodos,
             'meipa_componentes':   meipa_componentes,
+            # ── MEIPA hetero detallado desde Excel ──────────────────────
+            'meipa_hetero_periodos':    meipa_hetero.get('periodos', []),
+            'meipa_hetero_top':         meipa_hetero.get('comp_top', []),
+            'meipa_hetero_peor':        meipa_hetero.get('comp_peor', []),
+            'meipa_hetero_todas':       meipa_hetero.get('comp_todas', []),
+            'meipa_hetero_por_carrera': meipa_hetero.get('por_carrera', []),
+        }
+
+
+    # ── MEIPA Heteroevaluación detallada ─────────────────────────────────────
+    def _read_meipa_hetero(self) -> dict:
+        """
+        Lee el archivo CONSOLIDADO HETEROEVALUACIÓN para generar ranking de
+        competencias (DESC_AREA) por período y por carrera.
+        """
+        import glob, os, warnings, re, unicodedata
+        import pandas as pd
+        warnings.filterwarnings('ignore')
+
+        try:
+            from app.services.etl_service import BASE, FACULTAD_MAP as _FM
+        except Exception:
+            BASE = '/app/data'
+            _FM  = {}
+
+        # Buscar el archivo en pucese_data o meipa_hetero
+        candidates = (
+            glob.glob(os.path.join(BASE, 'pucese_data', 'hetero_meipa*.xlsx')) +
+            glob.glob(os.path.join(BASE, 'pucese_data', '*HETERO*.xlsx'))      +
+            glob.glob(os.path.join(BASE, 'meipa_hetero', '*.xlsx'))
+        )
+        if not candidates:
+            return {}
+
+        fpath = sorted(candidates)[-1]
+        SHEET = 'Resultados Finales Hetero Evalu'
+
+        try:
+            df = pd.read_excel(fpath, sheet_name=SHEET, dtype=str)
+        except Exception as e:
+            print(f'[kpi] _read_meipa_hetero: error leyendo {fpath}: {e}')
+            return {}
+
+        # ── Normalizar columnas ──────────────────────────────────────────
+        df.columns = [str(c).strip() for c in df.columns]
+        needed = {'STVTERM_DESC', 'DESC_AREA', 'PUNTAJE', 'CARERRA2'}
+        if not needed.issubset(set(df.columns)):
+            print(f'[kpi] _read_meipa_hetero: columnas faltantes. Disponibles: {list(df.columns)}')
+            return {}
+
+        df['PUNTAJE'] = pd.to_numeric(df['PUNTAJE'], errors='coerce')
+        df = df[df['PUNTAJE'].between(0, 100)].copy()
+
+        # ── Mapear período canónico desde STVTERM_DESC ───────────────────
+        _PERIOD_ORDER = {
+            'I Período 2023': 0, 'II Período 2023': 1,
+            'I Período 2024': 2, 'II Período 2024': 3,
+        }
+        def _parse_period(desc: str) -> str:
+            d = str(desc).strip()
+            m = re.search(r'(20\d{2})', d)
+            if not m:
+                return ''
+            year = m.group(1)
+            if 'Primer' in d or '1er' in d:
+                return f'I Período {year}'
+            if 'Segundo' in d or '2do' in d:
+                return f'II Período {year}'
+            return ''
+
+        df['periodo_canon'] = df['STVTERM_DESC'].apply(_parse_period)
+        df = df[df['periodo_canon'] != ''].copy()
+
+        # ── Limpiar texto ────────────────────────────────────────────────
+        def _clean(s: str) -> str:
+            if not isinstance(s, str):
+                return str(s)
+            s = unicodedata.normalize('NFKC', s)
+            return s.strip()
+
+        df['DESC_AREA'] = df['DESC_AREA'].apply(_clean)
+        df['CARERRA2']  = df['CARERRA2'].apply(_clean)
+
+        # ── Normalizar carrera a las 19 oficiales ────────────────────────
+        _CARR_OFIC = {
+            'Pedagogía Idiomas Nac. Ext.', 'Psicología', 'Derecho',
+            'Agroindustria', 'Negocios Internacionales', 'Contabilidad y Auditoría',
+            'Laboratorio Clínico', 'Administración de Empresas', 'TC Enfermería',
+            'Edu. Básica Semi - Quinindé', 'Fisioterapia', 'Enfermería',
+            'Ing. Recursos Naturales Renova', 'Tecnologías de la Información',
+            'Educación Básica', 'Diseño Gráfico', 'TG Gestión Culinaria',
+            'Medicina', 'TG Desarrollo de Software',
+        }
+        _FM_SORTED = sorted(_FM.keys(), key=len, reverse=True)
+
+        def _norm_car(raw: str) -> str:
+            if not raw:
+                return ''
+            ru = raw.strip()
+            if ru in _FM:
+                return _FM[ru]
+            rl = ru.lower()
+            for k in _FM_SORTED:
+                if rl == k.lower() or rl.startswith(k.lower()) or k.lower() in rl:
+                    return _FM[k]
+            # Fallback: título sin sufijos
+            for oficial in _CARR_OFIC:
+                if oficial.lower() in rl or rl.startswith(oficial.lower()[:8]):
+                    return oficial
+            return ''
+
+        df['carrera_norm'] = df['CARERRA2'].apply(_norm_car)
+
+        # ── Períodos canónicos disponibles ───────────────────────────────
+        periodos = sorted(
+            df['periodo_canon'].unique().tolist(),
+            key=lambda x: _PERIOD_ORDER.get(x, 99)
+        )
+
+        # ── Ranking de competencias global ───────────────────────────────
+        comp_g = (
+            df.groupby('DESC_AREA')['PUNTAJE']
+            .agg(promedio='mean', n='count')
+            .reset_index()
+        )
+        comp_g['promedio'] = comp_g['promedio'].round(2)
+        comp_g = comp_g[comp_g['DESC_AREA'].str.strip() != '']
+
+        # Promedios por período
+        comp_p = (
+            df.groupby(['DESC_AREA', 'periodo_canon'])['PUNTAJE']
+            .mean().round(2).reset_index()
+        )
+        comp_p.columns = ['DESC_AREA', 'periodo', 'promedio']
+
+        def _enrich(rows):
+            result = []
+            for _, r in rows.iterrows():
+                entry = {
+                    'competencia': r['DESC_AREA'],
+                    'promedio':    round(r['promedio'], 2),
+                    'n':           int(r['n']),
+                }
+                for p in periodos:
+                    val = comp_p[
+                        (comp_p['DESC_AREA'] == r['DESC_AREA']) &
+                        (comp_p['periodo'] == p)
+                    ]['promedio']
+                    entry[p] = round(float(val.values[0]), 2) if len(val) else None
+                result.append(entry)
+            return result
+
+        comp_sorted = comp_g.sort_values('promedio', ascending=False)
+        comp_top    = _enrich(comp_sorted.head(8))
+        comp_peor   = _enrich(comp_sorted.tail(8).sort_values('promedio'))
+        comp_todas  = _enrich(comp_sorted)
+
+        # ── Por carrera ──────────────────────────────────────────────────
+        df_ofic = df[df['carrera_norm'].isin(_CARR_OFIC)].copy()
+        por_carrera = []
+        for car in sorted(df_ofic['carrera_norm'].dropna().unique()):
+            dfc = df_ofic[df_ofic['carrera_norm'] == car]
+            if len(dfc) < 5:
+                continue
+            cg = (
+                dfc.groupby('DESC_AREA')['PUNTAJE']
+                .agg(promedio='mean', n='count')
+                .reset_index()
+            )
+            cg['promedio'] = cg['promedio'].round(2)
+            cg = cg[cg['DESC_AREA'].str.strip() != ''].sort_values('promedio', ascending=False)
+            cp = (
+                dfc.groupby(['DESC_AREA', 'periodo_canon'])['PUNTAJE']
+                .mean().round(2).reset_index()
+            )
+            cp.columns = ['DESC_AREA', 'periodo', 'promedio']
+
+            def _ec(rows, _cp=cp):
+                result = []
+                for _, r in rows.iterrows():
+                    entry = {'competencia': r['DESC_AREA'],
+                             'promedio': round(r['promedio'], 2), 'n': int(r['n'])}
+                    for p in periodos:
+                        v = _cp[(_cp['DESC_AREA']==r['DESC_AREA'])&(_cp['periodo']==p)]['promedio']
+                        entry[p] = round(float(v.values[0]),2) if len(v) else None
+                    result.append(entry)
+                return result
+
+            por_carrera.append({
+                'carrera':      car,
+                'n':            int(len(dfc)),
+                'promedio':     round(float(dfc['PUNTAJE'].mean()), 2),
+                'competencias': _ec(cg),
+            })
+
+        print(f'[kpi] _read_meipa_hetero: {len(df)} filas · {len(periodos)} períodos · '
+              f'{len(comp_todas)} competencias · {len(por_carrera)} carreras')
+
+        return {
+            'periodos':    periodos,
+            'comp_top':    comp_top,
+            'comp_peor':   comp_peor,
+            'comp_todas':  comp_todas,
+            'por_carrera': por_carrera,
         }
 
 
