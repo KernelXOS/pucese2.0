@@ -1808,4 +1808,310 @@ class KPIService:
         }
 
 
+    # ══════════════════════════════════════════════════════════════════════
+    # MÓDULO 1 — CARACTERIZACIÓN DEL CUERPO DOCENTE
+    # Devuelve CONTEOS (no promedios): cuántos docentes por período, género,
+    # carrera, edad y antigüedad.
+    # ══════════════════════════════════════════════════════════════════════
+    def get_caracterizacion(
+        self,
+        db: Session,
+        sistema: str = None,
+        anio: int = None,
+        periodo: str = None,
+        modelo: str = None,
+    ) -> dict:
+        q = _base_q(db, modelo, anio, sistema, periodo)
+
+        _GENERO_NORM = {
+            'mujer': 'Mujer', 'femenino': 'Mujer', 'f': 'Mujer',
+            'hombre': 'Hombre', 'masculino': 'Hombre', 'm': 'Hombre',
+        }
+        AGE_BRACKETS   = ['< 30 años', '31-45 años', '46-60 años', '61+ años']
+        ANTIG_BRACKETS = ['0-3 años', '4-10 años', '11-20 años', '20+ años']
+
+        total_evaluaciones = q.count()
+        total_docentes = (
+            q.with_entities(func.count(func.distinct(Evaluacion.cedula))).scalar()
+            or q.with_entities(func.count(func.distinct(Evaluacion.docente_nombre))).scalar()
+            or 0
+        )
+
+        # Por período raw + desglose género
+        per_rows = (
+            q.with_entities(Evaluacion.periodo, Evaluacion.sexo, func.count(Evaluacion.id))
+            .filter(Evaluacion.periodo.isnot(None))
+            .group_by(Evaluacion.periodo, Evaluacion.sexo)
+            .order_by(Evaluacion.periodo).all()
+        )
+        periodos_dict: dict = {}
+        for p, sexo, cnt in per_rows:
+            if p not in periodos_dict:
+                periodos_dict[p] = {'periodo': p, 'total': 0, 'Hombre': 0, 'Mujer': 0}
+            gkey = _GENERO_NORM.get(str(sexo or '').lower().strip(), 'Otro') if sexo else 'Otro'
+            periodos_dict[p]['total'] += cnt
+            if gkey in ('Hombre', 'Mujer'):
+                periodos_dict[p][gkey] = periodos_dict[p].get(gkey, 0) + cnt
+
+        # Consolidar al semestre canónico YYYY-I / YYYY-II
+        def _sem_key(code: str):
+            if not code or len(code) < 4:
+                return (code, '')
+            if '-' in code:
+                parts = code.split('-')
+                yr = parts[0] if parts[0].isdigit() else parts[1]
+                sem = next((p for p in parts if p in ('I', 'II')), '')
+                return (yr, sem)
+            if len(code) == 6 and code.isdigit():
+                yr = code[:4]
+                suf = int(code[4:])
+                sem = 'I' if (suf == 0 or suf == 1 or (10 <= suf <= 20) or (70 <= suf <= 73)) else 'II'
+                return (yr, sem)
+            return (code, '')
+
+        sem_dict: dict = {}
+        for row in sorted(periodos_dict.values(), key=lambda x: x['periodo']):
+            yr, sem = _sem_key(row['periodo'])
+            if not sem:
+                continue
+            key = f'{yr}-{sem}'
+            if key not in sem_dict:
+                sem_dict[key] = {'periodo': key, 'label': f'{sem} Período {yr}', 'total': 0, 'Hombre': 0, 'Mujer': 0}
+            sem_dict[key]['total']  += row.get('total', 0)
+            sem_dict[key]['Hombre'] += row.get('Hombre', 0)
+            sem_dict[key]['Mujer']  += row.get('Mujer', 0)
+        por_periodo_sem = sorted(sem_dict.values(), key=lambda x: x['periodo'])
+
+        # Por género total
+        genero_rows = (
+            q.with_entities(Evaluacion.sexo, func.count(Evaluacion.id))
+            .filter(Evaluacion.sexo.isnot(None), Evaluacion.sexo != '')
+            .group_by(Evaluacion.sexo).all()
+        )
+        _mg: dict = {}
+        for g, cnt in genero_rows:
+            key = _GENERO_NORM.get(str(g).lower().strip(), str(g).strip())
+            _mg[key] = _mg.get(key, 0) + cnt
+        por_genero = _mg
+
+        # Por carrera
+        carrera_rows = (
+            q.with_entities(Evaluacion.carrera, Evaluacion.sexo, func.count(Evaluacion.id))
+            .filter(Evaluacion.carrera.isnot(None), Evaluacion.carrera != '')
+            .group_by(Evaluacion.carrera, Evaluacion.sexo).all()
+        )
+        carreras_dict: dict = {}
+        for carrera, sexo, cnt in carrera_rows:
+            if carrera not in carreras_dict:
+                carreras_dict[carrera] = {'carrera': carrera, 'total': 0, 'Hombre': 0, 'Mujer': 0}
+            gkey = _GENERO_NORM.get(str(sexo or '').lower().strip(), 'Otro') if sexo else 'Otro'
+            carreras_dict[carrera]['total'] += cnt
+            if gkey in ('Hombre', 'Mujer'):
+                carreras_dict[carrera][gkey] = carreras_dict[carrera].get(gkey, 0) + cnt
+        por_carrera = sorted(carreras_dict.values(), key=lambda x: x['total'], reverse=True)
+
+        # Por rango de edad (conteos)
+        edad_rows = (
+            q.with_entities(Evaluacion.edad, Evaluacion.sexo)
+            .filter(Evaluacion.edad.isnot(None)).all()
+        )
+        edad_dict = {b: {'rango': b, 'total': 0, 'Hombre': 0, 'Mujer': 0} for b in AGE_BRACKETS}
+        for edad, sexo in edad_rows:
+            if edad is None: continue
+            if edad < 30:    bkt = '< 30 años'
+            elif edad <= 45: bkt = '31-45 años'
+            elif edad <= 60: bkt = '46-60 años'
+            else:            bkt = '61+ años'
+            gkey = _GENERO_NORM.get(str(sexo or '').lower().strip(), 'Otro') if sexo else 'Otro'
+            edad_dict[bkt]['total'] += 1
+            if gkey in ('Hombre', 'Mujer'):
+                edad_dict[bkt][gkey] += 1
+        por_edad = [v for v in edad_dict.values() if v['total'] > 0]
+
+        # Por antigüedad (conteos)
+        ant_rows = (
+            q.with_entities(Evaluacion.antiguedad_anos, Evaluacion.sexo)
+            .filter(Evaluacion.antiguedad_anos.isnot(None)).all()
+        )
+        ant_dict = {b: {'rango': b, 'total': 0, 'Hombre': 0, 'Mujer': 0} for b in ANTIG_BRACKETS}
+        for ant, sexo in ant_rows:
+            if ant is None: continue
+            if ant <= 3:    bkt = '0-3 años'
+            elif ant <= 10: bkt = '4-10 años'
+            elif ant <= 20: bkt = '11-20 años'
+            else:           bkt = '20+ años'
+            gkey = _GENERO_NORM.get(str(sexo or '').lower().strip(), 'Otro') if sexo else 'Otro'
+            ant_dict[bkt]['total'] += 1
+            if gkey in ('Hombre', 'Mujer'):
+                ant_dict[bkt][gkey] += 1
+        por_antiguedad = [v for v in ant_dict.values() if v['total'] > 0]
+
+        # Por facultad (conteos)
+        fac_rows = (
+            q.with_entities(Evaluacion.facultad, func.count(Evaluacion.id))
+            .filter(Evaluacion.facultad.isnot(None), Evaluacion.facultad != '')
+            .group_by(Evaluacion.facultad)
+            .order_by(func.count(Evaluacion.id).desc()).all()
+        )
+        por_facultad = [{'facultad': f, 'total': cnt} for f, cnt in fac_rows]
+
+        return {
+            'total_evaluaciones': total_evaluaciones,
+            'total_docentes':     total_docentes,
+            'por_periodo':        por_periodo_sem,
+            'por_genero':         por_genero,
+            'por_carrera':        por_carrera,
+            'por_edad':           por_edad,
+            'por_antiguedad':     por_antiguedad,
+            'por_facultad':       por_facultad,
+        }
+
+    # ══════════════════════════════════════════════════════════════════════
+    # MÓDULO 2 — REPORTE DE COMPETENCIAS
+    # Promedio de cada componente por modelo, carrera y tendencia temporal.
+    # ══════════════════════════════════════════════════════════════════════
+    def get_reporte_competencias(
+        self,
+        db: Session,
+        sistema: str = None,
+        anio: int = None,
+        periodo: str = None,
+        modelo: str = None,
+    ) -> dict:
+        q = _base_q(db, modelo, anio, sistema, periodo)
+
+        if sistema == 'meipa':
+            cfg_map = MEIPA_MODEL_CONFIG
+            modelos_activos = list(MEIPA_MODEL_CONFIG.keys())
+        else:
+            cfg_map = MODEL_CONFIG
+            modelos_activos = list(MODEL_CONFIG.keys()) if not modelo else [modelo]
+
+        resultados_modelos = []
+        for mod in modelos_activos:
+            cfg = cfg_map.get(mod)
+            if not cfg:
+                continue
+            qm = q
+            if sistema:
+                qm = qm.filter(Evaluacion.sistema == sistema)
+            if not modelo:
+                qm = qm.filter(Evaluacion.modelo == mod)
+            n_total = qm.count()
+            if n_total == 0:
+                continue
+            comps_resultado = []
+            for col_key, peso in cfg['components']:
+                col_attr = getattr(Evaluacion, col_key, None)
+                if col_attr is None:
+                    continue
+                avg_val = qm.with_entities(func.avg(col_attr)).filter(col_attr > 0).scalar()
+                n_val   = qm.with_entities(func.count(Evaluacion.id)).filter(col_attr > 0).scalar() or 0
+                if avg_val is None or n_val == 0:
+                    continue
+                comps_resultado.append({
+                    'key':     col_key,
+                    'label':   col_key.replace('_', ' ').title(),
+                    'peso':    peso,
+                    'promedio': round(float(avg_val), 2),
+                    'n':       n_val,
+                })
+            if not comps_resultado:
+                continue
+            resultados_modelos.append({
+                'modelo':      mod,
+                'label':       cfg['label'],
+                'n':           n_total,
+                'componentes': comps_resultado,
+            })
+
+        # Por carrera: mejor y peor componente
+        COMP_LABELS = {
+            'het_estudiantil':  'Het. Estudiantil',
+            'eval_pares':       'Eval. Pares',
+            'aula_virtual':     'Aula Virtual / TIC',
+            'autoevaluacion':   'Autoevaluación',
+            'comp_auto':        'Autoevaluación',
+            'comp_pares':       'Coevaluación Pares',
+            'comp_hetero_dir':  'Het. Directivo',
+            'comp_hetero_est':  'Het. Estudiantil',
+        }
+        carrera_comp_rows = (
+            q.with_entities(
+                Evaluacion.carrera, Evaluacion.modelo,
+                func.avg(Evaluacion.het_estudiantil),
+                func.avg(Evaluacion.eval_pares),
+                func.avg(Evaluacion.aula_virtual),
+                func.avg(Evaluacion.autoevaluacion),
+                func.avg(Evaluacion.comp_auto),
+                func.avg(Evaluacion.comp_pares),
+                func.avg(Evaluacion.comp_hetero_dir),
+                func.avg(Evaluacion.comp_hetero_est),
+                func.avg(Evaluacion.puntaje_100),
+                func.count(Evaluacion.id),
+            )
+            .filter(Evaluacion.carrera.isnot(None), Evaluacion.carrera != '')
+            .group_by(Evaluacion.carrera, Evaluacion.modelo)
+            .order_by(func.avg(Evaluacion.puntaje_100).desc()).all()
+        )
+        por_carrera = []
+        for row in carrera_comp_rows:
+            carrera, mod_r = row[0], row[1]
+            vals = {
+                'het_estudiantil': row[2], 'eval_pares': row[3],
+                'aula_virtual': row[4],    'autoevaluacion': row[5],
+                'comp_auto': row[6],       'comp_pares': row[7],
+                'comp_hetero_dir': row[8], 'comp_hetero_est': row[9],
+            }
+            prom_global = round(float(row[10] or 0), 2)
+            n = int(row[11] or 0)
+            comp_vals = {k: round(float(v), 2) for k, v in vals.items() if v is not None and float(v) > 0}
+            if not comp_vals:
+                continue
+            mejor_k = max(comp_vals, key=lambda k: comp_vals[k])
+            peor_k  = min(comp_vals, key=lambda k: comp_vals[k])
+            por_carrera.append({
+                'carrera': carrera, 'modelo': mod_r,
+                'promedio': prom_global, 'n': n,
+                'componentes': comp_vals,
+                'mejor_componente': COMP_LABELS.get(mejor_k, mejor_k),
+                'mejor_valor':      comp_vals[mejor_k],
+                'peor_componente':  COMP_LABELS.get(peor_k, peor_k),
+                'peor_valor':       comp_vals[peor_k],
+            })
+
+        # Tendencia de competencias por período
+        tend_rows = (
+            q.with_entities(
+                Evaluacion.periodo,
+                func.avg(Evaluacion.het_estudiantil),
+                func.avg(Evaluacion.eval_pares),
+                func.avg(Evaluacion.aula_virtual),
+                func.avg(Evaluacion.autoevaluacion),
+                func.avg(Evaluacion.comp_auto),
+                func.count(Evaluacion.id),
+            )
+            .filter(Evaluacion.periodo.isnot(None))
+            .group_by(Evaluacion.periodo)
+            .order_by(Evaluacion.periodo).all()
+        )
+        tend_competencias = []
+        for row in tend_rows:
+            tend_competencias.append({
+                'periodo':         row[0],
+                'het_estudiantil': round(float(row[1]), 2) if row[1] else None,
+                'eval_pares':      round(float(row[2]), 2) if row[2] else None,
+                'aula_virtual':    round(float(row[3]), 2) if row[3] else None,
+                'autoevaluacion':  round(float(row[4]), 2) if row[4] else None,
+                'comp_auto':       round(float(row[5]), 2) if row[5] else None,
+                'n':               int(row[6] or 0),
+            })
+
+        return {
+            'por_modelo':        resultados_modelos,
+            'por_carrera':       por_carrera,
+            'tend_competencias': tend_competencias,
+        }
+
+
 kpi_service = KPIService()

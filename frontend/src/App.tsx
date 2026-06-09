@@ -3514,9 +3514,45 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
   }, [])
 
   // ── Módulo Análisis de Instrumentos ─────────────────────────────────────
-  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'|'prediccion'>('dashboard')
+  const [activeView, setActiveView]             = useState<'dashboard'|'competencias-detalle'|'prediccion'|'caracterizacion'|'reporte-competencias'>('dashboard')
   const [compDetalle, setCompDetalle]           = useState<any>(null)
   const [loadingCompDetalle, setLoadingCompDetalle] = useState(false)
+
+  // ── Módulo Caracterización del Cuerpo Docente ─────────────────────────
+  const [caracterizacion, setCaracterizacion]           = useState<any>(null)
+  const [loadingCaracterizacion, setLoadingCaracterizacion] = useState(false)
+  const fetchCaracterizacion = async () => {
+    setLoadingCaracterizacion(true)
+    try {
+      const res = await api.getCaracterizacion()
+      setCaracterizacion(res.data)
+    } catch { setCaracterizacion(null) }
+    finally { setLoadingCaracterizacion(false) }
+  }
+  const goToCaracterizacion = async () => {
+    setActiveView('caracterizacion')
+    setSistema('overview' as any)
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
+    if (!caracterizacion) fetchCaracterizacion()
+  }
+
+  // ── Módulo Reporte de Competencias ────────────────────────────────────
+  const [reporteComp, setReporteComp]           = useState<any>(null)
+  const [loadingReporteComp, setLoadingReporteComp] = useState(false)
+  const fetchReporteComp = async () => {
+    setLoadingReporteComp(true)
+    try {
+      const res = await api.getReporteCompetencias()
+      setReporteComp(res.data)
+    } catch { setReporteComp(null) }
+    finally { setLoadingReporteComp(false) }
+  }
+  const goToReporteComp = async () => {
+    setActiveView('reporte-competencias')
+    setSistema('overview' as any)
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setSidebarOpen(false)
+    if (!reporteComp) fetchReporteComp()
+  }
   const [cdFiltroCarrera, setCdFiltroCarrera]   = useState('__todas__')
   const [cdFiltroPeriodo, setCdFiltroPeriodo]   = useState('__todos__')
   const [cdBusqueda, setCdBusqueda]             = useState('')
@@ -3671,6 +3707,38 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
             >
               <TrendingUp size={17} style={{ flexShrink:0, color: activeView === 'prediccion' ? '#d8b4fe' : 'inherit' }} />
               {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Predicción y Alertas</span>}
+            </button>
+
+            {/* ── Caracterización Docente ── */}
+            <button
+              onClick={goToCaracterizacion}
+              className="w-full flex items-center gap-3 text-left transition-all rounded-xl"
+              style={{
+                padding: sidebarOpen ? '10px 12px' : '10px',
+                justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                color: activeView === 'caracterizacion' ? '#fff' : 'rgba(255,255,255,0.5)',
+                background: activeView === 'caracterizacion' ? 'linear-gradient(135deg,rgba(245,158,11,0.35),rgba(245,158,11,0.15))' : 'transparent',
+                borderLeft: activeView === 'caracterizacion' ? '2px solid #fbbf24' : '2px solid transparent',
+              }}
+            >
+              <Users size={17} style={{ flexShrink:0, color: activeView === 'caracterizacion' ? '#fde68a' : 'inherit' }} />
+              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Caracterización Docente</span>}
+            </button>
+
+            {/* ── Reporte de Competencias ── */}
+            <button
+              onClick={goToReporteComp}
+              className="w-full flex items-center gap-3 text-left transition-all rounded-xl"
+              style={{
+                padding: sidebarOpen ? '10px 12px' : '10px',
+                justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                color: activeView === 'reporte-competencias' ? '#fff' : 'rgba(255,255,255,0.5)',
+                background: activeView === 'reporte-competencias' ? 'linear-gradient(135deg,rgba(20,184,166,0.35),rgba(20,184,166,0.15))' : 'transparent',
+                borderLeft: activeView === 'reporte-competencias' ? '2px solid #2dd4bf' : '2px solid transparent',
+              }}
+            >
+              <Award size={17} style={{ flexShrink:0, color: activeView === 'reporte-competencias' ? '#99f6e4' : 'inherit' }} />
+              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>Reporte Competencias</span>}
             </button>
 
             {sidebarOpen && <div style={{ height: 1, background:'rgba(255,255,255,0.06)', margin:'6px 4px' }} />}
@@ -3969,6 +4037,10 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                     ? 'Predicción de Tendencias y Alertas'
                     : activeView === 'competencias-detalle'
                     ? 'Análisis Detallado de Instrumentos y Competencias'
+                    : activeView === 'caracterizacion'
+                    ? 'Caracterización del Cuerpo Docente'
+                    : activeView === 'reporte-competencias'
+                    ? 'Reporte de Competencias'
                     : sistema === 'overview' ? 'Vista General'
                     : sistema === 'meipa' ? 'MEIPA — Evaluación Docente'
                     : sistema === 'salud' ? 'Salud — Docencia ABP'
@@ -5397,6 +5469,410 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                         )}
                       </div>
                     </div>
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ══ MÓDULO: Caracterización del Cuerpo Docente ══ */}
+          {activeView === 'caracterizacion' && (() => {
+            const data = caracterizacion
+            const porPeriodo: any[]  = data?.por_periodo    || []
+            const porGenero: any     = data?.por_genero     || {}
+            const porCarrera: any[]  = data?.por_carrera    || []
+            const porEdad: any[]     = data?.por_edad       || []
+            const porAntig: any[]    = data?.por_antiguedad || []
+            const porFacultad: any[] = data?.por_facultad   || []
+            const totalEv: number    = data?.total_evaluaciones || 0
+            const totalDoc: number   = data?.total_docentes     || 0
+
+            const hombresTotal = porGenero['Hombre'] || 0
+            const mujeresTotal = porGenero['Mujer']  || 0
+            const genTotal     = hombresTotal + mujeresTotal || 1
+
+            const periLabels = porPeriodo.map((p: any) => p.label || p.periodo)
+            const periHom    = porPeriodo.map((p: any) => p.Hombre || 0)
+            const periMuj    = porPeriodo.map((p: any) => p.Mujer  || 0)
+            const periTot    = porPeriodo.map((p: any) => p.total  || 0)
+
+            const chartPeriodo = {
+              data: [
+                { type: 'bar', name: 'Hombres', x: periLabels, y: periHom,
+                  marker: { color: '#1e40af', opacity: 0.9 },
+                  hovertemplate: '<b>Hombres</b><br>%{x}: %{y}<extra></extra>' },
+                { type: 'bar', name: 'Mujeres', x: periLabels, y: periMuj,
+                  marker: { color: '#9f1239', opacity: 0.9 },
+                  hovertemplate: '<b>Mujeres</b><br>%{x}: %{y}<extra></extra>' },
+              ],
+              layout: {
+                autosize: true, paper_bgcolor: 'white', plot_bgcolor: 'white',
+                font: { family: 'Inter', size: 9, color: '#64748b' },
+                margin: { t: 24, b: 60, l: 44, r: 14 },
+                barmode: 'stack',
+                xaxis: { tickfont: { family: 'Inter', size: 9, color: '#334155' }, tickangle: -20, showgrid: false, zeroline: false },
+                yaxis: { gridcolor: '#f0f4f8', tickfont: { family: 'Inter', size: 9 }, showgrid: true, zeroline: true },
+                showlegend: true,
+                legend: { font: { family: 'Inter', size: 10 }, orientation: 'h', y: -0.28, bgcolor: 'rgba(0,0,0,0)' },
+              },
+            }
+
+            const chartGenero = {
+              data: [{ type: 'pie', hole: 0.55, labels: ['Hombres', 'Mujeres'],
+                values: [hombresTotal, mujeresTotal], marker: { colors: ['#1e40af', '#9f1239'] },
+                textfont: { family: 'Inter', size: 10 },
+                hovertemplate: '<b>%{label}</b><br>%{value} (%{percent})<extra></extra>' }],
+              layout: { autosize: true, paper_bgcolor: 'white', plot_bgcolor: 'white',
+                font: { family: 'Inter', size: 9, color: '#64748b' },
+                margin: { t: 10, b: 30, l: 10, r: 10 }, showlegend: true,
+                legend: { font: { family: 'Inter', size: 10 }, orientation: 'h', y: -0.1, bgcolor: 'rgba(0,0,0,0)' } },
+            }
+
+            const chartCarrera = flatBar(
+              porCarrera.slice(0, 15).map((c: any) => c.carrera),
+              porCarrera.slice(0, 15).map((c: any) => c.total),
+              '#1e40af', { showMeta: false, marginB: 110, tickAngle: -38 }
+            )
+            const chartEdad = flatBar(
+              porEdad.map((e: any) => e.rango), porEdad.map((e: any) => e.total),
+              ['#1e40af', '#0891b2', '#059669', '#7c3aed'], { showMeta: false }
+            )
+            const chartAntig = flatBar(
+              porAntig.map((a: any) => a.rango), porAntig.map((a: any) => a.total),
+              ['#f59e0b', '#d97706', '#b45309', '#92400e'], { showMeta: false }
+            )
+
+            return (
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 rounded-xl" style={{ background: 'linear-gradient(135deg,#78350f,#b45309)' }}>
+                    <Users size={22} style={{ color: '#fde68a' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-[17px] font-black text-slate-800 leading-tight">Caracterización del Cuerpo Docente</h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Volumen de evaluaciones por período, género, carrera, edad y antigüedad</p>
+                  </div>
+                  {loadingCaracterizacion && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-amber-500 animate-spin" />}
+                  <button onClick={fetchCaracterizacion} disabled={loadingCaracterizacion}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all">
+                    <RefreshCw size={11} className={loadingCaracterizacion ? 'animate-spin' : ''} /> Actualizar
+                  </button>
+                </div>
+
+                {!data && !loadingCaracterizacion ? (
+                  <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                    <Users size={32} className="text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-500">Sin datos disponibles</p>
+                    <button onClick={fetchCaracterizacion} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-amber-500 hover:bg-amber-600">Cargar datos</button>
+                  </div>
+                ) : (
+                  <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                      {[
+                        { title: 'Total Evaluaciones', value: totalEv.toLocaleString(), label: 'registros', footer: 'Todos los períodos', accent: '#f59e0b' },
+                        { title: 'Docentes Únicos', value: totalDoc.toLocaleString(), label: 'docentes', footer: 'Identificados', accent: '#1e40af' },
+                        { title: 'Docentes Hombres', value: hombresTotal.toLocaleString(), label: `${Math.round(hombresTotal/genTotal*100)}%`, footer: 'Del total', accent: '#1e40af' },
+                        { title: 'Docentes Mujeres', value: mujeresTotal.toLocaleString(), label: `${Math.round(mujeresTotal/genTotal*100)}%`, footer: 'Del total', accent: '#9f1239' },
+                      ].map(k => <KPICard key={k.title} title={k.title} value={k.value} label={k.label} footer={k.footer} accent={k.accent} icon={null} iconBg={null} />)}
+                    </div>
+
+                    {/* Período + Género */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                      <div className="lg:col-span-2">
+                        <ChartCard title="Evaluaciones por Período" sub="Evolución Semestral">
+                          {periLabels.length > 0 ? (
+                            <>
+                              <Plot data={chartPeriodo.data} layout={chartPeriodo.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '240px' }} />
+                              <div className="overflow-x-auto mt-3">
+                                <table className="w-full text-[10px]">
+                                  <thead><tr className="border-b border-slate-100">
+                                    <th className="text-left pb-1.5 text-slate-400 font-bold uppercase tracking-wider">Período</th>
+                                    <th className="text-right pb-1.5 text-slate-400 font-bold uppercase tracking-wider">Total</th>
+                                    <th className="text-right pb-1.5 text-[#1e40af] font-bold uppercase tracking-wider">Hombres</th>
+                                    <th className="text-right pb-1.5 text-[#9f1239] font-bold uppercase tracking-wider">Mujeres</th>
+                                  </tr></thead>
+                                  <tbody>
+                                    {porPeriodo.map((p: any, i: number) => (
+                                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                                        <td className="py-1.5 font-semibold text-slate-700">{p.label || p.periodo}</td>
+                                        <td className="py-1.5 text-right font-black text-slate-800">{(p.total||0).toLocaleString()}</td>
+                                        <td className="py-1.5 text-right font-semibold" style={{ color: '#1e40af' }}>{(p.Hombre||0).toLocaleString()}</td>
+                                        <td className="py-1.5 text-right font-semibold" style={{ color: '#9f1239' }}>{(p.Mujer||0).toLocaleString()}</td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-slate-50 font-black">
+                                      <td className="py-1.5 text-slate-700 uppercase text-[9px] tracking-wider">TOTAL</td>
+                                      <td className="py-1.5 text-right text-slate-900">{periTot.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
+                                      <td className="py-1.5 text-right" style={{ color: '#1e40af' }}>{periHom.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
+                                      <td className="py-1.5 text-right" style={{ color: '#9f1239' }}>{periMuj.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          ) : <p className="text-xs text-slate-400 text-center py-10">Sin datos de períodos</p>}
+                        </ChartCard>
+                      </div>
+                      <div>
+                        <ChartCard title="Distribución por Género" sub="Global">
+                          {(hombresTotal + mujeresTotal) > 0 ? (
+                            <>
+                              <Plot data={chartGenero.data} layout={chartGenero.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '180px' }} />
+                              <div className="mt-3 space-y-2">
+                                {[['Hombres', hombresTotal, '#1e40af'], ['Mujeres', mujeresTotal, '#9f1239']].map(([label, val, color]) => (
+                                  <div key={label as string} className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color as string }} />
+                                    <span className="text-[10px] font-semibold text-slate-600 flex-1">{label}</span>
+                                    <span className="text-[11px] font-black" style={{ color: color as string }}>{(val as number).toLocaleString()}</span>
+                                    <span className="text-[9px] text-slate-400">{Math.round((val as number)/genTotal*100)}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : <p className="text-xs text-slate-400 text-center py-10">Sin datos</p>}
+                        </ChartCard>
+                      </div>
+                    </div>
+
+                    {/* Carrera + Edad + Antigüedad */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                      <div>
+                        <ChartCard title="Docentes por Carrera" sub="Top 15">
+                          {porCarrera.length > 0 ? (
+                            <>
+                              <Plot data={chartCarrera.data} layout={chartCarrera.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '260px' }} />
+                              <div className="overflow-y-auto max-h-40 mt-2">
+                                {porCarrera.map((c: any, i: number) => (
+                                  <div key={i} className="flex items-center gap-2 py-1 border-b border-slate-50">
+                                    <span className="text-[9px] text-slate-400 w-4">{i+1}</span>
+                                    <span className="text-[10px] font-semibold text-slate-700 flex-1 truncate">{c.carrera}</span>
+                                    <span className="text-[10px] font-black text-slate-800">{c.total}</span>
+                                    <span className="text-[9px] text-[#1e40af]">H:{c.Hombre||0}</span>
+                                    <span className="text-[9px] text-[#9f1239]">M:{c.Mujer||0}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : <p className="text-xs text-slate-400 text-center py-10">Sin datos</p>}
+                        </ChartCard>
+                      </div>
+                      <div>
+                        <ChartCard title="Distribución por Edad" sub="Rangos etarios">
+                          {porEdad.length > 0 ? (
+                            <>
+                              <Plot data={chartEdad.data} layout={chartEdad.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '180px' }} />
+                              <div className="mt-3 space-y-1">
+                                {porEdad.map((e: any, i: number) => (
+                                  <div key={i} className="flex items-center gap-2 py-1 border-b border-slate-50">
+                                    <span className="text-[10px] font-semibold text-slate-600 flex-1">{e.rango}</span>
+                                    <span className="text-[11px] font-black text-slate-800">{e.total}</span>
+                                    <span className="text-[9px] text-[#1e40af]">H:{e.Hombre||0}</span>
+                                    <span className="text-[9px] text-[#9f1239]">M:{e.Mujer||0}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : <p className="text-xs text-slate-400 text-center py-10">Sin datos de edad</p>}
+                        </ChartCard>
+                      </div>
+                      <div>
+                        <ChartCard title="Distribución por Antigüedad" sub="Años de servicio">
+                          {porAntig.length > 0 ? (
+                            <>
+                              <Plot data={chartAntig.data} layout={chartAntig.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '180px' }} />
+                              <div className="mt-3 space-y-1">
+                                {porAntig.map((a: any, i: number) => (
+                                  <div key={i} className="flex items-center gap-2 py-1 border-b border-slate-50">
+                                    <span className="text-[10px] font-semibold text-slate-600 flex-1">{a.rango}</span>
+                                    <span className="text-[11px] font-black text-slate-800">{a.total}</span>
+                                    <span className="text-[9px] text-[#1e40af]">H:{a.Hombre||0}</span>
+                                    <span className="text-[9px] text-[#9f1239]">M:{a.Mujer||0}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          ) : <p className="text-xs text-slate-400 text-center py-10">Sin datos de antigüedad</p>}
+                        </ChartCard>
+                      </div>
+                    </div>
+
+                    {/* Por facultad */}
+                    {porFacultad.length > 0 && (
+                      <ChartCard title="Evaluaciones por Unidad Académica / Facultad" sub="Conteo total">
+                        <div className="space-y-2">
+                          {porFacultad.map((f: any, i: number) => {
+                            const pct = Math.round(f.total / (totalEv || 1) * 100)
+                            return (
+                              <div key={i} className="space-y-0.5">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-semibold text-slate-700 truncate pr-2">{f.facultad}</span>
+                                  <span className="text-[11px] font-black text-slate-800 flex-shrink-0">{f.total} <span className="text-[9px] text-slate-400 font-normal">({pct}%)</span></span>
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#f59e0b' }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </ChartCard>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* ══ MÓDULO: Reporte de Competencias ══ */}
+          {activeView === 'reporte-competencias' && (() => {
+            const data = reporteComp
+            const porModelo: any[]   = data?.por_modelo      || []
+            const porCarrera: any[]  = data?.por_carrera     || []
+            const tendComp: any[]    = data?.tend_competencias || []
+
+            const COMP_COLOR_MAP: Record<string, string> = {
+              het_estudiantil: '#0056b3', eval_pares: '#7c3aed',
+              aula_virtual: '#0891b2',    autoevaluacion: '#059669',
+              comp_auto: '#059669',       comp_pares: '#7c3aed',
+              comp_hetero_dir: '#dc2626', comp_hetero_est: '#0056b3',
+            }
+            const scoreColor = (v: number) => v >= 85 ? '#16a34a' : v >= 70 ? '#ca8a04' : '#dc2626'
+            const scoreBg    = (v: number) => v >= 85 ? '#f0fdf4' : v >= 70 ? '#fefce8' : '#fef2f2'
+
+            const COMP_LABELS_SHORT: Record<string, string> = {
+              het_estudiantil: 'Het. Estudiantil', eval_pares: 'Eval. Pares',
+              aula_virtual: 'Aula Virtual',        autoevaluacion: 'Autoevaluación',
+            }
+            const tendKeys = ['het_estudiantil', 'eval_pares', 'aula_virtual', 'autoevaluacion']
+            const tendPeriods = tendComp.map((t: any) => t.periodo)
+            const tendTraces = tendKeys.map(key => ({
+              x: tendPeriods,
+              y: tendComp.map((t: any) => t[key] ?? null),
+              color: COMP_COLOR_MAP[key] || '#94a3b8',
+              name: COMP_LABELS_SHORT[key] || key,
+            })).filter(tr => tr.y.some((v: any) => v !== null))
+            const chartTend = tendTraces.length > 0 ? trendLine2D(tendTraces) : null
+
+            return (
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 rounded-xl" style={{ background: 'linear-gradient(135deg,#0f4c75,#1b6ca8)' }}>
+                    <Award size={22} style={{ color: '#99f6e4' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-[17px] font-black text-slate-800 leading-tight">Reporte de Competencias Docentes</h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Desempeño por componente — {porModelo.length} modelos · {porCarrera.length} carreras
+                    </p>
+                  </div>
+                  {loadingReporteComp && <div className="w-4 h-4 rounded-full border-2 border-slate-200 border-t-teal-500 animate-spin" />}
+                  <button onClick={fetchReporteComp} disabled={loadingReporteComp}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all">
+                    <RefreshCw size={11} className={loadingReporteComp ? 'animate-spin' : ''} /> Actualizar
+                  </button>
+                </div>
+
+                {!data && !loadingReporteComp ? (
+                  <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+                    <Award size={32} className="text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-500">Sin datos disponibles</p>
+                    <button onClick={fetchReporteComp} className="mt-4 px-4 py-2 rounded-lg text-xs font-bold text-white bg-teal-500 hover:bg-teal-600">Cargar datos</button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Tendencia de competencias */}
+                    {chartTend && (
+                      <div className="mb-6">
+                        <ChartCard title="Evolución de Competencias por Período" sub="Tendencia temporal">
+                          <Plot data={chartTend.data} layout={chartTend.layout} config={{ responsive: true, displayModeBar: false }} style={{ width: '100%', height: '280px' }} />
+                        </ChartCard>
+                      </div>
+                    )}
+
+                    {/* Por modelo */}
+                    {porModelo.length > 0 && (
+                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div className="px-5 py-3.5 border-b border-slate-100">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Componentes ·</span>
+                          <span className="ml-1 text-[13px] font-bold text-slate-700">Promedio Global por Modelo de Evaluación</span>
+                        </div>
+                        <div className="divide-y divide-slate-100">
+                          {porModelo.map((mod: any, mi: number) => (
+                            <div key={mi} className="p-5">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-[11px] font-black text-slate-700">{mod.label}</span>
+                                <span className="text-[9px] text-slate-400 font-semibold">{mod.n} evaluaciones</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {(mod.componentes || []).map((comp: any) => {
+                                  const color = COMP_COLOR_MAP[comp.key] || '#0056b3'
+                                  const pct = Math.min(100, comp.promedio)
+                                  return (
+                                    <div key={comp.key} className="rounded-xl p-3 border" style={{ borderColor: `${color}30`, background: `${color}08` }}>
+                                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">{comp.label}</p>
+                                      <div className="flex items-baseline gap-1">
+                                        <span className="text-[20px] font-black leading-none" style={{ color }}>{comp.promedio.toFixed(1)}</span>
+                                        <span className="text-[9px] text-slate-400">/100</span>
+                                      </div>
+                                      <p className="text-[8px] text-slate-400 mt-0.5">Peso: {comp.peso}% · {comp.n} reg.</p>
+                                      <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Por carrera: mejor y peor */}
+                    {porCarrera.length > 0 && (
+                      <div className="mb-6 bg-white border border-slate-200 rounded-2xl overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3">
+                          <GraduationCap size={14} className="text-teal-500" />
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Competencias ·</span>
+                          <span className="text-[13px] font-bold text-slate-700">Mejor y Peor Componente por Carrera</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[10px]">
+                            <thead>
+                              <tr className="border-b border-slate-100 bg-slate-50">
+                                <th className="text-left py-2.5 px-4 font-black text-slate-400 uppercase tracking-wider">Carrera</th>
+                                <th className="text-left py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">Modelo</th>
+                                <th className="text-right py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">Global</th>
+                                <th className="text-left py-2.5 px-3 font-black text-[#16a34a] uppercase tracking-wider">✓ Mejor</th>
+                                <th className="text-right py-2.5 px-3 font-black text-[#16a34a] uppercase tracking-wider">Val.</th>
+                                <th className="text-left py-2.5 px-3 font-black text-[#dc2626] uppercase tracking-wider">✗ Peor</th>
+                                <th className="text-right py-2.5 px-3 font-black text-[#dc2626] uppercase tracking-wider">Val.</th>
+                                <th className="text-right py-2.5 px-3 font-black text-slate-400 uppercase tracking-wider">N</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {porCarrera.map((c: any, i: number) => (
+                                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
+                                  <td className="py-2 px-4 font-semibold text-slate-700 max-w-[180px]"><span className="block truncate">{c.carrera}</span></td>
+                                  <td className="py-2 px-3">
+                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1e40af' }}>{c.modelo}</span>
+                                  </td>
+                                  <td className="py-2 px-3 text-right">
+                                    <span className="font-black text-[12px]" style={{ color: scoreColor(c.promedio), background: scoreBg(c.promedio), padding: '2px 6px', borderRadius: 4 }}>{c.promedio?.toFixed(1)}</span>
+                                  </td>
+                                  <td className="py-2 px-3 font-semibold text-[#16a34a] max-w-[140px]"><span className="block truncate">{c.mejor_componente}</span></td>
+                                  <td className="py-2 px-3 text-right font-black text-[#16a34a]">{c.mejor_valor?.toFixed(1)}</td>
+                                  <td className="py-2 px-3 font-semibold text-[#dc2626] max-w-[140px]"><span className="block truncate">{c.peor_componente}</span></td>
+                                  <td className="py-2 px-3 text-right font-black text-[#dc2626]">{c.peor_valor?.toFixed(1)}</td>
+                                  <td className="py-2 px-3 text-right text-slate-500">{c.n}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
