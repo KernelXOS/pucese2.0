@@ -5958,12 +5958,6 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
                                         <td className="py-1.5 text-right font-semibold" style={{ color: '#9f1239' }}>{(p.Mujer||0).toLocaleString()}</td>
                                       </tr>
                                     ))}
-                                    <tr className="bg-slate-50 font-black">
-                                      <td className="py-1.5 text-slate-700 uppercase text-[9px] tracking-wider">TOTAL</td>
-                                      <td className="py-1.5 text-right text-slate-900">{periTot.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
-                                      <td className="py-1.5 text-right" style={{ color: '#1e40af' }}>{periHom.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
-                                      <td className="py-1.5 text-right" style={{ color: '#9f1239' }}>{periMuj.reduce((a:number,b:number)=>a+b,0).toLocaleString()}</td>
-                                    </tr>
                                   </tbody>
                                 </table>
                               </div>
