@@ -2436,7 +2436,7 @@ function DesempenoPorVariables({ data }: { data: any }) {
 }
 
 // ── CompetenciasPreguntas ──────────────────────────────────────────────────────
-function CompetenciasPreguntas({ data }: { data: any }) {
+function CompetenciasPreguntas({ data, showMecdiTables = false }: { data: any; showMecdiTables?: boolean }) {
   const periodos: string[] = data.periodos || []
   const meipaPeriodos: string[] = data.meipa_periodos || []
   const meipaComps: any[]       = data.meipa_componentes || []
@@ -2539,6 +2539,26 @@ function CompetenciasPreguntas({ data }: { data: any }) {
           <p className="text-[11px] text-slate-400">Ranking por período — basado en evaluaciones detalladas</p>
         </div>
       </div>
+
+      {/* ── Competencias top/worst + Preguntas (solo en dashboard principal) ── */}
+      {showMecdiTables && (
+        <>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Competencias evaluadas</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TableSection title="Mejores competencias" icon="🏆" rows={data.competencias_top || []} nameKey="competencia" accent="#16a34a" />
+              <TableSection title="Competencias a mejorar" icon="⚠️" rows={data.competencias_peor || []} nameKey="competencia" accent="#dc2626" flip />
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-3">Preguntas individuales</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TableSection title="Preguntas mejor puntuadas" icon="⭐" rows={data.preguntas_top || []} nameKey="pregunta" accent="#16a34a" />
+              <TableSection title="Preguntas críticas" icon="📉" rows={data.preguntas_peor || []} nameKey="pregunta" accent="#dc2626" flip />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── MEIPA componentes desde BD ─────────────────────────────────────── */}
       {meipaComps.length > 0 && (
@@ -4481,7 +4501,7 @@ function AppDashboard({ onLogout }: { onLogout: () => void }) {
               )}
 
               {/* ── Competencias y Preguntas ─────────────────────────────── */}
-              {compPreguntas && <CompetenciasPreguntas data={compPreguntas} />}
+              {compPreguntas && <CompetenciasPreguntas data={compPreguntas} showMecdiTables />}
 
               <AIConsultaPanel anio={activeAnio} />
               </div>{/* end comparativoRef */}
