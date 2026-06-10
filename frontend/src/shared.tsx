@@ -1,11 +1,24 @@
 import React from 'react'
-const PlotInner = React.lazy(() => import('react-plotly.js'))
+const PlotInner = React.lazy(() => import('./PlotLazy'))
 export function Plot(props: any) {
   return (
     <React.Suspense fallback={<div style={{ height: props?.layout?.height || 280 }} />}>
       <PlotInner {...props} />
     </React.Suspense>
   )
+}
+
+// ── DeferredMount: monta contenido pesado de forma escalonada ────────────────
+// Evita que la UI se congele al renderizar muchos graficos de golpe.
+export function DeferredMount({ children, delay = 100, minHeight = 320 }:
+  { children: React.ReactNode; delay?: number; minHeight?: number }) {
+  const [show, setShow] = React.useState(false)
+  React.useEffect(() => {
+    const t = setTimeout(() => setShow(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  if (!show) return <div style={{ minHeight }} />
+  return <>{children}</>
 }
 import { FileText, BookOpen, Star, CheckCircle, AlertCircle, XCircle, Microscope, Heart, Link2, Briefcase, GraduationCap, Activity, Cpu } from 'lucide-react'
 

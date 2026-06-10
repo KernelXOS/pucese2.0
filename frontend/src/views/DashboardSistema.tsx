@@ -1,6 +1,6 @@
 import React from 'react'
 import { BarChart3, Users, TrendingUp, BrainCircuit, RefreshCw, Award, FileText, Search, Download, Loader2, Stethoscope } from 'lucide-react'
-import { Plot, COMP_COLORS, NivelBadge, ComponentBar, KPICard, AnalyticsSection, displayPeriodo } from '../shared'
+import { DeferredMount, Plot, COMP_COLORS, NivelBadge, ComponentBar, KPICard, AnalyticsSection, displayPeriodo } from '../shared'
 import TodosDocentesPanel from '../components/TodosDocentesPanel'
 
 export default function DashboardSistema(props: any) {
@@ -494,7 +494,7 @@ export default function DashboardSistema(props: any) {
 
 
                   {/* Analytics section */}
-                  <AnalyticsSection analytics={analytics} color={currentTabCfg.color} />
+                  <DeferredMount delay={200}><AnalyticsSection analytics={analytics} color={currentTabCfg.color} /></DeferredMount>
 
                   {/* Bottom: AI + Table */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -643,10 +643,12 @@ export default function DashboardSistema(props: any) {
                     const { modelo, sistemaParam } = getQueryParams()
                     return (
                       <div className="mt-6">
+                        <DeferredMount delay={350}>
                         <TodosDocentesPanel
                           docentes={todosDocentes}
                           context={{ modelo: modelo || '', sistema: sistemaParam || '', label: tabLabel }}
                         />
+                        </DeferredMount>
                       </div>
                     )
                   })()}

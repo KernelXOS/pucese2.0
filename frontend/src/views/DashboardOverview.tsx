@@ -1,6 +1,6 @@
 import React from 'react'
 import { BarChart3, RefreshCw, FileText, GraduationCap, Download, Loader2 } from 'lucide-react'
-import { VD_360_TABS } from '../shared'
+import { DeferredMount, VD_360_TABS } from '../shared'
 import AIConsultaPanel from '../components/AIConsultaPanel'
 import ComparativoPanel from '../components/ComparativoPanel'
 import MejoresPeoresPanel from '../components/MejoresPeoresPanel'
@@ -152,14 +152,14 @@ export default function DashboardOverview(props: any) {
               })()}
 
               {comparativo?.mejores_peores && Object.keys(comparativo.mejores_peores).length > 0 && (
-                <MejoresPeoresPanel mejoresPeores={comparativo.mejores_peores} />
+                <DeferredMount delay={100}><MejoresPeoresPanel mejoresPeores={comparativo.mejores_peores} /></DeferredMount>
               )}
               {comparativo?.variables_detalle && (() => {
                 const vd = comparativo.variables_detalle as Record<string, any[]>
                 const has360 = VD_360_TABS.some(t => (vd[t.key] || []).length > 0)
                 const hasMeipa = (vd['meipa_docencia'] || []).length > 0
                 return (
-                  <>
+                  <DeferredMount delay={200}>
                     {has360 && (
                       <VariablesDetallePanel
                         title="Puntaje por Variable — Modelo MECDI"
@@ -176,22 +176,22 @@ export default function DashboardOverview(props: any) {
                         varData={vd}
                       />
                     )}
-                  </>
+                  </DeferredMount>
                 )
               })()}
               {/* ── Desempeño por Variables ──────────────────────────────── */}
-              {desempVars && <DesempenoPorVariables data={desempVars} />}
+              {desempVars && <DeferredMount delay={300}><DesempenoPorVariables data={desempVars} /></DeferredMount>}
 
               {todosDocentes.length > 0 && (
                 <div className="mt-10">
-                  <TodosDocentesPanel docentes={todosDocentes} />
+                  <DeferredMount delay={400}><TodosDocentesPanel docentes={todosDocentes} /></DeferredMount>
                 </div>
               )}
 
               {/* ── Competencias y Preguntas ─────────────────────────────── */}
-              {compPreguntas && <CompetenciasPreguntas data={compPreguntas} showMecdiTables />}
+              {compPreguntas && <DeferredMount delay={500}><CompetenciasPreguntas data={compPreguntas} showMecdiTables /></DeferredMount>}
 
-              <AIConsultaPanel anio={activeAnio} />
+              <DeferredMount delay={600} minHeight={200}><AIConsultaPanel anio={activeAnio} /></DeferredMount>
               </div>{/* end comparativoRef */}
             </>
   )
