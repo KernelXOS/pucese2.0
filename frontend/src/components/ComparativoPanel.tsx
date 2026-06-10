@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
-import Plot from 'react-plotly.js'
 import { BarChart3, Award } from 'lucide-react'
-import { ChartCard, normPeriodo, displayPeriodo } from '../shared'
+import { Plot, ChartCard, normPeriodo, displayPeriodo } from '../shared'
 
 export default function ComparativoPanel({ comparativo }: { comparativo: any }) {
   const [crossPeriodo, setCrossPeriodo] = useState<string>('__todos__')

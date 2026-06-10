@@ -1,5 +1,12 @@
 import React from 'react'
-import Plot from 'react-plotly.js'
+const PlotInner = React.lazy(() => import('react-plotly.js'))
+export function Plot(props: any) {
+  return (
+    <React.Suspense fallback={<div style={{ height: props?.layout?.height || 280 }} />}>
+      <PlotInner {...props} />
+    </React.Suspense>
+  )
+}
 import { FileText, BookOpen, Star, CheckCircle, AlertCircle, XCircle, Microscope, Heart, Link2, Briefcase, GraduationCap, Activity, Cpu } from 'lucide-react'
 
 export const LOGO_URL = 'https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png'
