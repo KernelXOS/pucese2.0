@@ -1,0 +1,7 @@
+{
+  "@context": "https://w3id.org/openbadges/v2",
+  "type": "RevocationList",
+  "id": "https://credenciales.pucese.kernelxos.com/revocation.json",
+  "issuer": "https://credenciales.pucese.kernelxos.com/issuer.json",
+  "revokedAssertions": []
+}

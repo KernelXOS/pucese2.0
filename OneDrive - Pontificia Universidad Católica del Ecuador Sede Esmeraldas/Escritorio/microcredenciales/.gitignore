@@ -1,0 +1,13 @@
+# NUNCA versionar la clave privada del emisor
+data/cert-issuer/pk_issuer.txt
+*.pem
+*.key
+
+# Artefactos generados
+data/cert-tools/unsigned_certificates/*.json
+data/cert-tools/certificate_templates/*.json
+data/cert-issuer/blockchain_certificates/*.json
+data/cert-issuer/work/
+
+# Mantener las carpetas vacías en git
+!data/**/.gitkeep

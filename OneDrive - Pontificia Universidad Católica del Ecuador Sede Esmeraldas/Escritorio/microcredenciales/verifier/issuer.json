@@ -1,0 +1,19 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/openbadges/v2",
+    "https://w3id.org/blockcerts/v3"
+  ],
+  "id": "https://credenciales.pucese.kernelxos.com/issuer.json",
+  "type": "Profile",
+  "name": "PUCE Sede Esmeraldas",
+  "url": "https://www.pucese.edu.ec",
+  "email": "ricardo.guanolisa@pucese.edu.ec",
+  "revocationList": "https://credenciales.pucese.kernelxos.com/revocation.json",
+  "publicKey": [
+    {
+      "id": "ecdsa-koblitz-pubkey:0x2f7322f882c0004df7fEC72f64416e534bEAd06C",
+      "created": "2026-06-15T00:00:00Z"
+    }
+  ]
+}

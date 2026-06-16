@@ -1,0 +1,29 @@
+[
+    {
+        "file":  "15a220f9-c324-4747-a0ac-6c1df1ec8cc4.json",
+        "uid":  "15a220f9-c324-4747-a0ac-6c1df1ec8cc4",
+        "name":  "Gregorio Sebastian Gualavisi Gonzalez",
+        "course":  "Fundamentos de Prompt Engineering y LLMs",
+        "txid":  "0xef096383fdceb5ce18faf93099d7a6dcdbcf116cd96fde9541ee304fe95019ae",
+        "targetHash":  "b48e5664e04c8bf4a2fccf370afef1543e80eff0e0c581656b16ffcbe8f109ce",
+        "chain":  "ethereum_sepolia"
+    },
+    {
+        "file":  "82d1b507-3922-4125-ba46-17d242e56ee7.json",
+        "uid":  "82d1b507-3922-4125-ba46-17d242e56ee7",
+        "name":  "Carlos Andres Mina Caicedo",
+        "course":  "Fundamentos de Prompt Engineering y LLMs",
+        "txid":  "0xef096383fdceb5ce18faf93099d7a6dcdbcf116cd96fde9541ee304fe95019ae",
+        "targetHash":  "0b8c1873e2d4ef3fa029b35f15debb40df432ce4fc1ba83c4264fea553b6fe51",
+        "chain":  "ethereum_sepolia"
+    },
+    {
+        "file":  "870cad36-accb-4497-b988-803cd9ad58b7.json",
+        "uid":  "870cad36-accb-4497-b988-803cd9ad58b7",
+        "name":  "Ana Maria Quiñonez Valencia",
+        "course":  "Fundamentos de Prompt Engineering y LLMs",
+        "txid":  "0xef096383fdceb5ce18faf93099d7a6dcdbcf116cd96fde9541ee304fe95019ae",
+        "targetHash":  "5347b1fc0f2df2c32aaf48988a3439f91e3ec325a09a607800506bca5ae8ef0b",
+        "chain":  "ethereum_sepolia"
+    }
+]
