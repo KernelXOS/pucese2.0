@@ -22,7 +22,7 @@ export function DeferredMount({ children, delay = 100, minHeight = 320 }:
 }
 import { FileText, BookOpen, Star, CheckCircle, AlertCircle, XCircle, Microscope, Heart, Link2, Briefcase, GraduationCap, Activity, Cpu } from 'lucide-react'
 
-export const LOGO_URL = 'https://jorgebanet.com/puce/wp-content/uploads/2025/11/cropped-Logo_PUCESD.png'
+export const LOGO_URL = 'https://admision.pucese.edu.ec/pluginfile.php/1/theme_moove/logo/1774379971/Logo-puce-azul.png'
 
 export const TABS_360 = [
   { id: 'docencia',       label: 'Docencia',        icon: GraduationCap, color: '#0056b3', desc: 'Het.Est.50 · Par.20 · CEV.10 · Auto.20' },
